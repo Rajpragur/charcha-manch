@@ -50,7 +50,8 @@ const Navbar: React.FC = () => {
             <span className="text-sm font-medium">{isEnglish ? "EN" : "HI"}</span>
           </button>
           <Link to="/" className="flex-shrink-0 flex items-center">
-            {isEnglish ? <span className="text-1xl font-bold text-blue-600">CHARCHAMANCH</span> : <span className="text-2xl font-bold text-blue-600">चर्चामंच</span>}
+            <img src='images/logo.png' className='w-6 mx-1' />
+            {isEnglish ? <span className="text-1xl font-bold text-slate-900">CHARCHAMANCH</span> : <span className="text-2xl font-bold text-blue-600">चर्चामंच</span>}
           </Link>
           <div className="flex items-center space-x-4">
             <div className="relative" ref={profileRef}>
