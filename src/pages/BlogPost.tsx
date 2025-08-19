@@ -1,386 +1,370 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, User, Tag, Clock, Share2, ArrowLeft, Eye, ThumbsUp } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
+import { Calendar, User, Tag, ThumbsUp, MessageSquare, Eye, TrendingUp, Clock, ArrowLeft, ArrowRight } from 'lucide-react';
+import PhotoPlaceholder from '../components/PhotoPlaceholder';
 
 interface BlogPost {
   id: string;
-  title: string;
-  description: string;
-  headerImage: string;
-  author: string;
-  publishDate: string;
-  readTime: number;
+  title: BilingualText;
+  excerpt: BilingualText;
+  content: BilingualText;
+  author: BilingualText;
+  date: string;
+  readTime: string;
+  tags: string[];
   views: number;
   likes: number;
-  tags: string[];
-  sections: {
-    subtitle: string;
-    content: string;
-    image?: string;
-  }[];
+  comments: number;
+  category: BilingualText;
+  featured: boolean;
+}
+
+interface BilingualText {
+  en: string;
+  hi: string;
 }
 
 const BlogPost: React.FC = () => {
-  const [posts, setPosts] = useState<BlogPost[]>([]);
-  const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { isEnglish } = useLanguage();
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  // Mock blog data
-  const mockPosts: BlogPost[] = [
+  const content = {
+    title: isEnglish ? 'Blog & News' : 'ब्लॉग और समाचार',
+    subtitle: isEnglish ? 'Stay updated with the latest political developments and citizen discussions in Bihar' : 'बिहार में नवीनतम राजनीतिक विकास और नागरिक चर्चाओं के साथ अपडेट रहें',
+    searchPlaceholder: isEnglish ? 'Search articles...' : 'लेख खोजें...',
+    categories: isEnglish ? 'Categories' : 'श्रेणियां',
+    all: isEnglish ? 'All' : 'सभी',
+    politics: isEnglish ? 'Politics' : 'राजनीति',
+    development: isEnglish ? 'Development' : 'विकास',
+    education: isEnglish ? 'Education' : 'शिक्षा',
+    healthcare: isEnglish ? 'Healthcare' : 'स्वास्थ्य',
+    agriculture: isEnglish ? 'Agriculture' : 'कृषि',
+    infrastructure: isEnglish ? 'Infrastructure' : 'बुनियादी ढांचा',
+    readMore: isEnglish ? 'Read More' : 'और पढ़ें',
+    views: isEnglish ? 'views' : 'दृश्य',
+    likes: isEnglish ? 'likes' : 'लाइक',
+    comments: isEnglish ? 'comments' : 'टिप्पणियां',
+    readTime: isEnglish ? 'min read' : 'मिनट पढ़ने में',
+    by: isEnglish ? 'by' : 'द्वारा',
+    featured: isEnglish ? 'Featured' : 'विशेष',
+    trending: isEnglish ? 'Trending' : 'चर्चित',
+    recent: isEnglish ? 'Recent' : 'हाल के',
+    popular: isEnglish ? 'Popular' : 'लोकप्रिय'
+  };
+
+  // Sample blog posts data
+  const blogPosts: BlogPost[] = [
     {
       id: '1',
-      title: 'डिजिटल लोकतंत्र: भारत का भविष्य',
-      description: 'आधुनिक तकनीक कैसे भारतीय लोकतंत्र को मजबूत बना सकती है और नागरिकों की भागीदारी बढ़ा सकती है।',
-      headerImage: '/api/placeholder/800/400',
-      author: 'डॉ. राज कुमार',
-      publishDate: '2025-08-15',
-      readTime: 8,
-      views: 2341,
-      likes: 156,
-      tags: ['लोकतंत्र', 'तकनीक', 'नागरिकता'],
-      sections: [
-        {
-          subtitle: 'डिजिटल क्रांति का प्रभाव',
-          content: 'आज के युग में तकनीक ने हमारे जीवन के हर क्षेत्र को प्रभावित किया है। लोकतंत्र भी इससे अछूता नहीं है। डिजिटल प्लेटफॉर्म के माध्यम से नागरिक अब अपने प्रतिनिधियों से सीधे जुड़ सकते हैं और अपनी आवाज़ उठा सकते हैं। यह परिवर्तन न केवल पारदर्शिता लाता है बल्कि जवाबदेही भी सुनिश्चित करता है।',
-          image: '/api/placeholder/600/300'
-        },
-        {
-          subtitle: 'नागरिक सहभागिता में वृद्धि',
-          content: 'पारंपरिक तरीकों की तुलना में डिजिटल माध्यम से अधिक लोग राजनीतिक प्रक्रियाओं में भाग ले सकते हैं। ऑनलाइन चुनाव, डिजिटल सर्वे, और वर्चुअल टाउन हॉल मीटिंग्स के माध्यम से समाज के हर वर्ग की आवाज़ सुनी जा सकती है। यह विशेष रूप से युवाओं और महिलाओं की भागीदारी बढ़ाने में सहायक है।'
-        },
-        {
-          subtitle: 'चुनौतियाँ और समाधान',
-          content: 'डिजिटल लोकतंत्र की राह में कुछ चुनौतियाँ भी हैं जैसे साइबर सिक्योरिटी, डिजिटल डिवाइड, और फेक न्यूज़। इन समस्याओं का समाधान मजबूत नीतियों, शिक्षा, और तकनीकी सुरक्षा उपायों से किया जा सकता है। सरकार, नागरिक समाज, और तकनीकी कंपनियों को मिलकर इन चुनौतियों का सामना करना होगा।'
-        }
-      ]
+      title: {
+        en: 'Major Infrastructure Development Announced for Patna',
+        hi: 'पटना के लिए बड़े बुनियादी ढांचे के विकास की घोषणा'
+      },
+      excerpt: {
+        en: 'The government has announced comprehensive infrastructure development projects for Patna, including new roads, bridges, and public transport systems.',
+        hi: 'सरकार ने पटना के लिए व्यापक बुनियादी ढांचा विकास परियोजनाओं की घोषणा की है, जिसमें नई सड़कें, पुल और सार्वजनिक परिवहन प्रणालियां शामिल हैं।'
+      },
+      content: {
+        en: 'The comprehensive infrastructure development plan for Patna includes the construction of new arterial roads, modern bridges over the Ganga, and an integrated public transport system. This initiative aims to transform Patna into a modern, well-connected city that can accommodate its growing population and economic activities.',
+        hi: 'पटना के लिए व्यापक बुनियादी ढांचा विकास योजना में नई मुख्य सड़कों का निर्माण, गंगा पर आधुनिक पुल और एकीकृत सार्वजनिक परिवहन प्रणाली शामिल है। यह पहल पटना को एक आधुनिक, अच्छी तरह से जुड़े शहर में बदलने का लक्ष्य रखती है जो अपनी बढ़ती आबादी और आर्थिक गतिविधियों को समायोजित कर सकता है।'
+      },
+      author: {
+        en: 'Development Team',
+        hi: 'विकास टीम'
+      },
+      date: '2025-01-15',
+      readTime: '5',
+      tags: ['Infrastructure', 'Development', 'Patna'],
+      views: 1245,
+      likes: 89,
+      comments: 23,
+      category: {
+        en: 'Infrastructure',
+        hi: 'बुनियादी ढांचा'
+      },
+      featured: true
     },
     {
       id: '2',
-      title: 'युवाओं की राजनीतिक जागरूकता',
-      description: 'आज के युवा कैसे राजनीति में सक्रिय हो सकते हैं और लोकतंत्र को मजबूत बनाने में योगदान दे सकते हैं।',
-      headerImage: '/api/placeholder/800/400',
-      author: 'प्रिया शर्मा',
-      publishDate: '2025-08-12',
-      readTime: 6,
-      views: 1876,
-      likes: 89,
-      tags: ['युवा', 'राजनीति', 'जागरूकता'],
-      sections: [
-        {
-          subtitle: 'युवाओं की शक्ति',
-          content: 'भारत की 65% आबादी 35 वर्ष से कम उम्र की है। यह युवा शक्ति देश के भविष्य को आकार दे सकती है। राजनीतिक जागरूकता और सक्रिय भागीदारी के माध्यम से युवा एक बेहतर समाज का निर्माण कर सकते हैं।'
-        },
-        {
-          subtitle: 'सोशल मीडिया की भूमिका',
-          content: 'सोशल मीडिया ने युवाओं के लिए राजनीतिक चर्चा और जुड़ाव के नए रास्ते खोले हैं। ट्विटर, फेसबुक, और इंस्टाग्राम जैसे प्लेटफॉर्म पर युवा अपनी राय व्यक्त कर सकते हैं और सामाजिक मुद्दों पर आवाज़ उठा सकते हैं।'
-        }
-      ]
+      title: {
+        en: 'Education Reforms: New Policies for Better Learning',
+        hi: 'शिक्षा सुधार: बेहतर सीखने के लिए नई नीतियां'
+      },
+      excerpt: {
+        en: 'Comprehensive education reforms are being implemented across Bihar to improve learning outcomes and provide better opportunities for students.',
+        hi: 'बिहार भर में सीखने के परिणामों में सुधार और छात्रों के लिए बेहतर अवसर प्रदान करने के लिए व्यापक शिक्षा सुधार लागू किए जा रहे हैं।'
+      },
+      content: {
+        en: 'The new education policies focus on improving teacher training, modernizing school infrastructure, and implementing technology-driven learning methods. These reforms aim to bridge the urban-rural education gap and ensure quality education for all students in Bihar.',
+        hi: 'नई शिक्षा नीतियां शिक्षक प्रशिक्षण में सुधार, स्कूल के बुनियादी ढांचे को आधुनिक बनाने और तकनीक-संचालित सीखने के तरीकों को लागू करने पर ध्यान केंद्रित करती हैं। ये सुधार शहरी-ग्रामीण शिक्षा अंतर को पाटने और बिहार के सभी छात्रों के लिए गुणवत्तापूर्ण शिक्षा सुनिश्चित करने का लक्ष्य रखते हैं।'
+      },
+      author: {
+        en: 'Education Department',
+        hi: 'शिक्षा विभाग'
+      },
+      date: '2025-01-12',
+      readTime: '4',
+      tags: ['Education', 'Reforms', 'Policy'],
+      views: 987,
+      likes: 67,
+      comments: 18,
+      category: {
+        en: 'Education',
+        hi: 'शिक्षा'
+      },
+      featured: false
     },
     {
       id: '3',
-      title: 'महिला सशक्तिकरण और राजनीतिक भागीदारी',
-      description: 'भारतीय राजनीति में महिलाओं की बढ़ती भूमिका और उनके सामने आने वाली चुनौतियों का विश्लेषण।',
-      headerImage: '/api/placeholder/800/400',
-      author: 'अनीता गुप्ता',
-      publishDate: '2025-08-10',
-      readTime: 7,
-      views: 2156,
-      likes: 134,
-      tags: ['महिला सशक्तिकरण', 'राजनीति', 'समानता'],
-      sections: [
-        {
-          subtitle: 'बदलता परिदृश्य',
-          content: 'पिछले कुछ दशकों में भारतीय राजनीति में महिलाओं की भागीदारी में महत्वपूर्ण वृद्धि हुई है। पंचायती राज से लेकर संसद तक, महिलाएं अपनी उपस्थिति दर्ज करा रही हैं और समाज में सकारात्मक बदलाव ला रही हैं।'
-        }
-      ]
+      title: {
+        en: 'Healthcare Initiatives: Improving Medical Services in Rural Areas',
+        hi: 'स्वास्थ्य पहल: ग्रामीण क्षेत्रों में चिकित्सा सेवाओं में सुधार'
+      },
+      excerpt: {
+        en: 'New healthcare initiatives are being launched to improve medical services and accessibility in rural areas of Bihar.',
+        hi: 'बिहार के ग्रामीण क्षेत्रों में चिकित्सा सेवाओं और पहुंच में सुधार के लिए नई स्वास्थ्य पहल शुरू की जा रही हैं।'
+      },
+      content: {
+        en: 'The healthcare initiatives include setting up new primary health centers, mobile medical units, and telemedicine services. These efforts aim to provide better healthcare access to rural communities and reduce health disparities across the state.',
+        hi: 'स्वास्थ्य पहल में नए प्राथमिक स्वास्थ्य केंद्र, मोबाइल चिकित्सा इकाइयां और टेलीमेडिसिन सेवाएं शामिल हैं। ये प्रयास ग्रामीण समुदायों को बेहतर स्वास्थ्य देखभाल पहुंच प्रदान करने और राज्य भर में स्वास्थ्य असमानताओं को कम करने का लक्ष्य रखते हैं।'
+      },
+      author: {
+        en: 'Health Ministry',
+        hi: 'स्वास्थ्य मंत्रालय'
+      },
+      date: '2025-01-10',
+      readTime: '6',
+      tags: ['Healthcare', 'Rural', 'Medical'],
+      views: 756,
+      likes: 45,
+      comments: 12,
+      category: {
+        en: 'Healthcare',
+        hi: 'स्वास्थ्य'
+      },
+      featured: false
     }
   ];
 
-  useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setPosts(mockPosts);
-      setLoading(false);
-    }, 1000);
-  }, []);
+  const categories = [
+    { id: 'all', name: content.all, count: blogPosts.length },
+    { id: 'politics', name: content.politics, count: blogPosts.filter(post => post.category.en === 'Politics').length },
+    { id: 'development', name: content.development, count: blogPosts.filter(post => post.category.en === 'Development').length },
+    { id: 'education', name: content.education, count: blogPosts.filter(post => post.category.en === 'Education').length },
+    { id: 'healthcare', name: content.healthcare, count: blogPosts.filter(post => post.category.en === 'Healthcare').length },
+    { id: 'agriculture', name: content.agriculture, count: blogPosts.filter(post => post.category.en === 'Agriculture').length },
+    { id: 'infrastructure', name: content.infrastructure, count: blogPosts.filter(post => post.category.en === 'Infrastructure').length }
+  ];
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('hi-IN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
+  const filteredPosts = selectedCategory === 'all' 
+    ? blogPosts 
+    : blogPosts.filter(post => post.category.en.toLowerCase() === selectedCategory);
 
-  const handleShare = (post: BlogPost) => {
-    if (navigator.share) {
-      navigator.share({
-        title: post.title,
-        text: post.description,
-        url: window.location.href
-      });
-    } else {
-      // Fallback to copying URL
-      navigator.clipboard.writeText(window.location.href);
-      alert('लिंक कॉपी हो गया!');
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">ब्लॉग लोड हो रहा है...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Single post view
-  if (selectedPost) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Back Button */}
-          <button
-            onClick={() => setSelectedPost(null)}
-            className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 mb-6 transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            <span>वापस ब्लॉग सूची में जाएं</span>
-          </button>
-
-          <article className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            {/* Header Image */}
-            <div className="relative h-64 md:h-96">
-              <img 
-                src={selectedPost.headerImage} 
-                alt={selectedPost.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-            </div>
-
-            <div className="p-8 md:p-12">
-              {/* Meta Information */}
-              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-6">
-                <div className="flex items-center space-x-2">
-                  <User className="h-4 w-4" />
-                  <span>{selectedPost.author}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Calendar className="h-4 w-4" />
-                  <span>{formatDate(selectedPost.publishDate)}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Clock className="h-4 w-4" />
-                  <span>{selectedPost.readTime} मिनट पढ़ने का समय</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Eye className="h-4 w-4" />
-                  <span>{selectedPost.views.toLocaleString()} विचार</span>
-                </div>
-              </div>
-
-              {/* Title */}
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-6">
-                {selectedPost.title}
-              </h1>
-
-              {/* Description */}
-              <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-                {selectedPost.description}
-              </p>
-
-              {/* Tags */}
-              <div className="flex flex-wrap gap-2 mb-8">
-                {selectedPost.tags.map((tag, index) => (
-                  <span 
-                    key={index}
-                    className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium"
-                  >
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-
-              {/* Content Sections */}
-              <div className="space-y-8">
-                {selectedPost.sections.map((section, index) => (
-                  <div key={index}>
-                    <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-                      {section.subtitle}
-                    </h2>
-                    <div className="prose prose-lg max-w-none">
-                      <p className="text-gray-700 leading-relaxed mb-6">
-                        {section.content}
-                      </p>
-                      {section.image && (
-                        <img 
-                          src={section.image} 
-                          alt={section.subtitle}
-                          className="w-full rounded-lg shadow-md mb-6"
-                        />
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Footer Actions */}
-              <div className="border-t pt-8 mt-12">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <button className="flex items-center space-x-2 text-gray-600 hover:text-blue-600 transition-colors">
-                      <ThumbsUp className="h-5 w-5" />
-                      <span>{selectedPost.likes}</span>
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => handleShare(selectedPost)}
-                    className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-                  >
-                    <Share2 className="h-4 w-4" />
-                    <span>साझा करें</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </article>
-        </div>
-      </div>
-    );
-  }
-
-  // Blog list view
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-700 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 text-white py-12 sm:py-16 px-4 w-full">
+        <div className="w-full max-w-none mx-auto">
           <div className="text-center">
-            <h1 className="text-4xl md:text-6xl font-bold mb-6">
-              ब्लॉग
+            <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6">
+              {content.title}
             </h1>
-            <p className="text-xl md:text-2xl max-w-3xl mx-auto">
-              लोकतंत्र, राजनीति और सामाजिक मुद्दों पर विचारशील लेख
+            <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 max-w-4xl mx-auto px-4 text-slate-200">
+              {content.subtitle}
             </p>
+            
+            {/* Photo Placeholders */}
+            <div className="flex justify-center items-center space-x-4 mb-6 sm:mb-8">
+              <PhotoPlaceholder type="document" size="md" className="hidden sm:block" />
+              <PhotoPlaceholder type="chart" size="md" className="hidden sm:block" />
+              <PhotoPlaceholder type="general" size="md" className="hidden sm:block" />
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        {/* Featured Post */}
-        {posts.length > 0 && (
-          <section className="mb-16">
-            <h2 className="text-3xl font-bold text-gray-800 mb-8">फीचर्ड पोस्ट</h2>
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-shadow"
-                 onClick={() => setSelectedPost(posts[0])}>
-              <div className="md:flex">
-                <div className="md:w-1/2">
-                  <img 
-                    src={posts[0].headerImage} 
-                    alt={posts[0].title}
-                    className="w-full h-64 md:h-full object-cover"
-                  />
-                </div>
-                <div className="md:w-1/2 p-8">
-                  <div className="flex items-center space-x-4 text-sm text-gray-600 mb-4">
-                    <div className="flex items-center space-x-1">
-                      <User className="h-4 w-4" />
-                      <span>{posts[0].author}</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <Calendar className="h-4 w-4" />
-                      <span>{formatDate(posts[0].publishDate)}</span>
-                    </div>
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-800 mb-4">
-                    {posts[0].title}
-                  </h3>
-                  <p className="text-gray-600 mb-6 line-clamp-3">
-                    {posts[0].description}
-                  </p>
-                  <div className="flex flex-wrap gap-2 mb-6">
-                    {posts[0].tags.slice(0, 3).map((tag, index) => (
-                      <span 
-                        key={index}
-                        className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
-                      >
-                        #{tag}
+      <div className="w-full max-w-none mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+          {/* Left Sidebar */}
+          <div className="xl:col-span-1 space-y-6">
+            {/* Categories */}
+            <div className="bg-white rounded-lg shadow-md p-6 border border-slate-100">
+              <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
+                <Tag className="h-5 w-5 mr-2 text-sky-600" />
+                {content.categories}
+              </h3>
+              <div className="space-y-2">
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
+                    onClick={() => setSelectedCategory(category.id)}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                      selectedCategory === category.id
+                        ? 'bg-sky-100 text-sky-800 border border-sky-200'
+                        : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span>{category.name}</span>
+                      <span className="text-xs bg-slate-200 px-2 py-1 rounded-full">
+                        {category.count}
                       </span>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4 text-sm text-gray-500">
-                      <span>{posts[0].readTime} मिनट पढ़ने का समय</span>
-                      <span>{posts[0].views.toLocaleString()} विचार</span>
                     </div>
-                  </div>
-                </div>
+                  </button>
+                ))}
               </div>
             </div>
-          </section>
-        )}
 
-        {/* All Posts */}
-        <section>
-          <h2 className="text-3xl font-bold text-gray-800 mb-8">सभी पोस्ट</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {posts.map((post) => (
-              <div 
-                key={post.id}
-                className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => setSelectedPost(post)}
-              >
-                <img 
-                  src={post.headerImage} 
-                  alt={post.title}
-                  className="w-full h-48 object-cover"
-                />
+            {/* Popular Tags */}
+            <div className="bg-white rounded-lg shadow-md p-6 border border-slate-100">
+              <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
+                <TrendingUp className="h-5 w-5 mr-2 text-amber-600" />
+                {isEnglish ? 'Popular Tags' : 'लोकप्रिय टैग'}
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {['Development', 'Politics', 'Education', 'Healthcare', 'Infrastructure', 'Agriculture'].map((tag) => (
+                  <span key={tag} className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-xs hover:bg-slate-200 transition-colors cursor-pointer">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div className="xl:col-span-3 space-y-6">
+            {/* Featured Post */}
+            {blogPosts.filter(post => post.featured).map((post) => (
+              <div key={post.id} className="bg-white rounded-lg shadow-md overflow-hidden border border-slate-100">
                 <div className="p-6">
-                  <div className="flex items-center space-x-2 text-sm text-gray-600 mb-3">
-                    <Calendar className="h-4 w-4" />
-                    <span>{formatDate(post.publishDate)}</span>
+                  <div className="flex items-center space-x-2 mb-3">
+                    <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs font-medium rounded-full">
+                      {content.featured}
+                    </span>
+                    <span className="px-2 py-1 bg-sky-100 text-sky-800 text-xs font-medium rounded-full">
+                      {isEnglish ? post.category.en : post.category.hi}
+                    </span>
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-800 mb-3 line-clamp-2">
-                    {post.title}
-                  </h3>
-                  <p className="text-gray-600 mb-4 line-clamp-3">
-                    {post.description}
+                  
+                  <h2 className="text-2xl font-bold text-slate-800 mb-3">
+                    {isEnglish ? post.title.en : post.title.hi}
+                  </h2>
+                  
+                  <p className="text-slate-600 mb-4 leading-relaxed">
+                    {isEnglish ? post.excerpt.en : post.excerpt.hi}
                   </p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2 text-sm text-gray-500">
-                      <Clock className="h-4 w-4" />
-                      <span>{post.readTime} मिनट</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-sm text-gray-500">
-                      <Eye className="h-4 w-4" />
-                      <span>{post.views}</span>
+                  
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-4 text-sm text-slate-500">
+                      <span className="flex items-center">
+                        <User className="h-4 w-4 mr-1" />
+                        {isEnglish ? post.author.en : post.author.hi}
+                      </span>
+                      <span className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        {post.date}
+                      </span>
+                      <span className="flex items-center">
+                        <Clock className="h-4 w-4 mr-1" />
+                        {post.readTime} {content.readTime}
+                      </span>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 mt-4">
-                    {post.tags.slice(0, 2).map((tag, index) => (
-                      <span 
-                        key={index}
-                        className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs"
-                      >
-                        #{tag}
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4 text-sm text-slate-500">
+                      <span className="flex items-center">
+                        <Eye className="h-4 w-4 mr-1" />
+                        {post.views} {content.views}
                       </span>
-                    ))}
+                      <span className="flex items-center">
+                        <ThumbsUp className="h-4 w-4 mr-1" />
+                        {post.likes} {content.likes}
+                      </span>
+                      <span className="flex items-center">
+                        <MessageSquare className="h-4 w-4 mr-1" />
+                        {post.comments} {content.comments}
+                      </span>
+                    </div>
+                    
+                    <button className="bg-sky-600 text-white px-4 py-2 rounded-lg hover:bg-sky-700 transition-colors text-sm font-medium">
+                      {content.readMore}
+                    </button>
                   </div>
                 </div>
               </div>
             ))}
-          </div>
-        </section>
 
-        <div className="text-center mt-12">
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg transition-colors">
-            और पोस्ट लोड करें
-          </button>
+            {/* Regular Posts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {filteredPosts.filter(post => !post.featured).map((post) => (
+                <div key={post.id} className="bg-white rounded-lg shadow-md overflow-hidden border border-slate-100 hover:shadow-lg transition-shadow">
+                  <div className="p-6">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <span className="px-2 py-1 bg-sky-100 text-sky-800 text-xs font-medium rounded-full">
+                        {isEnglish ? post.category.en : post.category.hi}
+                      </span>
+                    </div>
+                    
+                    <h3 className="text-lg font-bold text-slate-800 mb-3 line-clamp-2">
+                      {isEnglish ? post.title.en : post.title.hi}
+                    </h3>
+                    
+                    <p className="text-slate-600 mb-4 text-sm leading-relaxed line-clamp-3">
+                      {isEnglish ? post.excerpt.en : post.excerpt.hi}
+                    </p>
+                    
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-3 text-xs text-slate-500">
+                        <span className="flex items-center">
+                          <User className="h-3 w-3 mr-1" />
+                          {isEnglish ? post.author.en : post.author.hi}
+                        </span>
+                        <span className="flex items-center">
+                          <Calendar className="h-3 w-3 mr-1" />
+                          {post.date}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3 text-xs text-slate-500">
+                        <span className="flex items-center">
+                          <Eye className="h-3 w-3 mr-1" />
+                          {post.views}
+                        </span>
+                        <span className="flex items-center">
+                          <ThumbsUp className="h-3 w-3 mr-1" />
+                          {post.likes}
+                        </span>
+                        <span className="flex items-center">
+                          <MessageSquare className="h-3 w-3 mr-1" />
+                          {post.comments}
+                        </span>
+                      </div>
+                      
+                      <button className="bg-slate-100 text-slate-700 px-3 py-1 rounded-lg hover:bg-slate-200 transition-colors text-xs font-medium">
+                        {content.readMore}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            <div className="flex justify-center items-center space-x-2 mt-8">
+              <button className="px-3 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <button className="px-3 py-2 bg-sky-600 text-white rounded-lg">1</button>
+              <button className="px-3 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">2</button>
+              <button className="px-3 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">3</button>
+              <button className="px-3 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
