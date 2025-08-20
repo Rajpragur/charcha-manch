@@ -127,9 +127,7 @@ const Home: React.FC<HomeProps> = () => {
   const content = {
     title: isEnglish ? 'Bihar Citizen Forum' : 'बिहार नागरिक मंच',
     subtitle: isEnglish ? 'जनता का चुनाव साथी' : 'जनता का चुनाव साथी',
-    description: isEnglish 
-      ? 'Empowering Democracy in Bihar - Your Voice, Your Right, Your Platform'
-      : 'बिहार में लोकतंत्र को सशक्त बनाना - आपकी आवाज़, आपका अधिकार, आपका मंच',
+    
     workDiscussion: isEnglish ? 'किसने किया है कितना काम आओ करे चर्चा' : 'किसने किया है कितना काम आओ करे चर्चा',
     searchPlaceholder: isEnglish ? 'Search your constituency in Bihar...' : 'बिहार में अपना निर्वाचन क्षेत्र खोजें...',
     nagrikYogdan: isEnglish ? 'Citizen Contribution' : 'नागरिक योगदान',
