@@ -318,7 +318,7 @@ const Home: React.FC<HomeProps> = () => {
                     onFocus={() => setIsDropdownOpen(true)}
                     className="w-full px-3 sm:px-4 py-2 sm:py-3 rounded-l-lg text-slate-900 bg-white border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-sm sm:text-base placeholder-slate-500"
                   />
-                 
+                  <MapPinIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                 </div>
                 <button 
                   className="bg-sky-600 hover:bg-sky-700 px-4 sm:px-6 py-2 sm:py-3 rounded-r-lg transition-colors border border-sky-600 hover:border-sky-700"
