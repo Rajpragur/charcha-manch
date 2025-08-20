@@ -9,26 +9,30 @@ const Navbar: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const { isEnglish, toggleLanguage } = useLanguage();
   const profileRef = useRef<HTMLDivElement>(null);
-  const navItems = isEnglish ? 
-    [ 
-      { name: "Home", href: "/" }, 
-      { name: "About", href: "/about" }, 
-      { name: "Your Constituency", href: "/aapka-shetra" }, 
-      { name: "Forum", href: "/discussion-forum" }, 
-      { name: "Blog", href: "/blog" }, 
-      { name: "Contact", href: "/contact" },
-    ] : [ 
-      { name: "होम", href: "/" }, 
-      { name: "परिचय", href: "/about" }, 
-      { name: "आपका क्षेत्र", href: "/aapka-shetra" }, 
-      { name: "चर्चा मंच", href: "/discussion-forum" }, 
-      { name: "ब्लॉग", href: "/blog" }, 
-      { name: "संपर्क", href: "/contact" }, 
-    ];
+  const navItems = isEnglish
+    ? [
+        { name: "Home", href: "/" },
+        { name: "About", href: "/about" },
+        { name: "Your Constituency", href: "/aapka-shetra" },
+        { name: "Forum", href: "/discussion-forum" },
+        { name: "Blog", href: "/blog" },
+        { name: "Contact", href: "/contact" },
+      ]
+    : [
+        { name: "होम", href: "/" },
+        { name: "परिचय", href: "/about" },
+        { name: "आपका क्षेत्र", href: "/aapka-shetra" },
+        { name: "चर्चा मंच", href: "/discussion-forum" },
+        { name: "ब्लॉग", href: "/blog" },
+        { name: "संपर्क", href: "/contact" },
+      ];
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+      if (
+        profileRef.current &&
+        !profileRef.current.contains(event.target as Node)
+      ) {
         setShowProfile(false);
       }
     };
@@ -37,10 +41,12 @@ const Navbar: React.FC = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
   return (
     <nav className="bg-white shadow-md sticky top-0 z-50 w-full overflow-x-clip">
-      <div className="w-full> px-2 sm:px-6 lg:px-8">
+      <div className="w-full px-2 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16 relative">
+          {/* Language Toggle */}
           <button
             onClick={toggleLanguage}
             className="flex items-center gap-2 px-1.5 sm:px-3 py-1 rounded-lg hover:text-blue-600 shrink-0"
@@ -50,17 +56,37 @@ const Navbar: React.FC = () => {
             ) : (
               <ToggleRight className="h-4 w-4 max-[340px]:h-3 sm:h-5 sm:w-5 md:h-6 md:w-6" />
             )}
-            <span className="hidden sm:inline text-xs font-medium">{isEnglish ? "EN" : "HI"}</span>
+            <span className="hidden sm:inline text-xs font-medium">
+              {isEnglish ? "EN" : "HI"}
+            </span>
           </button>
-          <Link to="/" className="absolute left-1/2 -translate-x-1/2 flex items-center min-w-0">
-            <img src="images/logo.png"  className="h-8 w-8 sm:h-10 sm:w-10 shrink-0 mx-2 object-contain"/>
 
-            {isEnglish ? (
-              <span className="whitespace-nowrap leading-none text-[12px] max-[340px]:text-[10px] sm:text-base md:text-xl font-bold text-slate-900"> CHARCHAGRAM</span>
-            ) : (
-              <span className="whitespace-nowrap leading-none text-sm max-[340px]:text-[10px] sm:text-xl md:text-2xl font-bold text-slate-900">CCHARCHAGRAM</span>
-            )}
+          {/* Logo fixed left */}
+          <Link
+            to="/"
+            className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center"
+          >
+            <img
+              src="images/logo.png"
+              className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 object-contain"
+              alt="Logo"
+            />
           </Link>
+
+          {/* Centered Text */}
+          <div className="absolute left-1/2 -translate-x-1/2">
+            {isEnglish ? (
+              <span className="whitespace-nowrap leading-none text-base sm:text-xl md:text-2xl lg:text-3xl font-bold text-slate-900">
+                CHARCHAGRAM
+              </span>
+            ) : (
+              <span className="whitespace-nowrap leading-none text-sm sm:text-xl md:text-2xl lg:text-3xl font-bold text-slate-900">
+                CCHARCHAGRAM
+              </span>
+            )}
+          </div>
+
+          {/* Right section (profile + menu) */}
           <div className="flex items-center space-x-2 sm:space-x-4 shrink-0">
             <div className="relative" ref={profileRef}>
               <button
@@ -128,6 +154,7 @@ const Navbar: React.FC = () => {
         </div>
       </div>
 
+      {/* Desktop nav */}
       <div className="bg-gray-50 w-full">
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="hidden md:flex justify-center space-x-6 py-2">
@@ -148,6 +175,7 @@ const Navbar: React.FC = () => {
         </div>
       </div>
 
+      {/* Mobile nav */}
       {isOpen && (
         <div className="md:hidden bg-gray-50 border-t w-full">
           <div className="px-4 pt-2 pb-4 space-y-2">
