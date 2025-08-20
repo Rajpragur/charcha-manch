@@ -338,7 +338,7 @@ const Home: React.FC<HomeProps> = () => {
                 </div>
               )}
             </div>
-            <div className="text-left space-y-3 mt-6 max-w-4xl px-4">
+            <div className="text-left space-y-3 mt-6 max-w-4xl mx-auto px-4">
   <p className="flex items-baseline gap-2">
     <span className="text-xl sm:text-2xl font-bold text-slate-50">
       {!isEnglish ? "जाने" : "Know"}
