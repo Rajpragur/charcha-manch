@@ -454,41 +454,7 @@ const Home: React.FC<HomeProps> = () => {
             </div>
 
             {/* Bihar Highlights */}
-            <div className="bg-white rounded-lg shadow-md p-6 border border-slate-100">
-              <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-                <Award className="h-5 w-5 mr-2 text-emerald-600" />
-                {isEnglish ? 'Bihar Highlights' : 'बिहार की विशेषताएं'}
-              </h3>
-{/*               <div className="space-y-3">
-                <div className="flex items-center space-x-3 p-3 bg-emerald-50 rounded-lg">
-                  <PhotoPlaceholder type="landmark" size="sm" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">
-                      {isEnglish ? 'Historical Sites' : 'ऐतिहासिक स्थल'}
-                    </p>
-                    <p className="text-xs text-slate-600">Bodh Gaya, Nalanda</p>
-                  </div>
-                </div> */}
-                <div className="flex items-center space-x-3 p-3 bg-amber-50 rounded-lg">
-                  <PhotoPlaceholder type="group" size="sm" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">
-                      {isEnglish ? 'Cultural Heritage' : 'सांस्कृतिक विरासत'}
-                    </p>
-                    <p className="text-xs text-slate-600">Folk Arts, Festivals</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3 p-3 bg-sky-50 rounded-lg">
-                  <PhotoPlaceholder type="building" size="sm" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">
-                      {isEnglish ? 'Modern Development' : 'आधुनिक विकास'}
-                    </p>
-                    <p className="text-xs text-slate-600">Infrastructure, Tech</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            
           </div>
 
           {/* Main Content */}
