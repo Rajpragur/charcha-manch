@@ -459,7 +459,7 @@ const Home: React.FC<HomeProps> = () => {
                 <Award className="h-5 w-5 mr-2 text-emerald-600" />
                 {isEnglish ? 'Bihar Highlights' : 'बिहार की विशेषताएं'}
               </h3>
-              <div className="space-y-3">
+{/*               <div className="space-y-3">
                 <div className="flex items-center space-x-3 p-3 bg-emerald-50 rounded-lg">
                   <PhotoPlaceholder type="landmark" size="sm" />
                   <div>
@@ -468,7 +468,7 @@ const Home: React.FC<HomeProps> = () => {
                     </p>
                     <p className="text-xs text-slate-600">Bodh Gaya, Nalanda</p>
                   </div>
-                </div>
+                </div> */}
                 <div className="flex items-center space-x-3 p-3 bg-amber-50 rounded-lg">
                   <PhotoPlaceholder type="group" size="sm" />
                   <div>
