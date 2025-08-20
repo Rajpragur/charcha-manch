@@ -134,7 +134,7 @@ const Home: React.FC<HomeProps> = () => {
     workDiscussion: isEnglish ? 'किसने किया है कितना काम आओ करे चर्चा' : 'किसने किया है कितना काम आओ करे चर्चा',
     searchPlaceholder: isEnglish ? 'Search your constituency in Bihar...' : 'बिहार में अपना निर्वाचन क्षेत्र खोजें...',
     nagrikYogdan: isEnglish ? 'Citizen Contribution' : 'नागरिक योगदान',
-    achievements: isEnglish ? 'Achievements' : 'उपलब्धियां',
+    achievements: isEnglish ? 'Our Achievements' : 'हमारी उपलब्धियां',
     charchitVidhanSabha: isEnglish ? 'Featured Constituencies' : 'चर्चित विधान सभा',
     loadMore: isEnglish ? 'Load More' : 'और देखें',
     moreDetails: isEnglish ? 'More Details' : 'और जानकारी',
