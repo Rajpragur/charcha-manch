@@ -661,10 +661,7 @@ const Home: React.FC<HomeProps> = () => {
                       <MessageSquare className="h-4 w-4" />
                       <span>{isEnglish ? 'Comment' : 'टिप्पणी'}</span>
                     </button>
-                    <button className="flex items-center space-x-1 text-slate-600 hover:text-sky-600 transition-colors">
-                      <Eye className="h-4 w-4" />
-                      <span>{isEnglish ? 'View' : 'देखें'}</span>
-                    </button>
+                   
                   </div>
 
                       <button
