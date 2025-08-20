@@ -7,16 +7,10 @@ import {
   Award, 
   FileText, 
   Share2, 
-  MessageSquare, 
-  ThumbsUp, 
-  Calendar,
   TrendingUp,
   Users,
   Building,
-  GraduationCap,
   DollarSign,
-  AlertTriangle,
-  CheckCircle,
   Star,
   BarChart3
 } from 'lucide-react';
