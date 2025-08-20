@@ -280,7 +280,7 @@ const Home: React.FC<HomeProps> = () => {
         <div className="w-full max-w-none mx-auto">
           <div className="text-center">
             <div className="grid grid-cols-2 gap-6 md:gap-20 items-center mb-6 sm:mb-8">
-              <div className="flex justify-end mx-">
+              <div className="flex justify-start mx-">
                 <img 
                   src="images/biharmap.png" 
                   alt="Bihar Map"
