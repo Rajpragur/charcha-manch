@@ -171,22 +171,22 @@ const Home: React.FC<HomeProps> = () => {
   const achievements = [
     { 
       title: isEnglish ? 'Bihar Voters' : 'बिहार मतदाता', 
-      count: 2024, 
+      count: 526389, 
       icon: <Award className="h-6 w-6 sm:h-8 sm:w-8 text-amber-600" /> 
     },
     { 
       title: isEnglish ? 'Active Discussions' : 'सक्रिय चर्चाएं', 
-      count: 156, 
+      count: 1569, 
       icon: <MessageCircle className="h-6 w-6 sm:h-8 sm:w-8 text-sky-600" /> 
     },
     { 
       title: isEnglish ? 'Constituency Forums' : 'निर्वाचन क्षेत्र मंच', 
-      count: 23, 
+      count: 243, 
       icon: <Users className="h-6 w-6 sm:h-8 sm:w-8 text-emerald-600" /> 
     },
     { 
       title: isEnglish ? 'Citizen Leaders' : 'नागरिक नेता', 
-      count: 12, 
+      count: 26, 
       icon: <Users className="h-6 w-6 sm:h-8 sm:w-8 text-rose-600" /> 
     },
   ];
