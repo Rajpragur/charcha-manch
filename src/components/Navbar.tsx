@@ -65,12 +65,28 @@ const Navbar: React.FC = () => {
           <Link
             to="/"
             className="absolute left-10 top-1/2 -translate-y-1/2 flex items-center"
-          >
+          />
             <img
               src="images/logo.png"
               className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 object-contain"
               alt="Logo"
             />
+          <div className="flex items-center gap-2">
+            <img src="images/logo.png" className='h-5 w-5 max-[340px]:h-5 max-[340px]:w-auto sm:h-7 sm:w-7 md:h-8 md:w-8 lg:w-10 lg:h-10' />
+            <button
+              onClick={toggleLanguage}
+              className="flex items-center gap-2 px-1.5 sm:px-3 py-1 rounded-lg hover:text-blue-600 shrink-0"
+            >
+              {isEnglish ? (
+                <ToggleLeft className="h-4 w-4 max-[340px]:h-3 sm:h-5 sm:w-5 md:h-6 md:w-6" />
+              ) : (
+                <ToggleRight className="h-4 w-4 max-[340px]:h-3 sm:h-5 sm:w-5 md:h-6 md:w-6" />
+              )}
+              <span className="hidden sm:inline text-xs font-medium">{isEnglish ? "EN" : "HI"}</span>
+            </button>
+          </div>
+          <Link to="/" className="absolute left-1/2 -translate-x-1/2 flex items-center min-w-0">
+            <img src='images/charchagram.png' className='w-40 h-auto max-[340px]:w-30 sm:h-auto sm:w-50 shrink-0 mx-1' />
           </Link>
 
           {/* Centered Text */}

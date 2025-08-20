@@ -279,17 +279,33 @@ const Home: React.FC<HomeProps> = () => {
       <div className="bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 text-white py-12 sm:py-16 px-4 w-full">
         <div className="w-full max-w-none mx-auto">
           <div className="text-center">
-            <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6">
-              {content.title}
-            </h1>
-            
-           
-            <p className="text-base sm:text-lg md:text-xl mb-6 sm:mb-8 max-w-3xl mx-auto px-4 text-amber-200 font-medium">
-              {content.workDiscussion}
-            </p>
-    
+            <div className="grid grid-cols-2 gap-6 md:gap-20 items-center mb-6 sm:mb-8">
+              <div className="flex justify-end mx-">
+                <img 
+                  src="images/biharmap.png" 
+                  alt="Bihar Map"
+                  className="w-15 h-15 lg:w-40 lg:h-40 md:w-30 md:h-30 sm:w-28 sm:h-28 rounded-full object-cover"
+                />
+              </div>
+              <div className="text-center">
+                <h1 className="text-3xl max-[340px]:text-2xl sm:text-4xl md:text-6xl font-bold leading-tight text-left">जनता का</h1>
+                <h1 className="text-3xl max-[340px]:text-2xl sm:text-4xl md:text-6xl font-bold leading-tight text-left">चुनावी <span className="text-red-400">साथी</span></h1>
+              </div>
+              <div className="text-center">
+                <p className="text-base max-[400px]:text-xs max-[330px]:text-[8px] sm:text-lg md:text-xl font-medium text-right">किसने किया है कैसा काम</p>
+                <p className="text-base max-[400px]:text-xs max-[330px]:text-[8px] sm:text-lg md:text-xl font-medium text-right">आओ करें चर्चाग्राम</p>
+              </div>
+              <div className="flex justify-left">
+                <img 
+                  src="images/golghar.png" 
+                  alt="Golghar"
+                  className="w-15 h-15 lg:w-40 lg:h-40 md:w-30 md:h-30 sm:w-28 sm:h-28 rounded-full object-cover"
+                />
+              </div>
+            </div>
+
             {/* Search Dropdown */}
-            <div className="relative max-w-sm sm:max-w-md mx-auto">
+            <div className="relative max-w-lg sm:max-w-lg mx-auto">
               <div className="flex">
                 <div className="relative flex-1">
                   <input
@@ -372,7 +388,38 @@ const Home: React.FC<HomeProps> = () => {
     </span>
   </p>
 </div>
-
+            <div className="text-center space-y-3 mt-6 max-w-4xl px-4">
+              <p className="flex justify-center items-baseline gap-2">
+                <span className="text-xl sm:text-2xl font-bold text-slate-50">
+                  {!isEnglish ? "जाने" : "Know"}
+                </span>
+                <span className="text-sm sm:text-base text-slate-200">
+                  {!isEnglish
+                    ? " - उम्मीदवारों की सम्पत्ति, आपराधिक मामले और संसद में भागीदारी"
+                    : " - The candidates' assets, criminal cases and participation in Parliament"}
+                </span>
+              </p>
+              <p className="flex justify-center items-baseline gap-2">
+                <span className="text-xl sm:text-2xl font-bold text-slate-50">
+                  {!isEnglish ? "रखें" : "Share"}
+                </span>
+                <span className="text-sm sm:text-base text-slate-200">
+                  {!isEnglish
+                    ? " - वर्तमान और पूर्व उम्मीदवारों पर अपनी राय"
+                    : " - Your views on current and past candidates"}
+                </span>
+              </p>
+              <p className="flex justify-center items-baseline gap-2">
+                <span className="text-xl sm:text-2xl font-bold text-slate-50">
+                  {!isEnglish ? "करें" : "Do"}
+                </span>
+                <span className="text-sm sm:text-base text-slate-200">
+                  {!isEnglish
+                    ? " - जनसंवाद, सवाल-जवाब और जवाबदेही तय"
+                    : " - Public dialogue, questions and answers, and fix accountability"}
+                </span>
+              </p>
+            </div>
           </div>
         </div>
       </div>
