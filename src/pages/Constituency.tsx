@@ -84,7 +84,6 @@ const Constituency: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedParty, setSelectedParty] = useState<string>('all');
 
-  // Clear constituency data when key changes (different constituency)
   useEffect(() => {
     setConstituencyData(null);
     setError(null);
