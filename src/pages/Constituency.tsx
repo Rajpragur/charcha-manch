@@ -10,9 +10,9 @@ import {
   TrendingUp,
   Users,
   Building,
-  DollarSign,
   Star,
-  BarChart3
+  BarChart3,
+  DollarSign
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import PlaceholderImages from '../components/PlaceholderImages';
@@ -84,6 +84,7 @@ const Constituency: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedParty, setSelectedParty] = useState<string>('all');
 
+  // Clear constituency data when key changes (different constituency)
   useEffect(() => {
     setConstituencyData(null);
     setError(null);

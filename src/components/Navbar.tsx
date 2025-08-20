@@ -13,7 +13,7 @@ const Navbar: React.FC = () => {
   const navItems = isEnglish
     ? [
         { name: "Home", href: "/" },
-        { name: "Constituencies", href: "/constituency/all-constituencies" },
+        { name: "Constituencies", href: "/constituency/all-constituencies?showAll=true" },
         { name: "About", href: "/about" },
         { name: "Your Constituency", href: "/aapka-shetra" },
         { name: "Forum", href: "/discussion-forum" },
@@ -22,7 +22,7 @@ const Navbar: React.FC = () => {
       ]
     : [
         { name: "होम", href: "/" },
-        { name: "निर्वाचन क्षेत्र", href: "/constituency/all-constituencies" },
+        { name: "निर्वाचन क्षेत्र", href: "/constituency/all-constituencies?showAll=true" },
         { name: "परिचय", href: "/about" },
         { name: "आपका क्षेत्र", href: "/aapka-shetra" },
         { name: "चर्चा मंच", href: "/discussion-forum" },
