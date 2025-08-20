@@ -688,6 +688,10 @@ const Home: React.FC<HomeProps> = () => {
                       <span>{isEnglish ? 'Like' : 'लाइक'}</span>
                     </button>
                     <button className="flex items-center space-x-1 text-slate-600 hover:text-sky-600 transition-colors">
+                      <ThumbsUp className="h-4 w-4" />
+                      <span>{isEnglish ? 'Dislike' : ' डिस्लाइक'}</span>
+                    </button>
+                    <button className="flex items-center space-x-1 text-slate-600 hover:text-sky-600 transition-colors">
                       <MessageSquare className="h-4 w-4" />
                       <span>{isEnglish ? 'Comment' : 'टिप्पणी'}</span>
                     </button>
