@@ -39,27 +39,35 @@ const Navbar: React.FC = () => {
   }, []);
 
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-50 w-full">
-      <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+    <nav className="bg-white shadow-md sticky top-0 z-50 w-full overflow-x-clip">
+      <div className="w-full> px-2 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16 relative">
           <button
             onClick={toggleLanguage}
-            className="flex items-center gap-2 px-3 py-1 rounded-lg hover:text-blue-600"
+            className="flex items-center gap-2 px-1.5 sm:px-3 py-1 rounded-lg hover:text-blue-600 shrink-0"
           >
-            {isEnglish ? <ToggleLeft size={20} /> : <ToggleRight size={20} />}
-            <span className="text-sm font-medium">{isEnglish ? "EN" : "HI"}</span>
+            {isEnglish ? (
+              <ToggleLeft className="h-4 w-4 max-[340px]:h-3 sm:h-5 sm:w-5 md:h-6 md:w-6" />
+            ) : (
+              <ToggleRight className="h-4 w-4 max-[340px]:h-3 sm:h-5 sm:w-5 md:h-6 md:w-6" />
+            )}
+            <span className="hidden sm:inline text-xs font-medium">{isEnglish ? "EN" : "HI"}</span>
           </button>
-          <Link to="/" className="flex-shrink-0 flex items-center">
-            <img src='images/logo.png' className='w-6 mx-1' />
-            {isEnglish ? <span className="text-1xl font-bold text-slate-900">CHARCHAMANCH</span> : <span className="text-2xl font-bold text-slate-900">चर्चामंच</span>}
+          <Link to="/" className="absolute left-1/2 -translate-x-1/2 flex items-center min-w-0">
+            <img src='images/logo.png' className='h-4 w-4 max-[340px]:w-3h-3sm:h-6 sm:w-6 shrink-0 mx-1' />
+            {isEnglish ? (
+              <span className="whitespace-nowrap leading-none text-[12px] max-[340px]:text-[10px] sm:text-base md:text-xl font-bold text-slate-900">CHARCHAMANCH</span>
+            ) : (
+              <span className="whitespace-nowrap leading-none text-sm max-[340px]:text-[10px] sm:text-xl md:text-2xl font-bold text-slate-900">चर्चामंच</span>
+            )}
           </Link>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4 shrink-0">
             <div className="relative" ref={profileRef}>
               <button
                 onClick={() => setShowProfile((prev) => !prev)}
-                className="p-2 rounded-full hover:text-blue-600"
+                className="p-1.5 sm:p-2 rounded-full hover:text-blue-600"
               >
-                <User className="h-6 w-6 text-gray-700" />
+                <User className="h-4 w-4 max-[340px]:h-3 sm:h-6 sm:w-6 text-gray-700" />
               </button>
               {showProfile && (
                 <div className="absolute right-0 mt-2 w-48 bg-white border rounded-lg shadow-lg py-2 z-50">
@@ -108,9 +116,13 @@ const Navbar: React.FC = () => {
             </div>
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="md:hidden inline-flex items-center justify-center p-2 rounded-md hover:text-blue-600"
+              className="md:hidden inline-flex items-center justify-center p-1.5 sm:p-2 rounded-md hover:text-blue-600"
             >
-              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              {isOpen ? (
+                <X className="h-4 w-4 max-[340px]:h-3 sm:h-6 sm:w-6" />
+              ) : (
+                <Menu className="h-4 w-4 max-[340px]:h-3 sm:h-6 sm:w-6" />
+              )}
             </button>
           </div>
         </div>

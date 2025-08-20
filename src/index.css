@@ -1,14 +1,1 @@
 @import "tailwindcss";
-
-/* Prevent horizontal scrolling on small screens without altering layout */
-html, body, #root {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
-/* Ensure images scale responsively within their containers */
-img {
-  max-width: 100%;
-  height: auto;
-}
