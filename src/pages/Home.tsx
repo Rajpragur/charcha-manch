@@ -286,9 +286,7 @@ const Home: React.FC<HomeProps> = () => {
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-3 sm:mb-4 text-amber-300">
               {content.subtitle}
             </h2>
-            <p className="text-lg sm:text-xl md:text-2xl mb-4 sm:mb-6 max-w-4xl mx-auto px-4 text-slate-200">
-              {content.description}
-            </p>
+           
             <p className="text-base sm:text-lg md:text-xl mb-6 sm:mb-8 max-w-3xl mx-auto px-4 text-amber-200 font-medium">
               {content.workDiscussion}
             </p>
