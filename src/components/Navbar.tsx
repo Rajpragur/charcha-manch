@@ -37,7 +37,6 @@ const Navbar: React.FC = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-
   return (
     <nav className="bg-white shadow-md sticky top-0 z-50 w-full overflow-x-clip">
       <div className="w-full> px-2 sm:px-6 lg:px-8">
