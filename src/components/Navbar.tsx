@@ -53,11 +53,12 @@ const Navbar: React.FC = () => {
             <span className="hidden sm:inline text-xs font-medium">{isEnglish ? "EN" : "HI"}</span>
           </button>
           <Link to="/" className="absolute left-1/2 -translate-x-1/2 flex items-center min-w-0">
-            <img src='images/logo.png' className='h-4 w-4 max-[340px]:w-3h-3sm:h-6 sm:w-6 shrink-0 mx-1' />
+            <img src="images/logo.png"  className="h-8 w-8 sm:h-10 sm:w-10 shrink-0 mx-2 object-contain"/>
+
             {isEnglish ? (
-              <span className="whitespace-nowrap leading-none text-[12px] max-[340px]:text-[10px] sm:text-base md:text-xl font-bold text-slate-900">CHARCHAMANCH</span>
+              <span className="whitespace-nowrap leading-none text-[12px] max-[340px]:text-[10px] sm:text-base md:text-xl font-bold text-slate-900"> CHARCHAGRAM</span>
             ) : (
-              <span className="whitespace-nowrap leading-none text-sm max-[340px]:text-[10px] sm:text-xl md:text-2xl font-bold text-slate-900">चर्चामंच</span>
+              <span className="whitespace-nowrap leading-none text-sm max-[340px]:text-[10px] sm:text-xl md:text-2xl font-bold text-slate-900">CCHARCHAGRAM</span>
             )}
           </Link>
           <div className="flex items-center space-x-2 sm:space-x-4 shrink-0">
