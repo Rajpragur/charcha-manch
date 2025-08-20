@@ -125,8 +125,7 @@ const Home: React.FC<HomeProps> = () => {
   const allConstituencies = useMemo(() => generateConstituencyData(), []);
 
   const content = {
-    title: isEnglish ? 'Bihar Citizen Forum' : 'बिहार नागरिक मंच',
-    subtitle: isEnglish ? 'जनता का चुनाव साथी' : 'जनता का चुनाव साथी',
+    title: isEnglish ? 'जनता का चुनावी साथी' : 'जनता का चुनावी साथी',
     
     workDiscussion: isEnglish ? 'किसने किया है कितना काम आओ करे चर्चा' : 'किसने किया है कितना काम आओ करे चर्चा',
     searchPlaceholder: isEnglish ? 'Search your constituency in Bihar...' : 'बिहार में अपना निर्वाचन क्षेत्र खोजें...',
@@ -283,9 +282,7 @@ const Home: React.FC<HomeProps> = () => {
             <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6">
               {content.title}
             </h1>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-3 sm:mb-4 text-amber-300">
-              {content.subtitle}
-            </h2>
+            
            
             <p className="text-base sm:text-lg md:text-xl mb-6 sm:mb-8 max-w-3xl mx-auto px-4 text-amber-200 font-medium">
               {content.workDiscussion}
@@ -343,7 +340,7 @@ const Home: React.FC<HomeProps> = () => {
             </div>
             <div className="text-left space-y-3 mt-6 max-w-4xl px-4">
   <p className="flex items-baseline gap-2">
-    <span className="text-2xl sm:text-3xl font-bold text-slate-50">
+    <span className="text-xl sm:text-2xl font-bold text-slate-50">
       {!isEnglish ? "जाने" : "Know"}
     </span>
     <span className="text-sm sm:text-base text-slate-200">
@@ -354,7 +351,7 @@ const Home: React.FC<HomeProps> = () => {
   </p>
 
   <p className="flex items-baseline gap-2">
-    <span className="text-2xl sm:text-3xl font-bold text-slate-50">
+    <span className="text-xl sm:text-2xl font-bold text-slate-50">
       {!isEnglish ? "रखें" : "Share"}
     </span>
     <span className="text-sm sm:text-base text-slate-200">
@@ -365,7 +362,7 @@ const Home: React.FC<HomeProps> = () => {
   </p>
 
   <p className="flex items-baseline gap-2">
-    <span className="text-2xl sm:text-3xl font-bold text-slate-50">
+    <span className="text-xl sm:text-2xl font-bold text-slate-50">
       {!isEnglish ? "करें" : "Do"}
     </span>
     <span className="text-sm sm:text-base text-slate-200">
