@@ -64,7 +64,7 @@ const Navbar: React.FC = () => {
           {/* Logo fixed left */}
           <Link
             to="/"
-            className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center"
+            className="absolute left-10 top-1/2 -translate-y-1/2 flex items-center"
           >
             <img
               src="images/logo.png"
