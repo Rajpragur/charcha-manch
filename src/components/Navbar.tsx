@@ -81,7 +81,7 @@ const Navbar: React.FC = () => {
               </span>
             ) : (
               <span className="whitespace-nowrap leading-none text-sm sm:text-xl md:text-2xl lg:text-3xl font-bold text-slate-900">
-                CCHARCHAGRAM
+                CHARCHAGRAM
               </span>
             )}
           </div>
