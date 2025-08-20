@@ -354,8 +354,9 @@ const Home: React.FC<HomeProps> = () => {
                 </div>
               )}
             </div>
-            <div className="text-center space-y-3 mt-6 max-w-4xl px-4">
-  <p className="flex flex-col items-center gap-1">
+            
+  <div className="text-center space-y-3 mt-6 max-w-4xl px-4">
+  <p className="flex justify-center items-center gap-2">
     <span className="text-xl sm:text-2xl font-bold text-slate-50">
       {!isEnglish ? "जाने" : "Know"}
     </span>
@@ -366,7 +367,7 @@ const Home: React.FC<HomeProps> = () => {
     </span>
   </p>
 
-  <p className="flex flex-col items-center gap-1">
+  <p className="flex justify-center items-center gap-2">
     <span className="text-xl sm:text-2xl font-bold text-slate-50">
       {!isEnglish ? "रखें" : "Share"}
     </span>
@@ -377,7 +378,7 @@ const Home: React.FC<HomeProps> = () => {
     </span>
   </p>
 
-  <p className="flex flex-col items-center gap-1">
+  <p className="flex justify-center items-center gap-2">
     <span className="text-xl sm:text-2xl font-bold text-slate-50">
       {!isEnglish ? "करें" : "Do"}
     </span>
@@ -388,6 +389,7 @@ const Home: React.FC<HomeProps> = () => {
     </span>
   </p>
 </div>
+
 
           </div>
         </div>
