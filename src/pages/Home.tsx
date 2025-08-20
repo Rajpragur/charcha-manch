@@ -341,40 +341,41 @@ const Home: React.FC<HomeProps> = () => {
                 </div>
               )}
             </div>
-            <div className="text-center space-y-4 mt-6">
-  <p className="max-w-4xl mx-auto px-4">
-    <span className="block text-2xl sm:text-3xl font-bold text-slate-50">
-      {!isEnglish ? "जाने" : "Know"}
+            <div className="text-left space-y-3 mt-6 max-w-4xl mx-auto px-4">
+  <p className="flex items-baseline gap-2">
+    <span className="text-2xl sm:text-3xl font-bold text-slate-50">
+      {!isEnglish ? "जाने –" : "Know –"}
     </span>
-    <span className="block text-sm sm:text-base text-slate-200">
+    <span className="text-sm sm:text-base text-slate-200">
       {!isEnglish
         ? "उम्मीदवारों की सम्पत्ति, आपराधिक मामले और संसद में भागीदारी"
         : "The candidates' assets, criminal cases and participation in Parliament"}
     </span>
   </p>
 
-  <p className="max-w-4xl mx-auto px-4">
-    <span className="block text-2xl sm:text-3xl font-bold text-slate-50">
-      {!isEnglish ? "रखें" : "Share"}
+  <p className="flex items-baseline gap-2">
+    <span className="text-2xl sm:text-3xl font-bold text-slate-50">
+      {!isEnglish ? "रखें –" : "Share –"}
     </span>
-    <span className="block text-sm sm:text-base text-slate-200">
+    <span className="text-sm sm:text-base text-slate-200">
       {!isEnglish
         ? "वर्तमान और पूर्व उम्मीदवारों पर अपनी राय"
         : "Your views on current and past candidates"}
     </span>
   </p>
 
-  <p className="max-w-4xl mx-auto px-4">
-    <span className="block text-2xl sm:text-3xl font-bold text-slate-50">
-      {!isEnglish ? "करें" : "Do"}
+  <p className="flex items-baseline gap-2">
+    <span className="text-2xl sm:text-3xl font-bold text-slate-50">
+      {!isEnglish ? "करें –" : "Do –"}
     </span>
-    <span className="block text-sm sm:text-base text-slate-200">
+    <span className="text-sm sm:text-base text-slate-200">
       {!isEnglish
         ? "जनसंवाद, सवाल-जवाब और जवाबदेही तय"
         : "Public dialogue, questions and answers, and fix accountability"}
     </span>
   </p>
 </div>
+
           </div>
         </div>
       </div>
