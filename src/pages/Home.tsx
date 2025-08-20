@@ -1,7 +1,56 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Users, MessageCircle, Award, Share2, MapPin, CheckCircle, MapPin as MapPinIcon, ThumbsUp, MessageSquare, FileText, Clock, Target, Zap } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import PlaceholderImages from '../components/PlaceholderImages';
+
+// New interface for candidates.json data structure
+interface CandidateData {
+  area_name: string;
+  vidhayak_info: {
+    name: string;
+    image_url: string;
+    age: number;
+    last_election_vote_percentage: number;
+    experience: string;
+    party_name: string;
+    party_icon_url: string;
+    manifesto_link: string;
+    manifesto_score: number;
+    metadata: {
+      education: string;
+      net_worth: number;
+      criminal_cases: number;
+      attendance: string;
+      questions_asked: string;
+      funds_utilisation: string;
+    };
+    survey_score: Array<{
+      question: string;
+      yes_votes: number;
+      no_votes: number;
+      score: number;
+    }>;
+  };
+  dept_info: Array<{
+    dept_name: string;
+    work_info: string;
+    survey_score: Array<{
+      question: string;
+      ratings: Record<string, number>;
+      score: number;
+    }>;
+    average_score: number;
+  }>;
+  other_candidates: Array<{
+    candidate_name: string;
+    candidate_image_url: string | null;
+    candidate_party: string;
+    vote_share: number;
+  }>;
+  latest_news: Array<{
+    title: string;
+  }>;
+}
 
 interface PartyData {
   name: string;
@@ -21,7 +70,7 @@ interface NewsData {
 
 interface ConstituencyData {
   id: string;
-  profileImage: string;
+  profileImage: string | undefined;
   constituencyName: BilingualText;
   candidateName: BilingualText;
   partyName: PartyData;
@@ -33,85 +82,92 @@ interface ConstituencyData {
   manifestoScore: number;
   activePostCount: number;
   interactionCount: number;
+  criminalCases: number;
+  netWorth: number;
+  attendance: string;
+  questionsAsked: string;
+  fundsUtilization: string;
+  rawData: CandidateData; // Added rawData for detailed view
 }
 
 interface HomeProps {
   // Remove isEnglish prop since we'll use context
 }
 
-const generateConstituencyData = (): ConstituencyData[] => {
-  const constituencies = [];
-  const parties = [
-    { name: 'BJP', nameHi: 'भाजपा', color: 'bg-amber-600' },
-    { name: 'JDU', nameHi: 'जदयू', color: 'bg-emerald-600' },
-    { name: 'RJD', nameHi: 'राजद', color: 'bg-rose-600' },
-    { name: 'Congress', nameHi: 'कांग्रेस', color: 'bg-sky-600' },
-    { name: 'CPI', nameHi: 'सीपीआई', color: 'bg-amber-500' }
-  ];
+// Function to get party color based on party name
+const getPartyColor = (partyName: string): string => {
+  const partyColors: Record<string, string> = {
+    'भारतीय जनता पार्टी': 'bg-amber-600',
+    'जनता दल (यूनाइटेड)': 'bg-emerald-600',
+    'राष्ट्रिया जनता दल': 'bg-green-600',
+    'भारतीय राष्ट्रीय कांग्रेस': 'bg-sky-600',
+    'कम्युनिस्ट पार्टी ऑफ इंडिया': 'bg-red-500',
+    'लोक जनशक्ति पार्टी': 'bg-purple-600',
+    'हिंदुस्तानी अवाम मोर्चा': 'bg-green-600',
+    'राष्ट्रीय लोक समता पार्टी': 'bg-blue-600',
+    'बहूजन समाज पार्टी': 'bg-blue-500',
+    'जन अधीकर पार्टी (लोकतांत्रिक)': 'bg-orange-600',
+    'कम्युनिस्ट पार्टी ऑफ इंडिया (मार्क्सवादी)':'bg-rose-500',
+    'नोटा': 'bg-gray-600',
+    'हिंदुस्तानी अवाम मोर्चा (धर्मनिरपेक्ष)':'bg-zinc-800',
+    'अखिल भारतीय मजलिस-ए-इटिहादुल मुस्लिमीन': 'bg-emerald-900',
+    'कम्युनिस्ट पार्टी ऑफ इंडिया (मार्क्सवादी-लेनिनवादी) (मुक्ति)': 'bg-red-600'
+
+  };
+  return partyColors[partyName] || 'bg-slate-600';
+};
+
+// Function to convert candidates.json data to ConstituencyData format
+const convertCandidateToConstituency = (candidate: any, index: number): ConstituencyData => {
+  console.log(`Converting candidate ${index}:`, candidate);
   
-  const biharConstituencies = [
-    'Patna Sahib', 'Patna Central', 'Banka', 'Bhagalpur', 'Gaya', 'Nalanda', 'Vaishali', 'Muzaffarpur',
-    'Darbhanga', 'Madhubani', 'Sitamarhi', 'Sheohar', 'East Champaran', 'West Champaran', 'Siwan', 'Gopalganj'
-  ];
-  const biharConstituenciesHindi = [
-    'पटना साहिब',
-    'पटना सेंट्रल',
-    'बांका',
-    'भागलपुर',
-    'गया',
-    'नालंदा',
-    'वैशाली',
-    'मुजफ्फरपुर',
-    'दरभंगा',
-    'मधुबनी',
-    'सीतामढ़ी',
-    'शिवहर',
-    'पूर्वी चंपारण',
-    'पश्चिमी चंपारण',
-    'सिवान',
-    'गोपालगंज'
-  ];
+  const result = {
+    id: index.toString(),
+    constituencyName: {
+      en: candidate.area_name,
+      hi: candidate.area_name
+    },
+    candidateName: {
+      en: candidate.vidhayak_info.name,
+      hi: candidate.vidhayak_info.name
+    },
+    partyName: {
+      name: candidate.vidhayak_info.party_name,
+      nameHi: candidate.vidhayak_info.party_name,
+      color: getPartyColor(candidate.vidhayak_info.party_name)
+    },
+    profileImage: candidate.vidhayak_info.image_url,
+    satisfactionYes: candidate.vidhayak_info.manifesto_score || 0,
+    satisfactionNo: 100 - (candidate.vidhayak_info.manifesto_score || 0),
+    criminalCases: candidate.vidhayak_info.metadata?.criminal_cases || 0,
+    netWorth: candidate.vidhayak_info.metadata?.net_worth || 0,
+    attendance: candidate.vidhayak_info.metadata?.attendance || 'N/A',
+    questionsAsked: candidate.vidhayak_info.metadata?.questions_asked || 'N/A',
+    fundsUtilization: candidate.vidhayak_info.metadata?.funds_utilisation || 'N/A',
+    education: {
+      en: candidate.vidhayak_info.metadata?.education || 'N/A',
+      hi: candidate.vidhayak_info.metadata?.education || 'N/A'
+    },
+    experience: {
+      en: candidate.vidhayak_info.experience || 'N/A',
+      hi: candidate.vidhayak_info.experience || 'N/A'
+    },
+    news: {
+      title: {
+        en: candidate.latest_news?.[0]?.title || 'No recent news',
+        hi: candidate.latest_news?.[0]?.title || 'कोई हाल की खबर नहीं'
+      },
+      date: '2025-01-15'
+    },
+    manifestoScore: candidate.vidhayak_info.manifesto_score || 0,
+    activePostCount: Math.floor(Math.random() * 50) + 10,
+    interactionCount: Math.floor(Math.random() * 1000) + 100,
+    // Add the raw candidate data for detailed view
+    rawData: candidate
+  };
   
-  
-  for (let i = 1; i <= 243; i++) {
-    const party = parties[Math.floor(Math.random() * parties.length)];
-    const constituencyIndex = (i - 1) % biharConstituencies.length;
-    
-    constituencies.push({
-      id: i.toString(),
-      profileImage: ``,
-      constituencyName: {
-        en: biharConstituencies[constituencyIndex] || `Constituency ${i}`,
-        hi: biharConstituenciesHindi[constituencyIndex] ? `${biharConstituenciesHindi[constituencyIndex]} क्षेत्र` : `विधानसभा क्षेत्र ${i}`
-      },
-      candidateName: {
-        en: `Candidate ${i}`,
-        hi: `उम्मीदवार ${i}`
-      },
-      partyName: party,
-      experience: {
-        en: `${Math.floor(Math.random() * 10) + 1} years`,
-        hi: `${Math.floor(Math.random() * 10) + 1} वर्ष`
-      },
-      education: {
-        en: 'M.A. Political Science',
-        hi: 'एम.ए. राजनीति विज्ञान'
-      },
-      satisfactionYes: Math.floor(Math.random() * 40) + 50,
-      satisfactionNo: 0,
-      news: {
-        title: {
-          en: `Development project announced for ${biharConstituencies[constituencyIndex] || `Constituency ${i}`}`,
-          hi: `${biharConstituenciesHindi[constituencyIndex] || `विधानसभा क्षेत्र ${i}`} के लिए विकास परियोजना की घोषणा`
-        },
-        date: '2025-08-15'
-      },
-      manifestoScore: Math.floor(Math.random() * 30) + 70,
-      activePostCount: Math.floor(Math.random() * 50) + 10,
-      interactionCount: Math.floor(Math.random() * 1000) + 100 // For sorting
-    });
-  }
-  return constituencies;
+  console.log(`Converted result ${index}:`, result);
+  return result;
 };
 
 const Home: React.FC<HomeProps> = () => {
@@ -119,16 +175,43 @@ const Home: React.FC<HomeProps> = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [visibleConstituencies, setVisibleConstituencies] = useState<number>(2);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
-  const [,setSelectedConstituency] = useState<ConstituencyData | null>(null);
+  const [selectedConstituency, setSelectedConstituency] = useState<ConstituencyData | null>(null);
   const [shareStatus, setShareStatus] = useState<string>('');
+  const [candidatesData, setCandidatesData] = useState<CandidateData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const allConstituencies = useMemo(() => generateConstituencyData(), []);
+  // Load candidates data from JSON file
+  useEffect(() => {
+    const loadCandidatesData = async () => {
+      try {
+        console.log('Loading candidates data...');
+        const response = await fetch('/data/candidates.json');
+        const data: CandidateData[] = await response.json();
+        console.log('Loaded candidates data:', data.length, 'constituencies');
+        setCandidatesData(data);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error loading candidates data:', error);
+        setIsLoading(false);
+      }
+    };
+
+    loadCandidatesData();
+  }, []);
+
+  // Convert candidates data to constituency format
+  const allConstituencies = useMemo(() => {
+    if (candidatesData.length === 0) return [];
+    const converted = candidatesData.map((candidate, index) => convertCandidateToConstituency(candidate, index));
+    console.log('Converted constituencies:', converted.length);
+    return converted;
+  }, [candidatesData]);
 
   const content = {
     title: isEnglish ? 'जनता का चुनावी साथी' : 'जनता का चुनावी साथी',
     
     workDiscussion: isEnglish ? 'किसने किया है कितना काम आओ करे चर्चा' : 'किसने किया है कितना काम आओ करे चर्चा',
-    searchPlaceholder: isEnglish ? 'Search your constituency in Bihar...' : 'बिहार में अपना निर्वाचन क्षेत्र खोजें...',
+    searchPlaceholder: isEnglish ? 'Search by constituency, candidate, or party...' : 'निर्वाचन क्षेत्र, उम्मीदवार, या पार्टी से खोजें...',
     nagrikYogdan: isEnglish ? 'Citizen Contribution' : 'नागरिक योगदान',
     achievements: isEnglish ? 'Our Achievements' : 'हमारी उपलब्धियां',
     charchitVidhanSabha: isEnglish ? 'Featured Constituencies' : 'चर्चित विधान सभा',
@@ -226,7 +309,9 @@ const Home: React.FC<HomeProps> = () => {
         constituency.constituencyName.en.toLowerCase().includes(searchQuery.toLowerCase()) ||
         constituency.constituencyName.hi.includes(searchQuery) ||
         constituency.candidateName.en.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        constituency.candidateName.hi.includes(searchQuery)
+        constituency.candidateName.hi.includes(searchQuery) ||
+        constituency.partyName.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        constituency.partyName.nameHi.includes(searchQuery)
       );
     }
 
@@ -248,9 +333,44 @@ const Home: React.FC<HomeProps> = () => {
     setIsDropdownOpen(false);
   };
 
+  // Function to map constituency data to website URL
+  const navigateToConstituencyPage = (constituency: ConstituencyData): void => {
+    console.log('=== NAVIGATION DEBUG ===');
+    console.log('Full constituency object:', constituency);
+    
+    // Use the raw candidate data for proper navigation
+    const candidateData = constituency.rawData;
+    console.log('Raw candidate data:', candidateData);
+    
+    if (!candidateData) {
+      console.error('No rawData found in constituency object!');
+      return;
+    }
+    
+    // Create a unique slug using both area name and ID to ensure uniqueness
+    const constituencySlug = `${candidateData.area_name.toLowerCase().replace(/\s+/g, '-')}-${constituency.id}`;
+    
+    // Create a more robust URL with encoded data
+    const encodedData = encodeURIComponent(JSON.stringify(candidateData));
+    const url = `/constituency/${constituencySlug}?id=${constituency.id}&data=${encodedData}`;
+    
+    console.log('Generated slug:', constituencySlug);
+    console.log('Navigation URL:', url);
+    
+    // Also store in localStorage as backup
+    localStorage.setItem('selectedConstituency', JSON.stringify(candidateData));
+    console.log('Stored in localStorage:', candidateData);
+    console.log('localStorage key check:', localStorage.getItem('selectedConstituency') ? 'SUCCESS' : 'FAILED');
+    
+    // Navigate to the constituency page
+    console.log('Navigating to:', url);
+    window.location.href = url;
+  };
+
   // Share functionality
   const handleShare = async (constituency: ConstituencyData): Promise<void> => {
-    const url = `${window.location.origin}/aapka-shetra?constituency=${constituency.id}`;
+    const constituencySlug = constituency.constituencyName.en.toLowerCase().replace(/\s+/g, '-');
+    const url = `${window.location.origin}/constituency/${constituencySlug}?id=${constituency.id}`;
     
     try {
       await navigator.clipboard.writeText(url);
@@ -272,6 +392,18 @@ const Home: React.FC<HomeProps> = () => {
     ...c,
     satisfactionNo: 100 - c.satisfactionYes
   }));
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-sky-600 mx-auto"></div>
+          <p className="mt-4 text-slate-600">Loading constituency data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -317,7 +449,8 @@ const Home: React.FC<HomeProps> = () => {
                       setIsDropdownOpen(true);
                     }}
                     onFocus={() => setIsDropdownOpen(true)}
-                    className="w-full px-3 sm:px-4 py-2 sm:py-3 rounded-l-lg text-slate-900 bg-white border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-sm sm:text-base placeholder-slate-500"
+                    onClick={() => setIsDropdownOpen(true)}
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 rounded-l-lg text-slate-900 bg-white border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-sm sm:text-base placeholder-slate-500 cursor-pointer"
                   />
                   <MapPinIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                 </div>
@@ -332,27 +465,49 @@ const Home: React.FC<HomeProps> = () => {
               {/* Dropdown Menu */}
               {isDropdownOpen && (
                 <div className="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto z-50">
-                  {filteredAndSortedConstituencies.slice(0, 10).map((constituency) => (
-                    <button
-                      key={constituency.id}
-                      onClick={() => handleConstituencySelect(constituency)}
-                      className="w-full text-left px-4 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-b-0 text-sm text-slate-900"
-                    >
-                      <div className="font-medium">
-                        {isEnglish ? constituency.constituencyName.en : constituency.constituencyName.hi}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {isEnglish ? constituency.candidateName.en : constituency.candidateName.hi} - {isEnglish ? constituency.partyName.name : constituency.partyName.nameHi}
-                      </div>
-                    </button>
-                  ))}
-                  {filteredAndSortedConstituencies.length === 0 && (
+                  {filteredAndSortedConstituencies.length > 0 ? (
+                    filteredAndSortedConstituencies.slice(0, 20).map((constituency) => (
+                      <button
+                        key={constituency.id}
+                        onClick={() => handleConstituencySelect(constituency)}
+                        className="w-full text-left px-4 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-b-0 text-sm text-slate-900"
+                      >
+                        <div className="font-medium">
+                          {isEnglish ? constituency.constituencyName.en : constituency.constituencyName.hi}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {isEnglish ? constituency.candidateName.en : constituency.candidateName.hi} - {isEnglish ? constituency.partyName.name : constituency.partyName.nameHi}
+                        </div>
+                      </button>
+                    ))
+                  ) : searchQuery.trim() ? (
                     <div className="px-4 py-2 text-sm text-slate-500">
                       {isEnglish ? 'No constituencies found' : 'कोई निर्वाचन क्षेत्र नहीं मिला'}
                     </div>
+                  ) : (
+                    // Show more initial constituencies when no search query
+                    allConstituencies.slice(0, 243).map((constituency) => (
+                      <button
+                        key={constituency.id}
+                        onClick={() => handleConstituencySelect(constituency)}
+                        className="w-full text-left px-4 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-b-0 text-sm text-slate-900"
+                      >
+                        <div className="font-medium">
+                          {isEnglish ? constituency.constituencyName.en : constituency.constituencyName.hi}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {isEnglish ? constituency.candidateName.en : constituency.candidateName.hi} - {isEnglish ? constituency.partyName.name : constituency.partyName.nameHi}
+                        </div>
+                      </button>
+                    ))
                   )}
                 </div>
               )}
+            </div>
+            
+            {/* Debug Info - Remove this in production */}
+            <div className="text-xs text-slate-300 mt-2">
+              {isEnglish ? `Loaded ${allConstituencies.length} constituencies` : `${allConstituencies.length} निर्वाचन क्षेत्र लोड किए गए`}
             </div>
             
   <div className="text-center space-y-3 mt-6 max-w-4xl px-4">
@@ -389,8 +544,233 @@ const Home: React.FC<HomeProps> = () => {
     </span>
   </p>
 </div>
+          </div>
+        </div>
+      </div>
 
+      {/* Selected Constituency Display Section */}
+      {selectedConstituency && (
+        <div className="w-full bg-white border-b border-slate-200 py-8">
+          <div className="w-full max-w-none mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="bg-gradient-to-r from-sky-50 to-blue-50 rounded-xl p-6 border border-sky-200">
+              <div className="text-center mb-6">
+                <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">
+                  {isEnglish ? 'Selected Constituency' : 'चयनित निर्वाचन क्षेत्र'}
+                </h2>
+                <p className="text-slate-600">
+                  {isEnglish ? 'Detailed information about your selected constituency' : 'आपके चयनित निर्वाचन क्षेत्र की विस्तृत जानकारी'}
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Candidate Info */}
+                <div className="bg-white rounded-lg p-6 shadow-md border border-slate-200">
+                  <div className="text-center mb-4">
+                    {selectedConstituency.profileImage ? (
+                      <img 
+                        src={selectedConstituency.profileImage} 
+                        alt={selectedConstituency.candidateName.en}
+                        className="w-24 h-24 rounded-full object-cover mx-auto mb-3 border-4 border-sky-100"
+                      />
+                    ) : (
+                      <PlaceholderImages type="profile" size="lg" className="mx-auto mb-3" />
+                    )}
+                    <h3 className="text-xl font-bold text-slate-800 mb-1">
+                      {selectedConstituency.candidateName.hi}
+                    </h3>
+                    <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium text-white ${selectedConstituency.partyName.color}`}>
+                      {selectedConstituency.partyName.nameHi}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">{isEnglish ? 'Constituency:' : 'निर्वाचन क्षेत्र:'}</span>
+                      <span className="font-medium">{selectedConstituency.constituencyName.hi}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">{isEnglish ? 'Experience:' : 'अनुभव:'}</span>
+                      <span className="font-medium">{selectedConstituency.experience.hi}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">{isEnglish ? 'Education:' : 'शिक्षा:'}</span>
+                      <span className="font-medium">{selectedConstituency.education.hi}</span>
+                    </div>
+                  </div>
+                </div>
 
+                {/* Performance Metrics */}
+                <div className="bg-white rounded-lg p-6 shadow-md border border-slate-200">
+                  <h4 className="text-lg font-semibold text-slate-800 mb-4 text-center">
+                    {isEnglish ? 'Performance Metrics' : 'कार्य प्रदर्शन'}
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-sky-600 mb-1">
+                        {selectedConstituency.manifestoScore}%
+                      </div>
+                      <div className="text-sm text-slate-600">
+                        {isEnglish ? 'Manifesto Score' : 'घोषणापत्र स्कोर'}
+                      </div>
+                    </div>
+                    
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-emerald-600 mb-1">
+                        {selectedConstituency.activePostCount}
+                      </div>
+                      <div className="text-sm text-slate-600">
+                        {isEnglish ? 'Active Posts' : 'सक्रिय पोस्ट'}
+                      </div>
+                    </div>
+                    
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-amber-600 mb-1">
+                        {selectedConstituency.interactionCount}
+                      </div>
+                      <div className="text-sm text-slate-600">
+                        {isEnglish ? 'Interactions' : 'संवाद'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Satisfaction Survey */}
+                <div className="bg-white rounded-lg p-6 shadow-md border border-slate-200">
+                  <h4 className="text-lg font-semibold text-slate-800 mb-4 text-center">
+                    {isEnglish ? 'Satisfaction Survey' : 'संतुष्टि सर्वेक्षण'}
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-emerald-600 mb-1">
+                        {selectedConstituency.satisfactionYes}%
+                      </div>
+                      <div className="text-sm text-slate-600">
+                        {isEnglish ? 'Satisfied' : 'संतुष्ट'}
+                      </div>
+                    </div>
+                    
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-rose-600 mb-1">
+                        {selectedConstituency.satisfactionNo}%
+                      </div>
+                      <div className="text-sm text-slate-600">
+                        {isEnglish ? 'Not Satisfied' : 'असंतुष्ट'}
+                      </div>
+                    </div>
+                    
+                    <div className="w-full bg-slate-200 rounded-full h-2">
+                      <div 
+                        className="bg-emerald-500 h-2 rounded-l-full transition-all duration-500"
+                        style={{ width: `${selectedConstituency.satisfactionYes}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
+                <button
+                  onClick={() => navigateToConstituencyPage(selectedConstituency)}
+                  className="bg-sky-600 text-white px-6 py-3 rounded-lg hover:bg-sky-700 transition-colors font-medium"
+                >
+                  {isEnglish ? 'View Full Profile' : 'पूरा प्रोफाइल देखें'}
+                </button>
+                <button
+                  onClick={() => handleShare(selectedConstituency)}
+                  className="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+                >
+                  {shareStatus === 'copied' ? (isEnglish ? 'Copied!' : 'कॉपी हो गया!') : (isEnglish ? 'Share Profile' : 'प्रोफाइल शेयर करें')}
+                </button>
+                <button
+                  onClick={() => setSelectedConstituency(null)}
+                  className="bg-slate-600 text-white px-6 py-3 rounded-lg hover:bg-slate-700 transition-colors font-medium"
+                >
+                  {isEnglish ? 'Clear Selection' : 'चयन हटाएं'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* All Constituencies Browser Section */}
+      <div className="w-full bg-slate-50 py-8">
+        <div className="w-full max-w-none mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">
+              {isEnglish ? 'Featured Constituencies' : 'चर्चित निर्वाचन क्षेत्र'}
+            </h2>
+            <p className="text-slate-600">
+              {isEnglish ? `Showing ${Math.min(12, allConstituencies.length)} of ${allConstituencies.length} constituencies` : `${Math.min(12, allConstituencies.length)} में से ${allConstituencies.length} निर्वाचन क्षेत्र दिखा रहे हैं`}
+            </p>
+          </div>
+          
+          {/* Constituency Grid - Limited to 12 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4 mb-8">
+            {allConstituencies.slice(0, 12).map((constituency) => (
+              <button
+                key={constituency.id}
+                onClick={() => navigateToConstituencyPage(constituency)}
+                className="bg-white hover:bg-slate-50 rounded-lg p-4 text-left border border-slate-200 transition-all duration-200 hover:shadow-md hover:scale-105"
+              >
+                <div className="flex items-center space-x-3">
+                  {constituency.profileImage ? (
+                    <img 
+                      src={constituency.profileImage} 
+                      alt={constituency.candidateName.en}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <PlaceholderImages type="profile" size="sm" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-slate-800 truncate text-sm">
+                      {constituency.constituencyName.hi}
+                    </h3>
+                    <p className="text-xs text-slate-600 truncate">
+                      {constituency.candidateName.hi}
+                    </p>
+                    <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium text-white mt-1 ${constituency.partyName.color}`}>
+                      {constituency.partyName.nameHi}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+          
+          {/* View All Constituencies Button */}
+          <div className="text-center">
+            <button
+              onClick={() => {
+                // Navigate to constituency page with a special parameter to show all
+                window.location.href = '/constituency/all-constituencies?showAll=true';
+              }}
+              className="bg-sky-600 text-white px-8 py-4 rounded-lg hover:bg-sky-700 transition-colors font-medium text-lg"
+            >
+              {isEnglish ? `View All ${allConstituencies.length} Constituencies` : `सभी ${allConstituencies.length} निर्वाचन क्षेत्र देखें`}
+            </button>
+            <p className="text-slate-500 mt-3 text-sm">
+              {isEnglish ? 'Get detailed information about every constituency in Bihar' : 'बिहार के हर निर्वाचन क्षेत्र की विस्तृत जानकारी प्राप्त करें'}
+            </p>
+            
+            {/* Test Button for Debugging */}
+            {allConstituencies.length > 0 && (
+              <div className="mt-4">
+                <button
+                  onClick={() => {
+                    console.log('Testing navigation with first constituency:', allConstituencies[0]);
+                    navigateToConstituencyPage(allConstituencies[0]);
+                  }}
+                  className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm"
+                >
+                  Test Navigation (Debug)
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -650,60 +1030,59 @@ const Home: React.FC<HomeProps> = () => {
                         </p>
                       </div>
 
-                                        {/* Stats */}
-                  <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 text-center">
-                    <div>
-                      <div className="text-base sm:text-lg font-bold text-sky-600">
-                        {constituency.manifestoScore}%
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {content.manifestoScore}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-base sm:text-lg font-bold text-emerald-600">
-                        {constituency.activePostCount}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {content.activePosts}
-                      </div>
-                    </div>
-                    <div>
-                      <button 
-                        onClick={() => handleShare(constituency)}
-                        className="text-sky-600 hover:text-sky-700 transition-colors"
-                      >
-                        {shareStatus === 'copied' ? (
-                          <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-emerald-600" />
-                        ) : (
-                          <Share2 className="h-4 w-4 sm:h-5 sm:w-5 mx-auto" />
-                        )}
-                        <div className="text-xs mt-1">
-                          {shareStatus === 'copied' ? (isEnglish ? 'Copied!' : 'कॉपी हो गया!') : content.share}
+                      {/* Stats */}
+                      <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 text-center">
+                        <div>
+                          <div className="text-base sm:text-lg font-bold text-sky-600">
+                            {constituency.manifestoScore}%
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {content.manifestoScore}
+                          </div>
                         </div>
-                      </button>
-                    </div>
-                  </div>
+                        <div>
+                          <div className="text-base sm:text-lg font-bold text-emerald-600">
+                            {constituency.activePostCount}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {content.activePosts}
+                          </div>
+                        </div>
+                        <div>
+                          <button 
+                            onClick={() => handleShare(constituency)}
+                            className="text-sky-600 hover:text-sky-700 transition-colors"
+                          >
+                            {shareStatus === 'copied' ? (
+                              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-emerald-600" />
+                            ) : (
+                              <Share2 className="h-4 w-4 sm:h-5 sm:w-5 mx-auto" />
+                            )}
+                            <div className="text-xs mt-1">
+                              {shareStatus === 'copied' ? (isEnglish ? 'Copied!' : 'कॉपी हो गया!') : content.share}
+                            </div>
+                          </button>
+                        </div>
+                      </div>
 
-                  {/* Engagement Actions */}
-                  <div className="flex items-center justify-between mb-4 text-sm">
-                    <button className="flex items-center space-x-1 text-slate-600 hover:text-sky-600 transition-colors">
-                      <ThumbsUp className="h-4 w-4" />
-                      <span>{isEnglish ? 'Like' : 'लाइक'}</span>
-                    </button>
-                    <button className="flex items-center space-x-1 text-slate-600 hover:text-sky-600 transition-colors">
-                      <ThumbsUp className="h-4 w-4" />
-                      <span>{isEnglish ? 'Dislike' : ' डिस्लाइक'}</span>
-                    </button>
-                    <button className="flex items-center space-x-1 text-slate-600 hover:text-sky-600 transition-colors">
-                      <MessageSquare className="h-4 w-4" />
-                      <span>{isEnglish ? 'Comment' : 'टिप्पणी'}</span>
-                    </button>
-                   
-                  </div>
+                      {/* Engagement Actions */}
+                      <div className="flex items-center justify-between mb-4 text-sm">
+                        <button className="flex items-center space-x-1 text-slate-600 hover:text-sky-600 transition-colors">
+                          <ThumbsUp className="h-4 w-4" />
+                          <span>{isEnglish ? 'Like' : 'लाइक'}</span>
+                        </button>
+                        <button className="flex items-center space-x-1 text-slate-600 hover:text-sky-600 transition-colors">
+                          <ThumbsUp className="h-4 w-4" />
+                          <span>{isEnglish ? 'Dislike' : ' डिस्लाइक'}</span>
+                        </button>
+                        <button className="flex items-center space-x-1 text-slate-600 hover:text-sky-600 transition-colors">
+                          <MessageSquare className="h-4 w-4" />
+                          <span>{isEnglish ? 'Comment' : 'टिप्पणी'}</span>
+                        </button>
+                      </div>
 
                       <button
-                        onClick={() => window.location.href = `/aapka-shetra?constituency=${constituency.id}`}
+                        onClick={() => navigateToConstituencyPage(constituency)}
                         className="block w-full bg-sky-600 text-white text-center py-2 sm:py-3 rounded-lg hover:bg-sky-700 transition-colors text-sm sm:text-base font-medium"
                       >
                         {content.moreDetails}

@@ -5,6 +5,7 @@ import Home from './pages/Home';
 import About from './pages/About';
 import Contact from './pages/Contact';
 import BlogPost from './pages/BlogPost';
+import Constituency from './pages/Constituency';
 import { LanguageProvider } from './contexts/LanguageContext';
 import './App.css';
 
@@ -20,6 +21,7 @@ const App: React.FC = () => {
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/blog" element={<BlogPost />}/>
+              <Route path="/constituency/:constituencySlug" element={<Constituency />} />
             </Routes>
           </main>
         </div>
