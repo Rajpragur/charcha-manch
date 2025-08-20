@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Users, MessageCircle, Award, Share2, MapPin, CheckCircle, MapPin as MapPinIcon, Eye, ThumbsUp, MessageSquare, FileText, Clock, Target, Zap } from 'lucide-react';
+import { Search, Users, MessageCircle, Award, Share2, MapPin, CheckCircle, MapPin as MapPinIcon, ThumbsUp, MessageSquare, FileText, Clock, Target, Zap } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import PlaceholderImages from '../components/PlaceholderImages';
-import PhotoPlaceholder from '../components/PhotoPlaceholder';
 
 interface PartyData {
   name: string;
