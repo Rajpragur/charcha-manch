@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link,useLocation } from "react-router-dom";
 import { Menu, X, User, ToggleRight, ToggleLeft } from "lucide-react";
 import { useLanguage } from "../contexts/LanguageContext";
 
@@ -9,6 +9,7 @@ const Navbar: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const { isEnglish, toggleLanguage } = useLanguage();
   const profileRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
   const navItems = isEnglish
     ? [
         { name: "Home", href: "/" },
