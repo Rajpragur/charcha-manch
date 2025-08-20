@@ -295,14 +295,7 @@ const Home: React.FC<HomeProps> = () => {
             <p className="text-base sm:text-lg md:text-xl mb-6 sm:mb-8 max-w-3xl mx-auto px-4 text-amber-200 font-medium">
               {content.workDiscussion}
             </p>
-            
-            {/* Photo Placeholders */}
-            <div className="flex justify-center items-center space-x-4 mb-6 sm:mb-8">
-              <PhotoPlaceholder type="constituency" size="md" className="hidden sm:block" />
-              <PhotoPlaceholder type="landmark" size="md" className="hidden sm:block" />
-              <PhotoPlaceholder type="group" size="md" className="hidden sm:block" />
-            </div>
-            
+    
             {/* Search Dropdown */}
             <div className="relative max-w-sm sm:max-w-md mx-auto">
               <div className="flex">
@@ -352,6 +345,17 @@ const Home: React.FC<HomeProps> = () => {
                   )}
                 </div>
               )}
+            </div>
+            <div className="text-center">
+              <p className="text-lg sm:text-xl max-w-4xl mx-auto px-4 mt-4 text-slate-200">
+                {!isEnglish ? "जाने - उम्मीदवारो की सम्पत्ति, आप्राधिक मामले और संसद में भागीदारी" : "Know - The candidates' assets, criminal cases and participation in Parliament"}
+              </p>
+              <p className="text-lg sm:text-xl max-w-4xl mx-auto px-4 my-2 text-slate-200">
+                {!isEnglish ? "रखे - वर्तमान और पूर्व उम्मीदवारो पर अपनी राय" : "Share - Your views on current and past candidates"}
+              </p>
+              <p className="text-lg sm:text-xl max-w-4xl mx-auto px-4 my-2 text-slate-200">
+                {!isEnglish ? "करे - जनसंवाद, सवाल-जवाब और जवाबदेही तय" : "Do – Public dialogue, questions and answers and fix accountability"}
+              </p>
             </div>
           </div>
         </div>
