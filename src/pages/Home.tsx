@@ -362,7 +362,7 @@ const Home: React.FC<HomeProps> = () => {
     </span>
     <span className="text-sm sm:text-base text-slate-200">
       {!isEnglish
-        ? "उम्मीदवारों की सम्पत्ति, आपराधिक मामले और संसद में भागीदारी"
+        ? "- उम्मीदवारों की सम्पत्ति, आपराधिक मामले और संसद में भागीदारी"
         : "The candidates' assets, criminal cases and participation in Parliament"}
     </span>
   </p>
@@ -373,7 +373,7 @@ const Home: React.FC<HomeProps> = () => {
     </span>
     <span className="text-sm sm:text-base text-slate-200">
       {!isEnglish
-        ? "वर्तमान और पूर्व उम्मीदवारों पर अपनी राय"
+        ? "- वर्तमान और पूर्व उम्मीदवारों पर अपनी राय"
         : "Your views on current and past candidates"}
     </span>
   </p>
@@ -384,7 +384,7 @@ const Home: React.FC<HomeProps> = () => {
     </span>
     <span className="text-sm sm:text-base text-slate-200">
       {!isEnglish
-        ? "जनसंवाद, सवाल-जवाब और जवाबदेही तय"
+        ? "- जनसंवाद, सवाल-जवाब और जवाबदेही तय"
         : "Public dialogue, questions and answers, and fix accountability"}
     </span>
   </p>
