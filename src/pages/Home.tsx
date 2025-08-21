@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Users, MessageCircle, Award, Share2, MapPin, CheckCircle, MapPin as MapPinIcon, ThumbsUp, MessageSquare, FileText, Clock, Target, Zap } from 'lucide-react';
+import { Search, Users, MessageCircle, Award, Share2, MapPin, CheckCircle, MapPin as MapPinIcon, ThumbsUp, MessageSquare, FileText, Clock, Target, Zap, User } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import { Link } from 'react-router-dom';
 import PlaceholderImages from '../components/PlaceholderImages';
 
 // New interface for candidates.json data structure
@@ -179,6 +181,7 @@ const Home: React.FC<HomeProps> = () => {
   const [shareStatus, setShareStatus] = useState<string>('');
   const [candidatesData, setCandidatesData] = useState<CandidateData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { currentUser } = useAuth();
 
   // Load candidates data from JSON file
   useEffect(() => {
@@ -414,7 +417,7 @@ const Home: React.FC<HomeProps> = () => {
             <div className="grid grid-cols-2 gap-6 md:gap-20 items-center mb-6 sm:mb-8">
               <div className="flex justify-end mx-">
                 <img 
-                  src="images/biharmap.png" 
+                  src="/images/biharmap.png" 
                   alt="Bihar Map"
                   className="w-15 h-15 lg:w-40 lg:h-40 md:w-30 md:h-30 sm:w-28 sm:h-28 rounded-full object-cover"
                 />
@@ -429,7 +432,7 @@ const Home: React.FC<HomeProps> = () => {
               </div>
               <div className="flex justify-left">
                 <img 
-                  src="images/golghar.png" 
+                  src="/images/golghar.png" 
                   alt="Golghar"
                   className="w-15 h-15 lg:w-40 lg:h-40 md:w-30 md:h-30 sm:w-28 sm:h-28 rounded-full object-cover"
                 />
@@ -547,6 +550,68 @@ const Home: React.FC<HomeProps> = () => {
           </div>
         </div>
       </div>
+
+      {/* Welcome Section for Authenticated Users */}
+      {currentUser && (
+        <div className="w-full bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-200 py-8">
+          <div className="w-full max-w-none mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="bg-white rounded-xl p-6 shadow-md border border-green-200">
+              <div className="text-center mb-6">
+                <div className="w-20 h-20 mx-auto bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-2xl font-bold mb-4">
+                  {currentUser.displayName?.charAt(0).toUpperCase() || currentUser.email?.charAt(1).toUpperCase() || 'U'}
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">
+                  {isEnglish ? `Welcome back, ${currentUser.displayName || 'User'}!` : `स्वागत है, ${currentUser.displayName || 'उपयोगकर्ता'}!`}
+                </h2>
+                <p className="text-slate-600">
+                  {isEnglish ? 'You\'re signed in and ready to explore constituencies and share your views.' : 'आप साइन इन हैं और निर्वाचन क्षेत्रों का पता लगाने और अपने विचार साझा करने के लिए तैयार हैं।'}
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Link
+                  to="/dashboard"
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-4 rounded-lg hover:from-green-700 hover:to-emerald-700 transition-colors text-center group"
+                >
+                  <User className="h-8 w-8 mx-auto mb-2 group-hover:scale-110 transition-transform" />
+                  <h3 className="font-semibold mb-1">
+                    {isEnglish ? 'Dashboard' : 'डैशबोर्ड'}
+                  </h3>
+                  <p className="text-green-100 text-sm">
+                    {isEnglish ? 'View your account overview' : 'अपना खाता अवलोकन देखें'}
+                  </p>
+                </Link>
+                
+                <Link
+                  to="/constituency/all-constituencies?showAll=true"
+                  className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-4 rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-colors text-center group"
+                >
+                  <MapPin className="h-8 w-8 mx-auto mb-2 group-hover:scale-110 transition-transform" />
+                  <h3 className="font-semibold mb-1">
+                    {isEnglish ? 'Browse All' : 'सभी देखें'}
+                  </h3>
+                  <p className="text-emerald-100 text-sm">
+                    {isEnglish ? 'Explore all constituencies' : 'सभी निर्वाचन क्षेत्रों का पता लगाएं'}
+                  </p>
+                </Link>
+                
+                <Link
+                  to="/profile"
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-colors text-center group"
+                >
+                  <User className="h-8 w-8 mx-auto mb-2 group-hover:scale-110 transition-transform" />
+                  <h3 className="font-semibold mb-1">
+                    {isEnglish ? 'Profile' : 'प्रोफाइल'}
+                  </h3>
+                  <p className="text-blue-100 text-sm">
+                    {isEnglish ? 'Manage your profile' : 'अपनी प्रोफाइल प्रबंधित करें'}
+                  </p>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Selected Constituency Display Section */}
       {selectedConstituency && (

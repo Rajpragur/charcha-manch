@@ -73,8 +73,15 @@ const Constituency: React.FC = () => {
   const showAll = searchParams.get('showAll') === 'true';
   const encodedData = searchParams.get('data');
   
-  // Create a unique key for this constituency to force re-render
-  const constituencyKey = `${constituencySlug}-${constituencyId}-${encodedData ? 'encoded' : 'none'}`;
+  // Debug: Log the parameters we receive
+  console.log('=== COMPONENT PARAMS ===');
+  console.log('constituencySlug from useParams:', constituencySlug);
+  console.log('constituencyId from searchParams:', constituencyId);
+  console.log('showAll from searchParams:', showAll);
+  console.log('encodedData from searchParams:', encodedData);
+  console.log('========================');
+  
+
   
   const [constituencyData, setConstituencyData] = useState<CandidateData | null>(null);
   const [allConstituencies, setAllConstituencies] = useState<CandidateData[]>([]);
@@ -84,26 +91,48 @@ const Constituency: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedParty, setSelectedParty] = useState<string>('all');
 
-  // Clear constituency data when key changes (different constituency)
+  // Clear constituency data when constituency changes
   useEffect(() => {
     setConstituencyData(null);
     setError(null);
     setIsLoading(true);
-  }, [constituencyKey]);
+  }, [constituencyId, constituencySlug]);
 
-  // Load constituency data
+    // Load all candidates data first
   useEffect(() => {
-    const loadConstituencyData = async () => {
+    const loadAllCandidates = async () => {
       try {
-        setIsLoading(true);
-        setError(null); // Clear any previous errors
-        console.log('Constituency page loading with params:', { constituencyId, constituencySlug, showAll, encodedData });
-        
-        // Load all candidates data
         const response = await fetch('/data/candidates.json');
         const allCandidates: CandidateData[] = await response.json();
         setAllConstituencies(allCandidates);
         console.log('Loaded all candidates:', allCandidates.length);
+      } catch (err) {
+        console.error('Error loading all candidates:', err);
+        setError('Failed to load candidates data');
+      }
+    };
+
+    loadAllCandidates();
+  }, []); // Only run once on component mount
+
+  // Find and load specific constituency data after candidates are loaded
+  useEffect(() => {
+    if (allConstituencies.length === 0) {
+      return; // Wait for candidates to load
+    }
+
+    const findConstituency = () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        console.log('=== LOADING CONSTITUENCY DATA ===');
+        console.log('constituencyId:', constituencyId);
+        console.log('constituencySlug:', constituencySlug);
+        console.log('showAll:', showAll);
+        console.log('encodedData:', encodedData);
+        console.log('Total candidates available:', allConstituencies.length);
+        console.log('================================');
         
         if (showAll) {
           // If showing all constituencies, don't set specific constituency data
@@ -131,59 +160,78 @@ const Constituency: React.FC = () => {
           }
         }
         
-        // Second try to get from localStorage (if navigated from home page)
-        const storedData = localStorage.getItem('selectedConstituency');
-        console.log('Stored constituency data from localStorage:', storedData);
+        // Clear localStorage when loading a new constituency to avoid stale data
+        localStorage.removeItem('selectedConstituency');
         
-        if (storedData) {
-          try {
-            const parsedData = JSON.parse(storedData);
-            console.log('Successfully parsed constituency data:', parsedData);
-            
-            // Validate that the data has the required structure
-            if (parsedData && parsedData.area_name && parsedData.vidhayak_info) {
-              setConstituencyData(parsedData);
-              setIsLoading(false);
-              console.log('Set constituency data from localStorage');
-              return;
-            } else {
-              console.log('Stored data is invalid, clearing localStorage');
-              localStorage.removeItem('selectedConstituency');
-            }
-          } catch (parseError) {
-            console.error('Error parsing stored constituency data:', parseError);
-            localStorage.removeItem('selectedConstituency'); // Clear invalid data
-          }
-        }
-
         // Find the specific constituency by ID or slug
         let foundConstituency: CandidateData | null = null;
         
         console.log('Looking for constituency with ID:', constituencyId, 'or slug:', constituencySlug);
+        console.log('Total candidates loaded:', allConstituencies.length);
         
-        if (constituencyId) {
+        // First priority: Use the ID query parameter if available
+        if (constituencyId && allConstituencies.length > 0) {
           const id = parseInt(constituencyId);
-          console.log('Parsed ID:', id, 'Total candidates:', allCandidates.length);
-          if (!isNaN(id) && id >= 0 && id < allCandidates.length) {
-            foundConstituency = allCandidates[id];
-            console.log('Found constituency by ID:', foundConstituency);
+          console.log('Parsed ID from query param:', id, 'Total candidates:', allConstituencies.length);
+          if (!isNaN(id) && id >= 0 && id < allConstituencies.length) {
+            foundConstituency = allConstituencies[id];
+            console.log('✅ Found constituency by ID query param:', foundConstituency.area_name);
           } else {
-            console.log('Invalid ID or out of range');
+            console.log('❌ Invalid ID or out of range:', id);
           }
-        } else if (constituencySlug && constituencySlug !== 'all-constituencies') {
+        } 
+        // Second priority: Extract ID from slug if no query param
+        else if (constituencySlug && constituencySlug !== 'all-constituencies' && allConstituencies.length > 0) {
           // Try to find by slug (area name) - new format includes ID
-          // Extract area name from slug (remove the ID part)
-          const areaNameFromSlug = constituencySlug.split('-').slice(0, -1).join('-');
-          console.log('Extracted area name from slug:', areaNameFromSlug);
+          // Extract ID from slug (last part after the last dash)
+          const slugParts = constituencySlug.split('-');
+          const possibleId = slugParts[slugParts.length - 1];
+          const id = parseInt(possibleId);
           
-          foundConstituency = allCandidates.find(candidate => 
-            candidate.area_name.toLowerCase().replace(/\s+/g, '-') === areaNameFromSlug
-          ) || null;
-          console.log('Found constituency by slug:', foundConstituency);
+          console.log('Extracted ID from slug:', possibleId, 'Parsed as:', id);
+          
+          if (!isNaN(id) && id >= 0 && id < allConstituencies.length) {
+            // Use the ID from the slug to find the constituency
+            foundConstituency = allConstituencies[id];
+            console.log('✅ Found constituency by ID from slug:', foundConstituency.area_name);
+          } else {
+            console.log('❌ Invalid ID from slug or out of range:', id);
+            // Fallback: try to find by area name
+            const areaNameFromSlug = slugParts.slice(0, -1).join('-');
+            console.log('Fallback: trying to find by area name:', areaNameFromSlug);
+            
+            foundConstituency = allConstituencies.find(candidate => 
+              candidate.area_name.toLowerCase().replace(/\s+/g, '-') === areaNameFromSlug
+            ) || null;
+            console.log('Fallback result:', foundConstituency ? foundConstituency.area_name : 'Not found');
+          }
+        }
+        
+        if (!foundConstituency && !showAll && allConstituencies.length > 0) {
+          console.log('❌ No constituency found with current logic');
+          console.log('Available constituencies:', allConstituencies.map((c, i) => `${i}: ${c.area_name}`));
         }
         
         if (foundConstituency) {
-          console.log('Setting constituency data from search:', foundConstituency);
+          console.log('=== CONSTITUENCY DATA LOADED ===');
+          console.log('Found constituency:', foundConstituency.area_name);
+          console.log('Candidate name:', foundConstituency.vidhayak_info.name);
+          console.log('Party:', foundConstituency.vidhayak_info.party_name);
+          console.log('Array index:', allConstituencies.indexOf(foundConstituency));
+          console.log('URL ID parameter:', constituencyId);
+          console.log('URL slug parameter:', constituencySlug);
+          console.log('Full constituency data:', foundConstituency);
+          console.log('================================');
+          
+          // Verify this is the correct constituency by checking the ID
+          const expectedIndex = parseInt(constituencyId || '0');
+          if (allConstituencies.indexOf(foundConstituency) === expectedIndex) {
+            console.log('✅ CORRECT CONSTITUENCY LOADED - Index matches URL ID');
+          } else {
+            console.log('❌ WRONG CONSTITUENCY LOADED - Index mismatch!');
+            console.log('Expected index:', expectedIndex, 'but got:', allConstituencies.indexOf(foundConstituency));
+          }
+          
           setConstituencyData(foundConstituency);
           // Store in localStorage for future reference
           localStorage.setItem('selectedConstituency', JSON.stringify(foundConstituency));
@@ -194,14 +242,14 @@ const Constituency: React.FC = () => {
         
         setIsLoading(false);
       } catch (err) {
-        console.error('Error loading constituency data:', err);
-        setError('Failed to load constituency data');
+        console.error('Error finding constituency:', err);
+        setError('Failed to find constituency');
         setIsLoading(false);
       }
     };
 
-    loadConstituencyData();
-  }, [constituencyId, constituencySlug, showAll, encodedData]); // Added encodedData to dependencies
+    findConstituency();
+  }, [constituencyId, constituencySlug, showAll, encodedData, allConstituencies]); // Now allConstituencies is available
 
   // Get party color
   const getPartyColor = (partyName: string): string => {
@@ -245,7 +293,6 @@ const Constituency: React.FC = () => {
           <p className="mt-4 text-slate-600">Loading constituency data...</p>
           <div className="mt-4 text-xs text-slate-400">
             <p>Debug Info:</p>
-            <p>Key: {constituencyKey}</p>
             <p>ID: {constituencyId}</p>
             <p>Slug: {constituencySlug}</p>
             <p>Show All: {showAll ? 'Yes' : 'No'}</p>
@@ -281,7 +328,7 @@ const Constituency: React.FC = () => {
   }
 
   const { vidhayak_info, dept_info, other_candidates, latest_news } = constituencyData || {};
-
+  console.log(constituencyData);
   // If showing all constituencies, render the all constituencies view
   if (showAll) {
     return (
@@ -367,7 +414,7 @@ const Constituency: React.FC = () => {
               .map((constituency, index) => (
                 <Link
                   key={index}
-                  to={`/constituency/${constituency.area_name.toLowerCase().replace(/\s+/g, '-')}?id=${index}`}
+                  to={`/constituency/${constituency.area_name.toLowerCase().replace(/\s+/g, '-')}-${index}?id=${index}`}
                   className="bg-white hover:bg-slate-50 rounded-lg p-4 text-left border border-slate-200 transition-all duration-200 hover:shadow-md hover:scale-105"
                 >
                   <div className="flex items-center space-x-3">
@@ -463,7 +510,6 @@ const Constituency: React.FC = () => {
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
           <h3 className="text-sm font-semibold text-yellow-800 mb-2">Debug Info (Remove in Production)</h3>
           <div className="text-xs text-yellow-700 space-y-1">
-            <p>Constituency Key: {constituencyKey}</p>
             <p>Area Name: {constituencyData?.area_name}</p>
             <p>Candidate Name: {constituencyData?.vidhayak_info?.name}</p>
             <p>Party: {constituencyData?.vidhayak_info?.party_name}</p>
