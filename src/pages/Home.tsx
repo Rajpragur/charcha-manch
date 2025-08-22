@@ -7,23 +7,13 @@ import {
   Search, 
   MapPin, 
   User, 
-  Award, 
   TrendingUp, 
   Users, 
   Calendar,
   MessageCircle,
   Star,
   Share2,
-  ChevronDown,
-  ChevronUp,
   Loader2,
-  Heart,
-  GraduationCap,
-  Shield,
-  Building,
-  BookOpen,
-  ThumbsUp,
-  ThumbsDown,
   RefreshCw
 } from 'lucide-react';
 import PlaceholderImages from '../components/PlaceholderImages';
@@ -122,8 +112,8 @@ const Home: React.FC = () => {
   const [visibleConstituencies, setVisibleConstituencies] = useState(6);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [userAchievements, setUserAchievements] = useState<any>(null);
-  const [englishData, setEnglishData] = useState<CandidateData[]>([]);
-  const [hindiData, setHindiData] = useState<CandidateData[]>([]);
+  const [, setEnglishData] = useState<CandidateData[]>([]);
+  const [, setHindiData] = useState<CandidateData[]>([]);
 
   // Load data on component mount
   useEffect(() => {

@@ -415,7 +415,7 @@ const Constituency: React.FC = () => {
                 {showDropdown && searchQuery.trim() && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     {englishData
-                      .filter((constituency, index) => {
+                      .filter((constituency, ) => {
                         const searchLower = searchQuery.toLowerCase();
                         return constituency.area_name.toLowerCase().includes(searchLower) ||
                                constituency.vidhayak_info.name.toLowerCase().includes(searchLower) ||
@@ -480,7 +480,7 @@ const Constituency: React.FC = () => {
           {/* Constituencies Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
             {allConstituencies
-              .filter((constituency, index) => {
+              .filter((_, index) => {
                 // Search in English data but filter Hindi data for display
                 const englishConstituency = englishData[index];
                 if (!englishConstituency) return false;

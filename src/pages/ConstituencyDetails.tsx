@@ -13,19 +13,13 @@ import {
   TrendingUp,
   Users,
   Building,
-  Star,
   BarChart3,
   DollarSign,
   Heart,
   MessageCircle,
-  ThumbsUp,
-  ThumbsDown,
-  Calendar,
   BookOpen,
   Shield,
-  GraduationCap,
-  Activity,
-  Coins
+  GraduationCap
 } from 'lucide-react';
 import PlaceholderImages from '../components/PlaceholderImages';
 
@@ -104,6 +98,14 @@ const ConstituencyDetails: React.FC = () => {
   useEffect(() => {
     loadJsonData();
   }, []);
+
+  // Retry loading constituency data when JSON data is available
+  useEffect(() => {
+    if (englishData.length > 0 && hindiData.length > 0 && constituencyId && !constituencyData) {
+      // If we have JSON data but no constituency data, try loading from JSON
+      loadFromJsonFiles();
+    }
+  }, [englishData, hindiData, constituencyId, constituencyData]);
 
   const loadJsonData = async () => {
     try {
@@ -349,7 +351,7 @@ const ConstituencyDetails: React.FC = () => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `${constituencyData?.area_name} - Charcha Manch`,
+          title: `${isEnglish ? constituencyData?.area_name : constituencyData?.area_name_hi} - Charcha Manch`,
           url: url
         });
       } catch (err) {
@@ -449,11 +451,20 @@ const ConstituencyDetails: React.FC = () => {
             
             <div className="text-center">
               <h1 className="text-xl font-semibold text-slate-800">
-                {constituencyData.area_name}
+                {isEnglish ? constituencyData.area_name : constituencyData.area_name_hi}
               </h1>
               <p className="text-sm text-slate-500">
                 {isEnglish ? 'Constituency Details' : 'निर्वाचन क्षेत्र विवरण'}
               </p>
+              <div className="mt-1">
+                <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                  isEnglish 
+                    ? 'bg-blue-100 text-blue-800' 
+                    : 'bg-green-100 text-green-800'
+                }`}>
+                  {isEnglish ? 'English' : 'हिंदी'}
+                </span>
+              </div>
             </div>
             
             <button 

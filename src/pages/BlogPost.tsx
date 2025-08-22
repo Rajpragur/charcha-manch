@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Calendar, User, Tag, ThumbsUp, MessageSquare, Eye, TrendingUp, Clock, ArrowLeft, ArrowRight } from 'lucide-react';
-import PhotoPlaceholder from '../components/PhotoPlaceholder';
 
 interface BlogPost {
   id: string;
