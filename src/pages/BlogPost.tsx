@@ -172,13 +172,6 @@ const BlogPost: React.FC = () => {
             <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 max-w-4xl mx-auto px-4 text-slate-200">
               {content.subtitle}
             </p>
-            
-            {/* Photo Placeholders */}
-            <div className="flex justify-center items-center space-x-4 mb-6 sm:mb-8">
-              <PhotoPlaceholder type="document" size="md" className="hidden sm:block" />
-              <PhotoPlaceholder type="chart" size="md" className="hidden sm:block" />
-              <PhotoPlaceholder type="general" size="md" className="hidden sm:block" />
-            </div>
           </div>
         </div>
       </div>

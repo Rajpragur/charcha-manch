@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useSearchParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
   MapPin, 
@@ -12,7 +12,8 @@ import {
   Building,
   Star,
   BarChart3,
-  DollarSign
+  DollarSign,
+  Search
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import PlaceholderImages from '../components/PlaceholderImages';
@@ -69,6 +70,7 @@ const Constituency: React.FC = () => {
   const { isEnglish } = useLanguage();
   const { constituencySlug } = useParams<{ constituencySlug: string }>();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const constituencyId = searchParams.get('id');
   const showAll = searchParams.get('showAll') === 'true';
   const encodedData = searchParams.get('data');
@@ -89,7 +91,22 @@ const Constituency: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
   const [selectedParty, setSelectedParty] = useState<string>('all');
+  const [englishData, setEnglishData] = useState<CandidateData[]>([]);
+  const [hindiData, setHindiData] = useState<CandidateData[]>([]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showDropdown && !(event.target as Element).closest('.search-container')) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showDropdown]);
 
   // Clear constituency data when constituency changes
   useEffect(() => {
@@ -102,12 +119,24 @@ const Constituency: React.FC = () => {
   useEffect(() => {
     const loadAllCandidates = async () => {
       try {
-        const response = await fetch('/data/candidates.json');
-        const allCandidates: CandidateData[] = await response.json();
-        setAllConstituencies(allCandidates);
-        console.log('Loaded all candidates:', allCandidates.length);
+        // Load both English and Hindi data
+        const [englishResponse, hindiResponse] = await Promise.all([
+          fetch('/data/candidates_en.json'),
+          fetch('/data/candidates.json')
+        ]);
+
+        const englishData: CandidateData[] = await englishResponse.json();
+        const hindiData: CandidateData[] = await hindiResponse.json();
+
+        setEnglishData(englishData);
+        setHindiData(hindiData);
+        
+        // Use Hindi data for display (for correct image URLs) but maintain English data for search
+        setAllConstituencies(hindiData);
+        console.log('Loaded English candidates:', englishData.length);
+        console.log('Loaded Hindi candidates:', hindiData.length);
       } catch (err) {
-        console.error('Error loading all candidates:', err);
+        console.error('Error loading candidates data:', err);
         setError('Failed to load candidates data');
       }
     };
@@ -365,18 +394,58 @@ const Constituency: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="bg-white rounded-lg shadow-md border border-slate-200 p-6 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Search */}
-              <div>
+              {/* Search - Always search in English data */}
+              <div className="search-container">
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   {isEnglish ? 'Search Constituencies' : 'निर्वाचन क्षेत्र खोजें'}
                 </label>
-                <input
-                  type="text"
-                  placeholder={isEnglish ? 'Search by name, candidate, or party...' : 'नाम, उम्मीदवार, या पार्टी से खोजें...'}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder={isEnglish ? 'Search by name, candidate, or party...' : 'नाम, उम्मीदवार, या पार्टी से खोजें...'}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => setShowDropdown(true)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                  />
+                  <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                </div>
+                
+                {/* Search Dropdown */}
+                {showDropdown && searchQuery.trim() && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {englishData
+                      .filter((constituency, index) => {
+                        const searchLower = searchQuery.toLowerCase();
+                        return constituency.area_name.toLowerCase().includes(searchLower) ||
+                               constituency.vidhayak_info.name.toLowerCase().includes(searchLower) ||
+                               constituency.vidhayak_info.party_name.toLowerCase().includes(searchLower);
+                      })
+                      .slice(0, 10)
+                      .map((constituency, index) => {
+                        // Find corresponding Hindi data for display
+                        const hindiConstituency = hindiData[index] || constituency;
+                        return (
+                          <button
+                            key={index}
+                            onClick={() => {
+                              navigate(`/constituency/${constituency.area_name.toLowerCase().replace(/\s+/g, '-')}-${index}?id=${index}`);
+                              setShowDropdown(false);
+                              setSearchQuery('');
+                            }}
+                            className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-b-0 text-sm text-slate-900 transition-colors"
+                          >
+                            <div className="font-medium">
+                              {isEnglish ? constituency.area_name : hindiConstituency.area_name}
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              {isEnglish ? constituency.vidhayak_info.name : hindiConstituency.vidhayak_info.name} - {isEnglish ? constituency.vidhayak_info.party_name : hindiConstituency.vidhayak_info.party_name}
+                            </div>
+                          </button>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
               
               {/* Party Filter */}
@@ -386,14 +455,24 @@ const Constituency: React.FC = () => {
                 </label>
                 <select
                   value={selectedParty}
-                  onChange={(e) => setSelectedParty(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedParty(e.target.value);
+                    console.log('Party filter changed to:', e.target.value);
+                  }}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                 >
                   <option value="all">{isEnglish ? 'All Parties' : 'सभी पार्टियां'}</option>
-                  {Array.from(new Set(allConstituencies.map(c => c.vidhayak_info.party_name))).map(party => (
+                  {Array.from(new Set(
+                    // Get unique party names from English data for accurate filtering
+                    englishData.map(c => c.vidhayak_info.party_name).filter(Boolean)
+                  )).sort().map(party => (
                     <option key={party} value={party}>{party}</option>
                   ))}
                 </select>
+                {/* Debug info */}
+                <div className="text-xs text-slate-500 mt-1">
+                  {isEnglish ? 'Available parties:' : 'उपलब्ध पार्टियां:'} {englishData.length > 0 ? englishData.slice(0, 3).map(c => c.vidhayak_info.party_name).join(', ') : 'Loading...'}
+                </div>
               </div>
             </div>
           </div>
@@ -401,50 +480,76 @@ const Constituency: React.FC = () => {
           {/* Constituencies Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
             {allConstituencies
-              .filter(constituency => {
-                const matchesSearch = searchQuery === '' || 
-                  constituency.area_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  constituency.vidhayak_info.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  constituency.vidhayak_info.party_name.toLowerCase().includes(searchQuery.toLowerCase());
+              .filter((constituency, index) => {
+                // Search in English data but filter Hindi data for display
+                const englishConstituency = englishData[index];
+                if (!englishConstituency) return false;
                 
-                const matchesParty = selectedParty === 'all' || constituency.vidhayak_info.party_name === selectedParty;
+                const searchLower = searchQuery.toLowerCase();
+                const matchesSearch = searchQuery === '' || 
+                  englishConstituency.area_name.toLowerCase().includes(searchLower) ||
+                  englishConstituency.vidhayak_info.name.toLowerCase().includes(searchLower) ||
+                  englishConstituency.vidhayak_info.party_name.toLowerCase().includes(searchLower);
+                
+                const matchesParty = selectedParty === 'all' || 
+                  englishConstituency.vidhayak_info.party_name === selectedParty;
+                
+                // Debug filtering
+                if (selectedParty !== 'all' && !matchesParty) {
+                  console.log('Party filter debug:', {
+                    constituency: englishConstituency.area_name,
+                    constituencyParty: englishConstituency.vidhayak_info.party_name,
+                    selectedParty,
+                    matchesParty
+                  });
+                }
                 
                 return matchesSearch && matchesParty;
               })
-              .map((constituency, index) => (
-                <Link
-                  key={index}
-                  to={`/constituency/${constituency.area_name.toLowerCase().replace(/\s+/g, '-')}-${index}?id=${index}`}
-                  className="bg-white hover:bg-slate-50 rounded-lg p-4 text-left border border-slate-200 transition-all duration-200 hover:shadow-md hover:scale-105"
-                >
-                  <div className="flex items-center space-x-3">
-                    {constituency.vidhayak_info.image_url ? (
-                      <img 
-                        src={constituency.vidhayak_info.image_url} 
-                        alt={constituency.vidhayak_info.name}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
-                    ) : (
-                      <PlaceholderImages type="profile" size="sm" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-slate-800 truncate text-sm">
-                        {constituency.area_name}
-                      </h3>
-                      <p className="text-xs text-slate-600 truncate">
-                        {constituency.vidhayak_info.name}
-                      </p>
-                      <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium text-white mt-1 ${getPartyColor(constituency.vidhayak_info.party_name)}`}>
-                        {constituency.vidhayak_info.party_name}
-                      </div>
-                      <div className="flex items-center space-x-1 mt-1 text-xs text-slate-500">
-                        <Award className="h-3 w-3" />
-                        <span>{constituency.vidhayak_info.last_election_vote_percentage}% votes</span>
+              .map((constituency, index) => {
+                // Get corresponding English data for search results
+                const englishConstituency = englishData[index];
+                return (
+                                  <Link
+                    key={index}
+                    to={`/constituency/${englishConstituency.area_name.toLowerCase().replace(/\s+/g, '-')}-${index}?id=${index}`}
+                    className="bg-white hover:bg-slate-50 rounded-lg p-4 text-left border border-slate-200 transition-all duration-200 hover:shadow-md hover:scale-105"
+                  >
+                    <div className="flex items-center space-x-3">
+                      {constituency.vidhayak_info.image_url ? (
+                        <img 
+                          src={constituency.vidhayak_info.image_url} 
+                          alt={constituency.vidhayak_info.name}
+                          className="w-12 h-12 rounded-full object-cover"
+                          onError={(e) => {
+                            // Fallback to placeholder if image fails to load
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      {!constituency.vidhayak_info.image_url && (
+                        <PlaceholderImages type="profile" size="sm" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-slate-800 truncate text-sm">
+                          {isEnglish ? englishConstituency.area_name : constituency.area_name}
+                        </h3>
+                        <p className="text-xs text-slate-600 truncate">
+                          {isEnglish ? englishConstituency.vidhayak_info.name : constituency.vidhayak_info.name}
+                        </p>
+                        <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium text-white mt-1 ${getPartyColor(constituency.vidhayak_info.party_name)}`}>
+                          {isEnglish ? englishConstituency.vidhayak_info.party_name : constituency.vidhayak_info.party_name}
+                        </div>
+                        <div className="flex items-center space-x-1 mt-1 text-xs text-slate-500">
+                          <Award className="h-3 w-3" />
+                          <span>{constituency.vidhayak_info.last_election_vote_percentage}% votes</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
-              ))}
+                                    </Link>
+                );
+              })}
           </div>
         </div>
       </div>
@@ -490,11 +595,23 @@ const Constituency: React.FC = () => {
             
             <div className="text-center">
               <h1 className="text-xl font-semibold text-slate-800">
-                {constituencyData?.area_name || 'All Constituencies'}
+                {isEnglish ? 
+                  (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.area_name : 'All Constituencies') :
+                  (constituencyData?.area_name || 'सभी निर्वाचन क्षेत्र')
+                }
               </h1>
               <p className="text-sm text-slate-500">
                 {isEnglish ? 'Constituency Details' : 'निर्वाचन क्षेत्र विवरण'}
               </p>
+              <div className="mt-1">
+                <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                  isEnglish 
+                    ? 'bg-blue-100 text-blue-800' 
+                    : 'bg-green-100 text-green-800'
+                }`}>
+                  {isEnglish ? 'English' : 'हिंदी'}
+                </span>
+              </div>
             </div>
             
             <button className="p-2 text-slate-600 hover:text-slate-800 transition-colors">
@@ -506,19 +623,6 @@ const Constituency: React.FC = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Debug Info - Remove in production */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-          <h3 className="text-sm font-semibold text-yellow-800 mb-2">Debug Info (Remove in Production)</h3>
-          <div className="text-xs text-yellow-700 space-y-1">
-            <p>Area Name: {constituencyData?.area_name}</p>
-            <p>Candidate Name: {constituencyData?.vidhayak_info?.name}</p>
-            <p>Party: {constituencyData?.vidhayak_info?.party_name}</p>
-            <p>ID from URL: {constituencyId}</p>
-            <p>Slug from URL: {constituencySlug}</p>
-            <p>Has Encoded Data: {encodedData ? 'Yes' : 'No'}</p>
-          </div>
-        </div>
-
         {/* Candidate Overview Card */}
         <div className="bg-white rounded-xl shadow-lg border border-slate-200 mb-8 overflow-hidden">
           <div className={`${getPartyColor(vidhayak_info?.party_name || 'नोटा')} h-2`}></div>
@@ -532,23 +636,38 @@ const Constituency: React.FC = () => {
                     src={vidhayak_info.image_url} 
                     alt={vidhayak_info.name}
                     className="w-32 h-32 lg:w-40 lg:h-40 rounded-full object-cover mx-auto lg:mx-0 mb-4 border-4 border-slate-100"
+                    onError={(e) => {
+                      // Fallback to placeholder if image fails to load
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                    }}
                   />
-                ) : (
+                ) : null}
+                {!vidhayak_info?.image_url && (
                   <PlaceholderImages type="profile" size="xl" className="mx-auto lg:mx-0 mb-4" />
                 )}
                 
                 <h2 className="text-2xl lg:text-3xl font-bold text-slate-800 mb-2">
-                  {vidhayak_info?.name || 'Not Specified'}
+                  {isEnglish ? 
+                    (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.vidhayak_info.name : 'Not Specified') :
+                    (vidhayak_info?.name || 'Not Specified')
+                  }
                 </h2>
                 
                 <div className={`inline-block px-4 py-2 rounded-full text-sm font-medium text-white mb-4 ${getPartyColor(vidhayak_info?.party_name || 'नोटा')}`}>
-                  {vidhayak_info?.party_name || 'Not Specified'}
+                  {isEnglish ? 
+                    (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.vidhayak_info.party_name : 'Not Specified') :
+                    (vidhayak_info?.party_name || 'Not Specified')
+                  }
                 </div>
                 
                 <div className="space-y-2 text-sm text-slate-600">
                   <div className="flex items-center justify-center lg:justify-start space-x-2">
                     <MapPin className="h-4 w-4" />
-                    <span>{constituencyData?.area_name || 'Not Specified'}</span>
+                    <span>{isEnglish ? 
+                      (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.area_name : 'Not Specified') :
+                      (constituencyData?.area_name || 'Not Specified')
+                    }</span>
                   </div>
                   <div className="flex items-center justify-center lg:justify-start space-x-2">
                     <User className="h-4 w-4" />
@@ -671,11 +790,17 @@ const Constituency: React.FC = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600">{isEnglish ? 'Education' : 'शिक्षा'}</span>
-                        <span className="font-medium">{vidhayak_info?.metadata.education || 'Not specified'}</span>
+                        <span className="font-medium">{isEnglish ? 
+                          (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.vidhayak_info.metadata.education : 'Not specified') :
+                          (vidhayak_info?.metadata.education || 'Not specified')
+                        }</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600">{isEnglish ? 'Experience' : 'अनुभव'}</span>
-                        <span className="font-medium">{vidhayak_info?.experience || 'Not specified'}</span>
+                        <span className="font-medium">{isEnglish ? 
+                          (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.vidhayak_info.experience : 'Not specified') :
+                          (vidhayak_info?.experience || 'Not specified')
+                        }</span>
                       </div>
                     </div>
                   </div>
@@ -693,7 +818,10 @@ const Constituency: React.FC = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600">{isEnglish ? 'Funds Utilisation' : 'धन उपयोग'}</span>
-                        <span className="font-medium">{vidhayak_info?.metadata.funds_utilisation || 'Not specified'}</span>
+                        <span className="font-medium">{isEnglish ? 
+                          (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.vidhayak_info.metadata.funds_utilisation : 'Not specified') :
+                          (vidhayak_info?.metadata.funds_utilisation || 'Not specified')
+                        }</span>
                       </div>
                     </div>
                   </div>
@@ -716,7 +844,10 @@ const Constituency: React.FC = () => {
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-emerald-600 mb-1">
-                        {vidhayak_info?.metadata.attendance || 'N/A'}
+                        {isEnglish ? 
+                          (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.vidhayak_info.metadata.attendance : 'N/A') :
+                          (vidhayak_info?.metadata.attendance || 'N/A')
+                        }
                       </div>
                       <div className="text-sm text-slate-600">
                         {isEnglish ? 'Attendance' : 'उपस्थिति'}
@@ -724,7 +855,10 @@ const Constituency: React.FC = () => {
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-amber-600 mb-1">
-                        {vidhayak_info?.metadata.questions_asked || 'N/A'}
+                        {isEnglish ? 
+                          (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.vidhayak_info.metadata.questions_asked : 'N/A') :
+                          (vidhayak_info?.metadata.questions_asked || 'N/A')
+                        }
                       </div>
                       <div className="text-sm text-slate-600">
                         {isEnglish ? 'Questions Asked' : 'पूछे गए प्रश्न'}
@@ -892,10 +1026,16 @@ const Constituency: React.FC = () => {
                           )}
                           <div className="flex-1 min-w-0">
                             <h4 className="font-medium text-slate-800 truncate">
-                              {candidate.candidate_name}
+                              {isEnglish ? 
+                                (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.other_candidates?.[index]?.candidate_name : candidate.candidate_name) :
+                                candidate.candidate_name
+                              }
                             </h4>
                             <p className="text-sm text-slate-600 truncate">
-                              {candidate.candidate_party}
+                              {isEnglish ? 
+                                (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.other_candidates?.[index]?.candidate_party : candidate.candidate_party) :
+                                candidate.candidate_party
+                              }
                             </p>
                             <div className="flex items-center space-x-1 mt-1">
                               <TrendingUp className="h-3 w-3 text-emerald-500" />
@@ -930,7 +1070,12 @@ const Constituency: React.FC = () => {
                         <div className="flex items-start space-x-3">
                           <FileText className="h-5 w-5 text-sky-600 mt-1 flex-shrink-0" />
                           <div>
-                            <p className="text-slate-700 font-medium">{news.title}</p>
+                            <p className="text-slate-700 font-medium">
+                              {isEnglish ? 
+                                (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.latest_news?.[index]?.title : news.title) :
+                                news.title
+                              }
+                            </p>
                             <p className="text-sm text-slate-500 mt-1">
                               {isEnglish ? 'Recent news from this constituency' : 'इस निर्वाचन क्षेत्र से ताजा समाचार'}
                             </p>

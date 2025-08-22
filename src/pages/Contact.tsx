@@ -165,12 +165,6 @@ const Contact: React.FC = () => {
               {content.description}
             </p>
             
-            {/* Photo Placeholders */}
-            <div className="flex justify-center items-center space-x-4 mb-6 sm:mb-8">
-              <PhotoPlaceholder type="general" size="md" className="hidden sm:block" />
-              <PhotoPlaceholder type="building" size="md" className="hidden sm:block" />
-              <PhotoPlaceholder type="group" size="md" className="hidden sm:block" />
-            </div>
           </div>
         </div>
       </div>

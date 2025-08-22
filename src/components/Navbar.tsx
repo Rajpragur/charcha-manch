@@ -17,7 +17,7 @@ const Navbar: React.FC = () => {
         { name: "Home", href: "/" },
         { name: "Constituencies", href: "/constituency/all-constituencies?showAll=true" },
         { name: "About", href: "/about" },
-        { name: "Your Constituency", href: "/aapka-shetra" },
+        { name: "Aapka Kshetra", href: "/aapka-shetra" },
         { name: "Forum", href: "/discussion-forum" },
         { name: "Blog", href: "/blog" },
         { name: "Contact", href: "/contact" },

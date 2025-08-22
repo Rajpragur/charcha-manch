@@ -113,13 +113,6 @@ const About: React.FC = () => {
             <p className="text-base sm:text-lg md:text-xl mb-6 sm:mb-8 max-w-3xl mx-auto px-4 text-slate-300">
               {content.description}
             </p>
-            
-            {/* Photo Placeholders */}
-            <div className="flex justify-center items-center space-x-4 mb-6 sm:mb-8">
-              <PhotoPlaceholder type="group" size="md" className="hidden sm:block" />
-              <PhotoPlaceholder type="building" size="md" className="hidden sm:block" />
-              <PhotoPlaceholder type="landmark" size="md" className="hidden sm:block" />
-            </div>
           </div>
         </div>
       </div>
