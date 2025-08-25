@@ -45,6 +45,7 @@ const DiscussionForum: React.FC = () => {
   const [showLowResultsButton, setShowLowResultsButton] = useState(false);
   const [showAllPostsButton, setShowAllPostsButton] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showCreatePost, setShowCreatePost] = useState(false);
 
   const content = {
     title: isEnglish ? 'Discussion Forum' : 'चर्चा मंच',
@@ -78,32 +79,6 @@ const DiscussionForum: React.FC = () => {
 
   // Fetch posts and constituencies
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Fetch posts
-        const fetchedPosts = await FirebaseService.getDiscussionPosts();
-        setPosts(fetchedPosts);
-        
-        // Fetch constituencies with post counts
-        const fetchedConstituencies = await FirebaseService.getConstituenciesWithPostCounts();
-        setConstituencies(fetchedConstituencies);
-        
-        // Check if user is admin
-        if (currentUser?.uid) {
-          // For now, we'll check if user has admin privileges through other means
-          // This can be enhanced later with proper role-based access control
-          setIsAdmin(false); // Default to false, can be enhanced
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        toast.error('Failed to load discussions');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchData();
   }, [currentUser?.uid]);
 
@@ -183,6 +158,39 @@ const DiscussionForum: React.FC = () => {
   const handleSeeAllPosts = () => {
     setSearchTerm('');
     setShowAllPostsButton(false);
+  };
+
+  // Handle post creation
+  const handlePostCreated = () => {
+    // Refresh posts
+    fetchData();
+  };
+
+  // Fetch data function
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch posts
+      const fetchedPosts = await FirebaseService.getDiscussionPosts();
+      setPosts(fetchedPosts);
+      
+      // Fetch constituencies with post counts
+      const fetchedConstituencies = await FirebaseService.getConstituenciesWithPostCounts();
+      setConstituencies(fetchedConstituencies);
+      
+      // Check if user is admin
+      if (currentUser?.uid) {
+        // For now, we'll check if user has admin privileges through other means
+        // This can be enhanced later with proper role-based access control
+        setIsAdmin(false); // Default to false, can be enhanced
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast.error('Failed to load discussions');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle post removal (admin only)
@@ -333,6 +341,7 @@ const DiscussionForum: React.FC = () => {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            onClick={() => setShowCreatePost(true)}
             className="bg-sky-600 text-white px-6 py-3 rounded-lg hover:bg-sky-700 transition-colors font-medium"
           >
             {content.createPost}
@@ -457,6 +466,13 @@ const DiscussionForum: React.FC = () => {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Create Post Modal */}
+      <CreatePost
+        isOpen={showCreatePost}
+        onClose={() => setShowCreatePost(false)}
+        onPostCreated={handlePostCreated}
+      />
     </div>
   );
 };

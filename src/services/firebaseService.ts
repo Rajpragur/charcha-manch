@@ -16,6 +16,12 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '../configs/firebase';
+import { storage } from '../configs/firebase';
+import { 
+  ref, 
+  uploadBytes, 
+  getDownloadURL 
+} from 'firebase/storage';
 
 // Types for Firebase data
 export interface FirebaseUserProfile {
@@ -108,12 +114,19 @@ export interface FirebaseDiscussionPost {
   title: string;
   content: string;
   constituency: number;
+  constituencyName: string;
   userId: string;
   createdAt: any;
   updatedAt?: any;
   status: 'published' | 'under_review' | 'removed';
   likesCount?: number;
   commentsCount?: number;
+  tags: string[];
+  media: {
+    type: 'image' | 'video';
+    url: string;
+    thumbnail?: string;
+  }[];
 }
 
 export interface FirebaseConstituency {
@@ -1527,6 +1540,60 @@ export class FirebaseService {
       return newPost.id;
     } catch (error: any) {
       console.error('Error creating discussion post:', error);
+      throw error;
+    }
+  }
+
+  static async uploadMedia(file: File, userId: string, postId: string): Promise<{ type: 'image' | 'video'; url: string; thumbnail?: string }> {
+    try {
+      const fileExtension = file.name.split('.').pop();
+      const fileName = `${userId}_${postId}_${Date.now()}.${fileExtension}`;
+      const storageRef = ref(storage, `discussion_media/${fileName}`);
+      
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      
+      let thumbnail;
+      if (file.type.startsWith('image/')) {
+        // For images, we can use the same URL as thumbnail
+        thumbnail = downloadURL;
+        return {
+          type: 'image' as const,
+          url: downloadURL,
+          thumbnail
+        };
+      } else if (file.type.startsWith('video/')) {
+        // For videos, we'll need to generate a thumbnail
+        // For now, we'll use a placeholder
+        thumbnail = '/images/video-placeholder.png';
+        return {
+          type: 'video' as const,
+          url: downloadURL,
+          thumbnail
+        };
+      }
+      
+      return {
+        type: 'image' as const,
+        url: downloadURL,
+        thumbnail
+      };
+    } catch (error: any) {
+      console.error('Error uploading media:', error);
+      throw error;
+    }
+  }
+
+  static async updateDiscussionPost(postId: string, updateData: Partial<FirebaseDiscussionPost>): Promise<void> {
+    try {
+      const postRef = doc(db, 'discussion_posts', postId);
+      await updateDoc(postRef, {
+        ...updateData,
+        updatedAt: serverTimestamp()
+      });
+      console.log(`✅ Updated discussion post ${postId}`);
+    } catch (error: any) {
+      console.error('Error updating discussion post:', error);
       throw error;
     }
   }
