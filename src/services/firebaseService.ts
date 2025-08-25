@@ -1407,9 +1407,9 @@ export class FirebaseService {
   static async getDiscussionPosts(): Promise<any[]> {
     try {
       const postsRef = collection(db, 'discussion_posts');
-      // Simplified query to avoid index requirements
-      const q = query(postsRef, orderBy('createdAt', 'desc'));
-      const querySnapshot = await getDocs(q);
+      
+      // Get all posts without ordering to avoid index issues
+      const querySnapshot = await getDocs(postsRef);
 
       const posts = querySnapshot.docs.map(doc => ({
         id: doc.id,
@@ -1449,6 +1449,13 @@ export class FirebaseService {
           }
         })
       );
+
+      // Sort posts by createdAt in memory instead of in query
+      enrichedPosts.sort((a, b) => {
+        const aTime = a.createdAt?.toDate?.() || new Date(a.createdAt);
+        const bTime = b.createdAt?.toDate?.() || new Date(b.createdAt);
+        return bTime.getTime() - aTime.getTime(); // Newest first
+      });
 
       return enrichedPosts;
     } catch (error: any) {
@@ -1694,8 +1701,8 @@ export class FirebaseService {
       const commentsRef = collection(db, 'comments');
       const q = query(
         commentsRef,
-        where('postId', '==', postId),
-        orderBy('createdAt', 'asc')
+        where('postId', '==', postId)
+        // Removed orderBy to avoid index requirement
       );
       
       const querySnapshot = await getDocs(q);
@@ -1707,6 +1714,13 @@ export class FirebaseService {
           id: doc.id,
           ...commentData
         });
+      });
+      
+      // Sort comments by createdAt in memory instead
+      comments.sort((a, b) => {
+        const aTime = a.createdAt?.toDate?.() || new Date(a.createdAt);
+        const bTime = b.createdAt?.toDate?.() || new Date(b.createdAt);
+        return aTime.getTime() - bTime.getTime();
       });
       
       return comments;
@@ -1808,14 +1822,16 @@ export class FirebaseService {
     }
   }
 
+
+
   // Get replies for a comment
   static async getReplies(commentId: string): Promise<any[]> {
     try {
       const repliesRef = collection(db, 'comment_replies');
       const q = query(
         repliesRef,
-        where('parentCommentId', '==', commentId),
-        orderBy('createdAt', 'asc')
+        where('parentCommentId', '==', commentId)
+        // Removed orderBy to avoid index requirement
       );
       
       const querySnapshot = await getDocs(q);
@@ -1827,6 +1843,13 @@ export class FirebaseService {
           id: doc.id,
           ...replyData
         });
+      });
+      
+      // Sort replies by createdAt in memory instead
+      replies.sort((a, b) => {
+        const aTime = a.createdAt?.toDate?.() || new Date(a.createdAt);
+        const bTime = b.createdAt?.toDate?.() || new Date(b.createdAt);
+        return aTime.getTime() - bTime.getTime();
       });
       
       return replies;
@@ -1845,8 +1868,8 @@ export class FirebaseService {
       const q = query(
         postsRef, 
         where('constituency', '==', constituencyId),
-        where('status', 'in', ['published', 'under_review']),
-        orderBy('createdAt', 'desc')
+        where('status', 'in', ['published', 'under_review'])
+        // Removed orderBy to avoid index requirement
       );
       const querySnapshot = await getDocs(q);
 
@@ -1875,6 +1898,13 @@ export class FirebaseService {
           }
         })
       );
+
+      // Sort posts by createdAt in memory instead of in query
+      enrichedPosts.sort((a, b) => {
+        const aTime = a.createdAt?.toDate?.() || new Date(a.createdAt);
+        const bTime = b.createdAt?.toDate?.() || new Date(b.createdAt);
+        return bTime.getTime() - aTime.getTime(); // Newest first
+      });
 
       return enrichedPosts;
     } catch (error: any) {

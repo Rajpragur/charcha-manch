@@ -113,6 +113,39 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; // Only admins can delete
     }
     
+    // Comments collection - allow authenticated users to read and write comments
+    match /comments/{commentId} {
+      allow read: if true; // Allow public read access
+      allow create: if request.auth != null; // Only authenticated users can create
+      allow update: if request.auth != null && (
+        resource.data.userId == request.auth.uid || // Users can edit their own comments
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' // Admins can edit any comment
+      );
+      allow delete: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; // Only admins can delete
+    }
+    
+    // Post likes collection - allow authenticated users to manage their likes
+    match /post_likes/{likeId} {
+      allow read: if true; // Allow public read access
+      allow create: if request.auth != null && 
+        request.resource.data.userId == request.auth.uid; // Users can only create likes for themselves
+      allow update, delete: if request.auth != null && 
+        resource.data.userId == request.auth.uid; // Users can only manage their own likes
+    }
+    
+    // Comment replies collection - allow authenticated users to read and write replies
+    match /comment_replies/{replyId} {
+      allow read: if true; // Allow public read access
+      allow create: if request.auth != null; // Only authenticated users can create
+      allow update: if request.auth != null && (
+        resource.data.userId == request.auth.uid || // Users can edit their own replies
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' // Admins can edit any reply
+      );
+      allow delete: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; // Only admins can delete
+    }
+    
     // Allow public read access to published blogs for better SEO and sharing
     match /blogs/{blogId} {
       allow read: if true; // Allow public read access

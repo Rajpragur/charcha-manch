@@ -181,10 +181,7 @@ const DiscussionForum: React.FC = () => {
     }
 
     try {
-      console.log('Submitting comment:', { postId, commentContent, currentUser });
-      
       const currentPost = posts.find(p => p.id === postId);
-      console.log('Current post:', currentPost);
       
       await FirebaseService.addComment(postId, {
         userId: currentUser.uid,
@@ -264,14 +261,10 @@ const DiscussionForum: React.FC = () => {
     }
 
     try {
-      console.log('Liking post:', { postId, currentUser: currentUser.uid, currentLikeState: userReactions[postId]?.liked });
-      
       await FirebaseService.likePost(postId, currentUser.uid);
       
       // Get current like state
       const currentLikeState = userReactions[postId]?.liked || false;
-      
-      console.log('Like successful, updating state:', { currentLikeState, newState: !currentLikeState });
       
       // Update local state
       setUserReactions(prev => ({
