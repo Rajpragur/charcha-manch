@@ -5,6 +5,8 @@ import {
   getDocs,
   addDoc,
   updateDoc,
+  setDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -142,10 +144,10 @@ export class FirebaseService {
   static async updateUserProfile(userId: string, updateData: Partial<FirebaseUserProfile>): Promise<void> {
     try {
       const userRef = doc(db, 'user_profiles', userId);
-      await updateDoc(userRef, {
+      await setDoc(userRef, {
         ...updateData,
         updated_at: serverTimestamp()
-      });
+      }, { merge: true });
     } catch (error) {
       console.error('Error updating user profile:', error);
       throw error;
@@ -1029,6 +1031,291 @@ export class FirebaseService {
     } catch (error) {
       console.error('Error deleting user profile:', error);
       throw error;
+    }
+  }
+
+  // Blog Operations
+  static async getAllBlogs(): Promise<any[]> {
+    try {
+      const blogsRef = collection(db, 'blogs');
+      const q = query(blogsRef, orderBy('createdAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+
+      const blogs = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      console.log(`📝 Loaded ${blogs.length} blogs from database`);
+      return blogs;
+    } catch (error: any) {
+      if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
+        console.warn('Permission denied accessing blogs, returning empty array');
+        return [];
+      }
+      console.error('Error getting blogs:', error);
+      return [];
+    }
+  }
+
+  static async getPublishedBlogs(): Promise<any[]> {
+    try {
+      console.log('🔍 getPublishedBlogs: Starting to fetch blogs...');
+      
+      const blogsRef = collection(db, 'blogs');
+      console.log('🔍 getPublishedBlogs: Collection reference created');
+      
+      // First try to get all blogs to see what's available
+      const allBlogsQuery = query(blogsRef);
+      const allBlogsSnapshot = await getDocs(allBlogsQuery);
+      console.log(`🔍 getPublishedBlogs: Found ${allBlogsSnapshot.size} total blogs in collection`);
+      
+      if (allBlogsSnapshot.size === 0) {
+        console.log('🔍 getPublishedBlogs: No blogs found in collection');
+        return [];
+      }
+      
+      // Log the first blog to see its structure
+      const firstBlog = allBlogsSnapshot.docs[0];
+      if (firstBlog) {
+        console.log('🔍 getPublishedBlogs: First blog data:', firstBlog.data());
+        console.log('🔍 getPublishedBlogs: First blog status:', firstBlog.data().status);
+      }
+      
+      // Now try to get published blogs
+      const q = query(
+        blogsRef, 
+        where('status', '==', 'published'),
+        orderBy('createdAt', 'desc')
+      );
+      console.log('🔍 getPublishedBlogs: Query created with status filter');
+      
+      const querySnapshot = await getDocs(q);
+      console.log(`🔍 getPublishedBlogs: Published blogs query returned ${querySnapshot.size} results`);
+
+      const blogs = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      console.log(`📝 Loaded ${blogs.length} published blogs from database`);
+      return blogs;
+    } catch (error: any) {
+      console.error('❌ getPublishedBlogs: Error details:', error);
+      console.error('❌ getPublishedBlogs: Error code:', error.code);
+      console.error('❌ getPublishedBlogs: Error message:', error.message);
+      
+      if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
+        console.warn('Permission denied accessing published blogs, returning empty array');
+        return [];
+      }
+      
+              // If there's an error with the status filter, try getting all blogs
+        try {
+          console.log('🔄 getPublishedBlogs: Trying to get all blogs without status filter...');
+          const blogsRef = collection(db, 'blogs');
+          const allBlogsQuery = query(blogsRef, orderBy('createdAt', 'desc'));
+          const allBlogsSnapshot = await getDocs(allBlogsQuery);
+          
+          const allBlogs = allBlogsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          
+          console.log(`🔄 getPublishedBlogs: Successfully loaded ${allBlogs.length} blogs without status filter`);
+          
+          // Filter to only show published blogs from the fallback results
+          const publishedBlogs = allBlogs.filter((blog: any) => blog.status === 'published');
+          console.log(`🔄 getPublishedBlogs: Filtered to ${publishedBlogs.length} published blogs from fallback`);
+          
+          return publishedBlogs;
+        } catch (fallbackError) {
+          console.error('❌ getPublishedBlogs: Fallback also failed:', fallbackError);
+          return [];
+        }
+    }
+  }
+
+  static async getBlogById(blogId: string): Promise<any | null> {
+    try {
+      const blogDoc = await getDoc(doc(db, 'blogs', blogId));
+      if (blogDoc.exists()) {
+        return { id: blogDoc.id, ...blogDoc.data() };
+      }
+      return null;
+    } catch (error: any) {
+      if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
+        console.warn('Permission denied accessing blog, returning null');
+        return null;
+      }
+      console.error('Error getting blog:', error);
+      return null;
+    }
+  }
+
+  static async getBlogsByCategory(category: string): Promise<any[]> {
+    try {
+      const blogsRef = collection(db, 'blogs');
+      const q = query(
+        blogsRef, 
+        where('status', '==', 'published'),
+        where('category', '==', category),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+
+      const blogs = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      return blogs;
+    } catch (error: any) {
+      if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
+        console.warn('Permission denied accessing blogs by category, returning empty array');
+        return [];
+      }
+      console.error('Error getting blogs by category:', error);
+      return [];
+    }
+  }
+
+  static async searchBlogs(searchTerm: string): Promise<any[]> {
+    try {
+      const blogsRef = collection(db, 'blogs');
+      const q = query(
+        blogsRef, 
+        where('status', '==', 'published'),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+
+      const blogs = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Filter blogs based on search term (title, excerpt, content)
+      const filteredBlogs = blogs.filter(blog => {
+        const searchLower = searchTerm.toLowerCase();
+        const blogData = blog as any;
+        return (
+          blogData.title?.toLowerCase().includes(searchLower) ||
+          blogData.excerpt?.toLowerCase().includes(searchLower) ||
+          blogData.content?.toLowerCase().includes(searchLower)
+        );
+      });
+
+      return filteredBlogs;
+    } catch (error: any) {
+      if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
+        console.warn('Permission denied searching blogs, returning empty array');
+        return [];
+      }
+      console.error('Error searching blogs:', error);
+      return [];
+    }
+  }
+
+  // Like/Unlike blog
+  static async toggleBlogLike(blogId: string, userId: string): Promise<{ success: boolean; newLikeCount: number; isLiked: boolean }> {
+    try {
+      const blogRef = doc(db, 'blogs', blogId);
+      const likeRef = doc(db, 'blog_likes', `${blogId}_${userId}`);
+      
+      // Check if user already liked this blog
+      const likeDoc = await getDoc(likeRef);
+      const isCurrentlyLiked = likeDoc.exists();
+      
+      if (isCurrentlyLiked) {
+        // Unlike: remove like document and decrease count
+        await deleteDoc(likeRef);
+        
+        // Update blog like count
+        const blogDoc = await getDoc(blogRef);
+        if (blogDoc.exists()) {
+          const currentLikes = blogDoc.data().likes || 0;
+          const newLikeCount = Math.max(0, currentLikes - 1);
+          
+          await updateDoc(blogRef, {
+            likes: newLikeCount,
+            updatedAt: serverTimestamp()
+          });
+          
+          return {
+            success: true,
+            newLikeCount,
+            isLiked: false
+          };
+        }
+      } else {
+        // Like: create like document and increase count
+        await setDoc(likeRef, {
+          blogId,
+          userId,
+          createdAt: serverTimestamp()
+        });
+        
+        // Update blog like count
+        const blogDoc = await getDoc(blogRef);
+        if (blogDoc.exists()) {
+          const currentLikes = blogDoc.data().likes || 0;
+          const newLikeCount = currentLikes + 1;
+          
+          await updateDoc(blogRef, {
+            likes: newLikeCount,
+            updatedAt: serverTimestamp()
+          });
+          
+          return {
+            success: true,
+            newLikeCount,
+            isLiked: true
+          };
+        }
+      }
+      
+      return {
+        success: false,
+        newLikeCount: 0,
+        isLiked: false
+      };
+    } catch (error: any) {
+      console.error('Error toggling blog like:', error);
+      return {
+        success: false,
+        newLikeCount: 0,
+        isLiked: false
+      };
+    }
+  }
+
+  // Get user's liked blogs
+  static async getUserLikedBlogs(userId: string): Promise<string[]> {
+    try {
+      const likesRef = collection(db, 'blog_likes');
+      const q = query(likesRef, where('userId', '==', userId));
+      const querySnapshot = await getDocs(q);
+      
+      const likedBlogIds = querySnapshot.docs.map(doc => doc.data().blogId);
+      return likedBlogIds;
+    } catch (error: any) {
+      console.error('Error getting user liked blogs:', error);
+      return [];
+    }
+  }
+
+  // Get blog like count
+  static async getBlogLikeCount(blogId: string): Promise<number> {
+    try {
+      const blogDoc = await getDoc(doc(db, 'blogs', blogId));
+      if (blogDoc.exists()) {
+        return blogDoc.data().likes || 0;
+      }
+      return 0;
+    } catch (error: any) {
+      console.error('Error getting blog like count:', error);
+      return 0;
     }
   }
 }

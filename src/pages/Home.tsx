@@ -140,7 +140,6 @@ const Home: React.FC = () => {
         setIsLoading(true);
         
         // Initialize constituency scores first to ensure database is ready
-        console.log('🔄 Ensuring database is initialized...');
         await initializeConstituencyScores();
         
         // Load other data
@@ -156,7 +155,6 @@ const Home: React.FC = () => {
           await loadUserVotesFromFirebase();
         }
         
-        console.log('✅ All data loaded successfully - database is ready');
       } catch (error) {
         console.error('Error loading data:', error);
         
@@ -174,7 +172,6 @@ const Home: React.FC = () => {
   const performDatabaseCleanup = async () => {
     try {
       setIsLoading(true);
-      console.log('🧹 Performing one-time database cleanup...');
       
       // Clean up duplicates first
       await FirebaseService.cleanupDuplicateConstituencyScores();
@@ -377,11 +374,9 @@ const Home: React.FC = () => {
     
     try {
       setIsInitializing(true);
-      console.log('🔄 Checking if constituency scores need initialization...');
       
       // Try to load scores first
       const scores = await FirebaseService.getAllConstituencyScores();
-      console.log('📊 Current scores in database:', scores.length);
       
       // Check if we have valid constituency scores (1-243)
       const validConstituencies = scores.filter(score => 
@@ -390,11 +385,9 @@ const Home: React.FC = () => {
         score.constituency_id === Math.floor(score.constituency_id) // Ensure it's an integer
       );
       
-      console.log('✅ Valid constituencies found:', validConstituencies.length);
       
       // If we have more than 243 scores, there are duplicates - clean them up first
       if (scores.length > 243) {
-        console.log('🧹 Found duplicate constituency scores, cleaning up database...');
         await FirebaseService.cleanupDuplicateConstituencyScores();
         
         // Reload scores after cleanup
@@ -405,17 +398,13 @@ const Home: React.FC = () => {
           score.constituency_id === Math.floor(score.constituency_id)
         );
         
-        console.log('✅ After cleanup - Valid constituencies found:', cleanedValidConstituencies.length);
         
         if (cleanedValidConstituencies.length < 243) {
-          console.log('📝 Database still incomplete after cleanup - initializing missing constituencies...');
           await FirebaseService.initializeConstituencyScores();
         }
       } else if (validConstituencies.length < 243) {
-        console.log('📝 Database incomplete - initializing constituency scores for constituencies 1-243...');
         await FirebaseService.initializeConstituencyScores();
       } else {
-        console.log('✅ Valid constituency scores already exist in database, loading them...');
       }
       
       // Clear cache and reload scores
@@ -423,7 +412,6 @@ const Home: React.FC = () => {
       await loadConstituencyScoresFromDatabase();
       
       if (scores.length > 243) {
-        console.log('✅ Database automatically cleaned and optimized');
         // Don't show popup for automatic cleanup - it's seamless
       }
     } catch (error) {
@@ -431,7 +419,6 @@ const Home: React.FC = () => {
       
       // Only try to initialize if there's a real error, not just permission issues
       if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' && !error.message.includes('permission')) {
-        console.log('🔄 Error occurred, attempting database initialization...');
         try {
           await FirebaseService.initializeConstituencyScores();
           localStorage.removeItem('constituencyScoresCache');
@@ -441,7 +428,6 @@ const Home: React.FC = () => {
           // Don't show error popup for automatic initialization - just log it
         }
               } else {
-          console.log('⚠️ Permission error - skipping database initialization');
           // Try to load existing data anyway
           await loadConstituencyScoresFromDatabase();
         }
@@ -453,7 +439,6 @@ const Home: React.FC = () => {
   // Load constituency scores from Firebase database with local caching
   const loadConstituencyScoresFromDatabase = async () => {
     try {
-      console.log('🔄 Loading constituency scores from database...');
       
       // Check cache first
       const cacheKey = 'constituencyScoresCache';
@@ -465,7 +450,6 @@ const Home: React.FC = () => {
           
           // Cache is valid for 5 minutes
           if (now < cacheData.expiresAt) {
-            console.log('📦 Using cached constituency scores');
             
             // Update constituencies with cached scores
             setConstituencies(prev => {
@@ -496,8 +480,6 @@ const Home: React.FC = () => {
       
       // Load constituency data including satisfaction votes for Charchit Vidhan Sabha
       const constituencyData = await FirebaseService.getConstituencyDataWithSatisfaction();
-      console.log('📊 Constituency data with satisfaction loaded from Firebase:', constituencyData.length, 'out of 243');
-      
       // Try to cache the data (but don't fail if storage is full)
       try {
         const cacheData = {
@@ -506,7 +488,6 @@ const Home: React.FC = () => {
           expiresAt: Date.now() + (5 * 60 * 1000) // Cache for 5 minutes
         };
         localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-        console.log('💾 Cached constituency data with satisfaction');
       } catch (storageError) {
         console.warn('⚠️ Failed to cache constituency data (storage full):', storageError);
         // Continue without caching
@@ -518,7 +499,6 @@ const Home: React.FC = () => {
           // Find data for this constituency
           const data = constituencyData.find(d => d.constituency_id === parseInt(constituency.id) + 1);
           if (data) {
-            console.log(`🏛️ Constituency ${constituency.id}: Interactions=${data.interaction_count}, Manifesto=${data.manifesto_average}, Yes=${data.satisfaction_yes}, No=${data.satisfaction_no}`);
             return {
               ...constituency,
               satisfactionYes: data.satisfaction_yes || 0,
@@ -541,14 +521,7 @@ const Home: React.FC = () => {
           return a.constituencyName.en.localeCompare(b.constituencyName.en);
         });
         
-        // Debug: Show top 5 constituencies by interaction count
-        console.log('🏆 Top 5 constituencies by interaction count:');
-        sorted.slice(0, 5).forEach((constituency, index) => {
-          console.log(`${index + 1}. ${constituency.constituencyName.en}: ${constituency.interactionCount} interactions`);
-        });
         
-        console.log('✅ Constituencies updated and sorted by interaction count');
-        console.log(`📊 Total constituencies loaded: ${sorted.length}`);
         return sorted;
       });
       
@@ -561,7 +534,6 @@ const Home: React.FC = () => {
   // Refresh constituency data to show real-time updates (e.g., after satisfaction votes)
   const refreshConstituencyData = async () => {
     try {
-      console.log('🔄 Refreshing constituency data for real-time updates...');
       await loadConstituencyScoresFromDatabase();
     } catch (error) {
       console.error('Error refreshing constituency data:', error);
@@ -714,7 +686,6 @@ const Home: React.FC = () => {
           url: url
         });
       } catch (err) {
-        console.log('Error sharing:', err);
       }
     } else {
       // Show custom share options
@@ -769,9 +740,7 @@ const Home: React.FC = () => {
 
 
 // Fixed submitSatisfactionSurvey function - properly saves to Firebase
-const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean) => {
-  console.log('submitSatisfactionSurvey called with:', { constituencyId, answer, currentUser: !!currentUser });
-  
+const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean) => {  
   if (!currentUser) {
     showPopup(
       isEnglish ? 'Authentication Required' : 'प्रमाणीकरण आवश्यक है',
@@ -797,14 +766,6 @@ const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean)
       );
       return;
     }
-
-    // Submit survey response to Firebase
-    console.log('Inserting survey into database:', {
-      constituency_id: constituencyIdForFirebase,
-      user_id: userId,
-      question: 'Are you satisfied with your tenure of last 5 years?',
-      answer: answer
-    });
     
     await FirebaseService.submitSatisfactionSurvey({
       constituency_id: constituencyIdForFirebase,
@@ -820,8 +781,6 @@ const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean)
     const currentNo = currentScores?.satisfaction_no || 0;
     const currentTotal = currentScores?.satisfaction_total || 0;
     
-    console.log(`📊 Current scores for constituency ${constituencyIdForFirebase}: Yes=${currentYes}, No=${currentNo}, Total=${currentTotal}`);
-    
     // Update constituency scores in Firebase with incremented values
     await FirebaseService.updateConstituencyScores(constituencyIdForFirebase, {
       satisfaction_yes: currentYes + (answer ? 1 : 0),
@@ -830,8 +789,6 @@ const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean)
       interaction_count: currentScores?.interaction_count || 0
     });
     
-    console.log(`✅ Updated constituency ${constituencyIdForFirebase}: Yes=${currentYes + (answer ? 1 : 0)}, No=${currentNo + (answer ? 0 : 1)}, Total=${currentTotal + 1}`);
-
     // Clear cache to ensure fresh data
     localStorage.removeItem('constituencyScoresCache');
     
@@ -895,7 +852,6 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
         
         // Cache is valid for 10 minutes
         if (now < cacheData.expiresAt) {
-          console.log('📦 Using cached user votes');
           setUserSurveys(new Set(cacheData.votes));
           return;
         }
@@ -906,17 +862,14 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
     }
     
     try {
-      console.log('🔄 Loading user votes from Firebase for user:', currentUser.uid);
       const { surveys } = await FirebaseService.loadUserInteractions(currentUser.uid);
       
-      console.log('📊 Surveys found:', surveys);
       
       // Create a set of constituency IDs where user has voted
       const userVotedConstituencies = new Set(
         surveys.map(s => (s.constituency_id - 1).toString())
       );
       
-      console.log('🗳️ User voted constituencies:', Array.from(userVotedConstituencies));
       
       // Update userSurveys state
       setUserSurveys(userVotedConstituencies);
@@ -929,7 +882,6 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
           expiresAt: Date.now() + (10 * 60 * 1000) // Cache for 10 minutes
         };
         localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-        console.log('💾 Cached user votes');
       } catch (storageError) {
         console.warn('⚠️ Failed to cache user votes:', storageError);
       }
@@ -1032,48 +984,6 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
               </div>
             </div>
             
-            {/* Database Status and Cleanup */}
-            <div className="mt-6 text-center">
-              {globalStats && (
-                <div className="mb-4">
-                  <div className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium">
-                    {globalStats.total_constituencies > 243 ? (
-                      <>
-                        <span className="w-3 h-3 bg-red-500 rounded-full mr-2"></span>
-                        <span className="text-red-700">
-                          {isEnglish ? 'Database Issue Detected' : 'डेटाबेस समस्या पाई गई'}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="w-3 h-3 bg-green-500 rounded-full mr-2"></span>
-                        <span className="text-green-700">
-                          {isEnglish ? 'Database Healthy' : 'डेटाबेस स्वस्थ'}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {isEnglish ? `${globalStats.total_constituencies} constituencies found (expected: 243)` : `${globalStats.total_constituencies} निर्वाचन क्षेत्र मिले (अपेक्षित: 243)`}
-                  </p>
-                </div>
-              )}
-              
-              {globalStats && globalStats.total_constituencies > 243 && (
-                <div>
-                  <button
-                    onClick={performDatabaseCleanup}
-                    disabled={isLoading}
-                    className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 shadow-lg"
-                  >
-                    {isLoading ? '🧹 Cleaning Database...' : '🧹 Clean Database (Fix 16K+ Rows Issue)'}
-                  </button>
-                  <p className="text-sm text-gray-400 mt-2 max-w-md mx-auto">
-                    {isEnglish ? 'Click to clean up duplicate constituency scores and optimize database performance' : 'डुप्लिकेट निर्वाचन क्षेत्र स्कोर साफ करने और डेटाबेस प्रदर्शन अनुकूलित करने के लिए कृपया क्लिक करें'}
-                  </p>
-                </div>
-              )}
-            </div>
             
             {/* Enhanced Search Dropdown */}
             <div className="relative max-w-lg sm:max-w-lg mx-auto">
@@ -1102,7 +1012,7 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
               {(showDropdown && (searchQuery.trim() || constituencies.length > 0)) && (
                 <div className="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto z-50">
                   {filteredAndSortedConstituencies.length > 0 ? (
-                    filteredAndSortedConstituencies.slice(0, 20).map((constituency) => (
+                    filteredAndSortedConstituencies.slice(0, 243).map((constituency) => (
                       <button
                         key={constituency.id}
                         onClick={() => handleConstituencySelect(constituency)}
@@ -1122,7 +1032,7 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
                     </div>
                   ) : (
                     // Show initial constituencies when no search query
-                    constituencies.slice(0, 10).map((constituency) => (
+                    constituencies.slice(0, 243).map((constituency) => (
                       <button
                         key={constituency.id}
                         onClick={() => handleConstituencySelect(constituency)}

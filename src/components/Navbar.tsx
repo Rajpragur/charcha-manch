@@ -17,23 +17,21 @@ const Navbar: React.FC = () => {
   const navItems = isEnglish
     ? [
         { name: "Home", href: "/" },
-
         { name: "Constituencies", href: "/constituency/all-constituencies?showAll=true" },
-        { name: "About", href: "/about" },
         { name: "Aapka Kshetra", href: "/aapka-kshetra" },
-        { name: "Forum", href: "/discussion-forum" },
+        { name: "Charcha Manch", href: "/discussion-forum" },
         { name: "Blog", href: "/blog" },
         { name: "Contact", href: "/contact" },
+        { name: "About", href: "/about" },
       ]
     : [
         { name: "होम", href: "/" },
-
         { name: "निर्वाचन क्षेत्र", href: "/constituency/all-constituencies?showAll=true" },
-        { name: "परिचय", href: "/about" },
         { name: "आपका क्षेत्र", href: "/aapka-kshetra" },
         { name: "चर्चा मंच", href: "/discussion-forum" },
         { name: "ब्लॉग", href: "/blog" },
         { name: "संपर्क", href: "/contact" },
+        { name: "परिचय", href: "/about" },
       ];
 
   useEffect(() => {

@@ -4,12 +4,12 @@ const { getFirestore, doc, setDoc, getDoc } = require('firebase/firestore');
 // Your Firebase config - replace with your actual config
 const firebaseConfig = {
   // Add your Firebase config here
-  apiKey: "your-api-key",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "your-sender-id",
-  appId: "your-app-id"
+  apiKey: meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: meta.env.VITE_FIREBASE_APP_ID
 };
 
 // Initialize Firebase
@@ -31,7 +31,6 @@ async function setupAdminUser(uid, email, displayName, role = 'admin') {
         updatedAt: new Date(),
         adminGrantedAt: new Date()
       }, { merge: true });
-      console.log(`✅ Updated user ${email} to ${role} role`);
     } else {
       // Create new admin user document
       await setDoc(userRef, {
@@ -44,7 +43,6 @@ async function setupAdminUser(uid, email, displayName, role = 'admin') {
         adminGrantedAt: new Date(),
         lastLogin: new Date()
       });
-      console.log(`✅ Created new ${role} user: ${email}`);
     }
   } catch (error) {
     console.error(`❌ Error setting up admin user ${email}:`, error);
@@ -64,14 +62,12 @@ async function setupSystemSettings() {
       createdAt: new Date(),
       updatedAt: new Date()
     });
-    console.log('✅ System settings configured');
   } catch (error) {
     console.error('❌ Error setting up system settings:', error);
   }
 }
 
 async function main() {
-  console.log('🚀 Setting up admin users and system configuration...\n');
   
   // Add your admin users here
   const adminUsers = [
@@ -99,12 +95,6 @@ async function main() {
   // Setup system settings
   await setupSystemSettings();
   
-  console.log('\n✨ Admin setup complete!');
-  console.log('\n📝 Next steps:');
-  console.log('1. Replace the placeholder UIDs with actual Firebase Auth user UIDs');
-  console.log('2. Run this script again with real UIDs');
-  console.log('3. Users will now have admin access to the panel');
-  console.log('4. Access the admin panel at /admin route');
 }
 
 // Run the setup

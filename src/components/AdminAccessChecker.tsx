@@ -5,6 +5,9 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../configs/firebase';
 import { Shield, CheckCircle, XCircle, AlertCircle, Loader } from 'lucide-react';
 
+// Only allow the specific authorized admin UID to access admin setup
+const AUTHORIZED_ADMIN_UID = '4zCKNy2r4tNAMdtnLUINpmzuyU52';
+
 const AdminAccessChecker: React.FC = () => {
   const { currentUser } = useAuth();
   const { isAdmin, adminLevel } = useAdmin();
@@ -62,6 +65,19 @@ const AdminAccessChecker: React.FC = () => {
             <p><strong>UID:</strong> {currentUser.uid}</p>
             <p><strong>Email:</strong> {currentUser.email}</p>
             <p><strong>Display Name:</strong> {currentUser.displayName || 'Not set'}</p>
+            <p><strong>Admin Setup Access:</strong> 
+              {currentUser.uid === AUTHORIZED_ADMIN_UID ? (
+                <span className="inline-flex items-center text-green-600 ml-2">
+                  <CheckCircle className="h-4 w-4 mr-1" />
+                  Authorized
+                </span>
+              ) : (
+                <span className="inline-flex items-center text-red-600 ml-2">
+                  <XCircle className="h-4 w-4 mr-1" />
+                  Restricted
+                </span>
+              )}
+            </p>
           </div>
         </div>
 
@@ -129,12 +145,18 @@ const AdminAccessChecker: React.FC = () => {
             {loading ? 'Checking...' : 'Refresh Status'}
           </button>
           
-          <a
-            href="/admin-setup"
-            className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-          >
-            Setup Admin Access
-          </a>
+          {currentUser?.uid === AUTHORIZED_ADMIN_UID ? (
+            <a
+              href="/admin-setup"
+              className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            >
+              Setup Admin Access
+            </a>
+          ) : (
+            <div className="px-4 py-2 bg-gray-400 text-white text-sm font-medium rounded-md text-center">
+              Admin Setup Restricted
+            </div>
+          )}
           
           {isAdmin && (
             <a

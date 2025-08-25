@@ -2,8 +2,13 @@ import React, { useState } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../configs/firebase';
 import { Shield, CheckCircle, AlertCircle, Loader } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+
+// Only allow the specific authorized admin UID to access this component
+const AUTHORIZED_ADMIN_UID = '4zCKNy2r4tNAMdtnLUINpmzuyU52';
 
 const AdminAccessSetup: React.FC = () => {
+  const { currentUser } = useAuth();
   const [uidOrEmail, setUidOrEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -12,6 +17,12 @@ const AdminAccessSetup: React.FC = () => {
   const setupAdminAccess = async () => {
     if (!uidOrEmail.trim()) {
       setMessage('Please enter a Firebase UID or email');
+      setMessageType('error');
+      return;
+    }
+
+    if (!currentUser || currentUser.uid !== AUTHORIZED_ADMIN_UID) {
+      setMessage('Only the authorized system administrator can grant admin access');
       setMessageType('error');
       return;
     }
@@ -58,6 +69,33 @@ const AdminAccessSetup: React.FC = () => {
     }
   };
 
+  // Check if current user is authorized to access admin setup
+  if (!currentUser || currentUser.uid !== AUTHORIZED_ADMIN_UID) {
+    return (
+      <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
+        <div className="text-center mb-6">
+          <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+            <AlertCircle className="h-6 w-6 text-red-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900">Access Denied</h2>
+          <p className="text-sm text-red-600 mt-2">
+            Only the authorized system administrator can access this component.
+          </p>
+          {currentUser && (
+            <div className="mt-4 p-3 bg-red-50 rounded-lg border border-red-200">
+              <p className="text-xs text-red-700">
+                Your UID: <span className="font-mono">{currentUser.uid}</span>
+              </p>
+              <p className="text-xs text-red-600 mt-1">
+                Authorized UID: <span className="font-mono">{AUTHORIZED_ADMIN_UID}</span>
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
       <div className="text-center mb-6">
@@ -68,6 +106,17 @@ const AdminAccessSetup: React.FC = () => {
         <p className="text-sm text-gray-600 mt-2">
           Enter your Firebase UID or email to grant admin access
         </p>
+        
+        {/* Security Note */}
+        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center justify-center mb-1">
+            <Shield className="h-4 w-4 text-green-600 mr-1" />
+            <span className="text-xs font-medium text-green-800">Authorized Access</span>
+          </div>
+          <p className="text-xs text-green-700">
+            You are the authorized system administrator.
+          </p>
+        </div>
       </div>
 
       <div className="space-y-4">

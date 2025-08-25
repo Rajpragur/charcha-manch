@@ -32,11 +32,31 @@ const Onboarding: React.FC = () => {
   const [bio, setBio] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
 
-  // Load constituencies on component mount
+  // Load constituencies on component mount and check if user already has constituency
   useEffect(() => {
     loadConstituencies();
-  }, []);
+    
+    // Check if user already has constituency set
+    const checkExistingConstituency = async () => {
+      if (currentUser) {
+        try {
+          const userProfile = await FirebaseService.getUserProfile(currentUser.uid);
+          if (userProfile && userProfile.constituency_id) {
+            // User already has constituency, redirect to home
+            navigate('/');
+            return;
+          }
+        } catch (err) {
+          console.error('Error checking existing constituency:', err);
+        }
+      }
+    };
+    
+    checkExistingConstituency();
+  }, [currentUser, navigate]);
 
   // Load constituencies from JSON (derived from candidates data)
   const loadConstituencies = async () => {
@@ -100,8 +120,14 @@ const Onboarding: React.FC = () => {
         engagement_score: 0
       });
 
-      // Redirect to dashboard
-      navigate('/dashboard');
+      // Show success message before redirecting
+      setMessage('✅ Constituency set successfully! Redirecting to portal...');
+      setMessageType('success');
+      
+      // Redirect to home page after a short delay
+      setTimeout(() => {
+        navigate('/');
+      }, 2000);
     } catch (err) {
       console.error('Error saving onboarding data:', err);
       setError('Failed to save your information. Please try again.');
@@ -154,6 +180,20 @@ const Onboarding: React.FC = () => {
     return null;
   }
 
+  // If user already has constituency, redirect to home
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-green-600" />
+          <p className="text-gray-600">
+            {isEnglish ? 'Checking your setup...' : 'आपकी सेटअप की जांच कर रहे हैं...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
       <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-8">
@@ -168,6 +208,11 @@ const Onboarding: React.FC = () => {
           <p className="text-gray-600">
             {isEnglish ? 'Let\'s get to know you better' : 'आइए आपको बेहतर तरीके से जानें'}
           </p>
+          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-700">
+              {isEnglish ? 'Setting your constituency is required to access the portal' : 'पोर्टल का उपयोग करने के लिए अपना क्षेत्र सेट करना आवश्यक है'}
+            </p>
+          </div>
         </div>
 
         {/* Progress Bar */}
@@ -322,6 +367,17 @@ const Onboarding: React.FC = () => {
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-800 text-sm">{error}</p>
+          </div>
+        )}
+
+        {/* Success Message */}
+        {message && (
+          <div className={`mb-6 p-4 rounded-lg border ${
+            messageType === 'success' 
+              ? 'bg-green-50 text-green-800 border-green-200' 
+              : 'bg-blue-50 text-blue-800 border-blue-200'
+          }`}>
+            <p className="text-sm">{message}</p>
           </div>
         )}
 

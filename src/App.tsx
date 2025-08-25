@@ -20,6 +20,8 @@ import Onboarding from './components/Onboarding';
 
 import AdminPanel from './pages/AdminPanel';
 import AdminSetup from './pages/AdminSetup';
+import BlogCreate from './pages/BlogCreate';
+import ConstituencyCheck from './components/ConstituencyCheck';
 import './App.css';
 
 const App: React.FC = () => {
@@ -32,27 +34,66 @@ const App: React.FC = () => {
               <Navbar />
               <main className="flex-grow">
                 <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/about" element={<About />} />
-                  <Route path="/contact" element={<Contact />} />
-                  <Route path="/blog" element={<BlogPost />}/>
-                  <Route path="/constituency/:constituencySlug" element={<Constituency />} />
-                  <Route path="/constituency/:constituencyId" element={<ConstituencyDetails />} />
-                  <Route path="/aapka-kshetra" element={<AapkaKshetra />} />
+                  {/* Public routes - no constituency check needed */}
                   <Route path="/signup" element={<Signup />} />
                   <Route path="/signin" element={<Signin />} />
                   <Route path="/onboarding" element={<Onboarding />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route 
-                    path="/admin" 
-                    element={<AdminPanel />} 
-                  />
-                  <Route 
-                    path="/admin-setup" 
-                    element={<AdminSetup />} 
-                  />
+                  <Route path="/admin" element={<AdminPanel />} />
+                  <Route path="/admin-setup" element={<AdminSetup />} />
+                  <Route path="/admin/blog/create" element={<BlogCreate />} />
+                  <Route path="/admin/blog/edit/:blogId" element={<BlogCreate />} />
+                  
+                  {/* Routes that require constituency verification */}
+                  <Route path="/" element={
+                    <ConstituencyCheck>
+                      <Home />
+                    </ConstituencyCheck>
+                  } />
+                  <Route path="/about" element={
+                    <ConstituencyCheck>
+                      <About />
+                    </ConstituencyCheck>
+                  } />
+                  <Route path="/contact" element={
+                    <ConstituencyCheck>
+                      <Contact />
+                    </ConstituencyCheck>
+                  } />
+                  <Route path="/blog" element={
+                    <ConstituencyCheck>
+                      <BlogPost />
+                    </ConstituencyCheck>
+                  } />
+                  <Route path="/constituency/:constituencySlug" element={
+                    <ConstituencyCheck>
+                      <Constituency />
+                    </ConstituencyCheck>
+                  } />
+                  <Route path="/constituency/:constituencyId" element={
+                    <ConstituencyCheck>
+                      <ConstituencyDetails />
+                    </ConstituencyCheck>
+                  } />
+                  <Route path="/aapka-kshetra" element={
+                    <ConstituencyCheck>
+                      <AapkaKshetra />
+                    </ConstituencyCheck>
+                  } />
+                  <Route path="/dashboard" element={
+                    <ConstituencyCheck>
+                      <Dashboard />
+                    </ConstituencyCheck>
+                  } />
+                  <Route path="/profile" element={
+                    <ConstituencyCheck>
+                      <Profile />
+                    </ConstituencyCheck>
+                  } />
+                  <Route path="/settings" element={
+                    <ConstituencyCheck>
+                      <Settings />
+                    </ConstituencyCheck>
+                  } />
                 </Routes>
               </main>
             </div>

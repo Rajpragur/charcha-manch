@@ -33,9 +33,6 @@ export const auth = getAuth(app);
 // Initialize Firestore with aggressive transport controls
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
-  cacheSizeBytes: 1048576, // Minimum allowed value (1MB)
+  cacheSizeBytes: 1048576,
   ignoreUndefinedProperties: true
 });
-
-// Log Firestore configuration
-console.log('Firestore initialized with long-polling transport');
