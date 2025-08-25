@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../configs/firebase';
+import { useAuth } from '../contexts/AuthContext';
+import { useAdmin } from '../contexts/AdminContext';
+import AdminStatusDebug from '../components/AdminStatusDebug';
 import { Shield, CheckCircle, AlertCircle, Loader, ArrowRight, Users, Settings, BarChart3 } from 'lucide-react';
 
 const AdminSetup: React.FC = () => {
@@ -8,10 +11,18 @@ const AdminSetup: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
+  const { currentUser } = useAuth();
+  const { checkAdminStatus } = useAdmin();
 
   const setupAdminAccess = async () => {
     if (!uidOrEmail.trim()) {
       setMessage('Please enter a Firebase UID or email');
+      setMessageType('error');
+      return;
+    }
+
+    if (!currentUser) {
+      setMessage('You must be signed in to set up admin access');
       setMessageType('error');
       return;
     }
@@ -22,10 +33,18 @@ const AdminSetup: React.FC = () => {
     try {
       let uid = uidOrEmail.trim();
       
+      // If input is an email, use the current user's UID
+      if (uidOrEmail.includes('@')) {
+        uid = currentUser.uid;
+        setMessage('Using your authenticated UID for admin setup');
+        setMessageType('success');
+      }
+      
       // Create or update the user document with admin role
       const userRef = doc(db, 'users', uid);
       
       await setDoc(userRef, {
+        uid: uid,
         email: uidOrEmail.includes('@') ? uidOrEmail : `${uidOrEmail}@admin.local`,
         displayName: uidOrEmail.includes('@') ? uidOrEmail.split('@')[0] : uidOrEmail,
         role: 'super_admin',
@@ -34,12 +53,32 @@ const AdminSetup: React.FC = () => {
         createdAt: new Date(),
         lastLogin: new Date(),
         adminGrantedAt: new Date(),
-        setupBy: 'admin_setup_page'
+        setupBy: 'admin_setup_page',
+        setupByUid: currentUser.uid
       }, { merge: true });
 
-      setMessage(`✅ Admin access granted to ${uidOrEmail}! You can now access the admin panel.`);
+      setMessage(`✅ Admin access granted to ${uid}! You can now access the admin panel.`);
       setMessageType('success');
       setUidOrEmail('');
+      
+      // Refresh admin status to immediately recognize the user as admin
+      setTimeout(() => {
+        console.log('🔄 Refreshing admin status after setup...');
+        checkAdminStatus();
+      }, 1000);
+      
+      // Add additional success message with admin panel link
+      setTimeout(() => {
+        setMessage(`✅ Admin access granted to ${uid}! 
+        
+        🎉 You are now an admin! 
+        
+        🔗 Click here to go to the admin panel: 
+        <a href="/admin" class="text-blue-600 underline">Go to Admin Panel</a>
+        
+        💡 If you're redirected to home, try refreshing the page or wait a few seconds for the system to recognize your admin status.`);
+        setMessageType('success');
+      }, 2000);
       
     } catch (error) {
       console.error('Error setting up admin access:', error);
@@ -49,6 +88,25 @@ const AdminSetup: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  // Show authentication required message if not signed in
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="text-center mb-12">
+            <div className="mx-auto w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
+              <AlertCircle className="h-10 w-10 text-red-600" />
+            </div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">Authentication Required</h1>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              You must be signed in to set up admin access. Please sign in first and then return to this page.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -62,6 +120,12 @@ const AdminSetup: React.FC = () => {
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Set up admin access for your Charcha Manch application. This will grant you full administrative privileges.
           </p>
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg inline-block">
+            <p className="text-sm text-blue-700">
+              Signed in as: <span className="font-semibold">{currentUser.email}</span>
+            </p>
+            <p className="text-xs text-blue-600">UID: {currentUser.uid}</p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -85,6 +149,9 @@ const AdminSetup: React.FC = () => {
                 />
                 <p className="mt-2 text-sm text-gray-500">
                   You can find your Firebase UID in the Firebase Console under Authentication `{`>`}` Users
+                </p>
+                <p className="mt-1 text-xs text-blue-600">
+                  💡 Tip: If you enter an email, your current authenticated UID will be used automatically.
                 </p>
               </div>
 
@@ -205,6 +272,9 @@ const AdminSetup: React.FC = () => {
           </div>
         </div>
       </div>
+      
+      {/* Admin Status Debug Component */}
+      <AdminStatusDebug />
     </div>
   );
 };

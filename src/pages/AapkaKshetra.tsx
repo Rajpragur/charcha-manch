@@ -54,9 +54,13 @@ const AapkaKshetra: React.FC = () => {
   const [showCharchaManch, setShowCharchaManch] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showConstituencySelector, setShowConstituencySelector] = useState(true);
-  const [manifestoScore, setManifestoScore] = useState<number | null>(null);
+
   const [hasSubmittedQuestionnaire, setHasSubmittedQuestionnaire] = useState(false);
   const [constituencyId, setConstituencyId] = useState<number | null>(null);
+  const [currentInteractionCount, setCurrentInteractionCount] = useState<number>(0);
+  const [currentManifestoScore, setCurrentManifestoScore] = useState<number>(0);
+  const [currentSatisfactionYes, setCurrentSatisfactionYes] = useState<number>(0);
+  const [currentSatisfactionNo, setCurrentSatisfactionNo] = useState<number>(0);
 
   const translations = {
     title: {
@@ -174,6 +178,14 @@ const AapkaKshetra: React.FC = () => {
     constituencyConfirmed: {
       en: "Constituency confirmed! This cannot be changed.",
       hi: "क्षेत्र की पुष्टि हो गई! इसे नहीं बदला जा सकता।"
+    },
+    totalInteractions: {
+      en: "Total Interactions",
+      hi: "कुल इंटरैक्शन"
+    },
+    manifestoScore: {
+      en: "Manifesto Score",
+      hi: "घोषणापत्र स्कोर"
     }
   };
 
@@ -262,10 +274,41 @@ const AapkaKshetra: React.FC = () => {
     }
   };
 
-  const handleSatisfactionVote = (vote: 'yes' | 'no') => {
-    if (currentUser) {
-      setSatisfactionVote(vote);
-      // Here you would typically send this to your backend
+  const handleSatisfactionVote = async (vote: 'yes' | 'no') => {
+    if (currentUser && constituencyId) {
+      try {
+        setSatisfactionVote(vote);
+        
+        // Immediately update the constituency scores in Firebase
+        await FirebaseService.updateSatisfactionVote(constituencyId, vote);
+        
+        // Update local state immediately for better UX
+        if (vote === 'yes') {
+          setCurrentSatisfactionYes(prev => prev + 1);
+        } else {
+          setCurrentSatisfactionNo(prev => prev + 1);
+        }
+        
+        // Refresh the constituency scores to show updated values
+        try {
+          const constituencyScores = await FirebaseService.getConstituencyScores(constituencyId);
+          if (constituencyScores) {
+            setCurrentInteractionCount(constituencyScores.interaction_count || 0);
+            setCurrentManifestoScore(constituencyScores.manifesto_average || 0);
+            setCurrentSatisfactionYes(constituencyScores.satisfaction_yes || 0);
+            setCurrentSatisfactionNo(constituencyScores.satisfaction_no || 0);
+          }
+        } catch (error) {
+          console.error('Error refreshing constituency scores after vote:', error);
+        }
+        
+        console.log(`✅ Satisfaction vote '${vote}' recorded for constituency ${constituencyId}`);
+      } catch (error) {
+        console.error('Error recording satisfaction vote:', error);
+        // Revert the local state if Firebase update fails
+        setSatisfactionVote(null);
+        alert(isEnglish ? 'Failed to record vote. Please try again.' : 'वोट रिकॉर्ड करने में विफल। कृपया पुनः प्रयास करें।');
+      }
     }
   };
 
@@ -279,18 +322,24 @@ const AapkaKshetra: React.FC = () => {
     }
   };
 
-  // Check if user already submitted questionnaire and load manifesto average
+  // Check if user already submitted questionnaire and load constituency scores
   useEffect(() => {
     const checkSubmission = async () => {
       if (!currentUser || !constituencyId) return;
       const submitted = await FirebaseService.hasSubmittedQuestionnaire(currentUser.uid, constituencyId);
       setHasSubmittedQuestionnaire(submitted);
-      if (submitted) {
-        const avg = await FirebaseService.getManifestoAverageScore(constituencyId);
-        if (avg) {
-          // setManifestoAverage(avg.average);
-          // setManifestoCount(avg.count);
+      
+      // Fetch current constituency scores
+      try {
+        const constituencyScores = await FirebaseService.getConstituencyScores(constituencyId);
+        if (constituencyScores) {
+          setCurrentInteractionCount(constituencyScores.interaction_count || 0);
+          setCurrentManifestoScore(constituencyScores.manifesto_average || 0);
+          setCurrentSatisfactionYes(constituencyScores.satisfaction_yes || 0);
+          setCurrentSatisfactionNo(constituencyScores.satisfaction_no || 0);
         }
+      } catch (error) {
+        console.error('Error fetching constituency scores:', error);
       }
     };
     checkSubmission();
@@ -299,7 +348,6 @@ const AapkaKshetra: React.FC = () => {
   const canSubmitQuestionnaire = () => {
     if (!currentUser || hasSubmittedQuestionnaire) return false;
     if (satisfactionVote === null) return false;
-    if (manifestoScore === null) return false;
     // ensure all department ratings selected (non-zero)
     const deptValues = Object.values(departmentRatings);
     if (deptValues.length === 0) return false;
@@ -310,21 +358,38 @@ const AapkaKshetra: React.FC = () => {
   const handleQuestionnaireSubmit = async () => {
     if (!currentUser || !constituencyId) return;
     if (!canSubmitQuestionnaire()) return;
+    
     try {
+      // Calculate new manifesto score based on department ratings
+      const deptValues = Object.values(departmentRatings);
+      const newManifestoScore = deptValues.reduce((sum, rating) => sum + rating, 0) / deptValues.length;
+      
+      // Submit questionnaire with calculated manifesto score
       await FirebaseService.submitQuestionnaire({
         user_id: currentUser.uid,
         constituency_id: constituencyId,
         satisfaction_vote: satisfactionVote === 'yes',
         department_ratings: departmentRatings,
-        manifesto_score: manifestoScore as number,
+        manifesto_score: newManifestoScore,
       });
-      await FirebaseService.recalcAndUpdateManifestoAverageScore(constituencyId);
-      setHasSubmittedQuestionnaire(true);
-      const avg = await FirebaseService.getManifestoAverageScore(constituencyId);
-      if (avg) {
-        // setManifestoAverage(avg.average);
-        // setManifestoCount(avg.count);
+      
+      // Update constituency scores with new average calculation
+      await FirebaseService.updateManifestoAverageIncrement(constituencyId, newManifestoScore);
+      
+      // Refresh constituency scores to show updated values
+      try {
+        const constituencyScores = await FirebaseService.getConstituencyScores(constituencyId);
+        if (constituencyScores) {
+          setCurrentInteractionCount(constituencyScores.interaction_count || 0);
+          setCurrentManifestoScore(constituencyScores.manifesto_average || 0);
+          setCurrentSatisfactionYes(constituencyScores.satisfaction_yes || 0);
+          setCurrentSatisfactionNo(constituencyScores.satisfaction_no || 0);
+        }
+      } catch (error) {
+        console.error('Error refreshing constituency scores:', error);
       }
+      
+      setHasSubmittedQuestionnaire(true);
       alert(isEnglish ? 'Thank you! Your responses have been submitted.' : 'धन्यवाद! आपकी प्रतिक्रियाएं सबमिट कर दी गई हैं।');
     } catch (e) {
       console.error('Error submitting questionnaire', e);
@@ -420,6 +485,16 @@ const AapkaKshetra: React.FC = () => {
             <h1 className="text-2xl font-semibold text-slate-800 mb-2">{translations.charchaManch[isEnglish ? 'en' : 'hi']}</h1>
             <p className="text-sm text-slate-600 mb-4">{translations.constituency[isEnglish ? 'en' : 'hi']}: <span className="font-medium text-emerald-700">{selectedConstituency}</span></p>
             <div className="bg-slate-50 rounded-lg p-4 mb-6 text-left border border-slate-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="bg-white rounded-lg p-3 border border-slate-200">
+                  <div className="text-sm text-slate-600 mb-1">{translations.totalInteractions[isEnglish ? 'en' : 'hi']}</div>
+                  <div className="text-2xl font-bold text-emerald-600">{currentInteractionCount}</div>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-slate-200">
+                  <div className="text-sm text-slate-600 mb-1">{translations.manifestoScore[isEnglish ? 'en' : 'hi']}</div>
+                  <div className="text-2xl font-bold text-purple-600">{currentManifestoScore.toFixed(1)}/5</div>
+                </div>
+              </div>
               <p className="text-slate-700 text-sm">चर्चा मंच सामग्री यहाँ दिखाई जाएगी...</p>
             </div>
             <button 
@@ -615,30 +690,41 @@ const AapkaKshetra: React.FC = () => {
                 </div>
                 
                 {currentUser ? (
-                  <div className="flex items-center justify-center space-x-8 mb-6">
-                    <label className="flex items-center space-x-3 cursor-pointer group">
-                      <input
-                        type="radio"
-                        name="satisfaction"
-                        value="yes"
-                        checked={satisfactionVote === 'yes'}
-                        onChange={() => handleSatisfactionVote('yes')}
-                        className="text-green-600 w-5 h-5"
-                      />
-                      <span className="text-slate-700 font-medium group-hover:text-green-600 transition-colors">{translations.yes[isEnglish ? 'en' : 'hi']}</span>
-                    </label>
-                    <label className="flex items-center space-x-3 cursor-pointer group">
-                      <input
-                        type="radio"
-                        name="satisfaction"
-                        value="no"
-                        checked={satisfactionVote === 'no'}
-                        onChange={() => handleSatisfactionVote('no')}
-                        className="text-red-600 w-5 h-5"
-                      />
-                      <span className="text-slate-700 font-medium group-hover:text-red-600 transition-colors">{translations.no[isEnglish ? 'en' : 'hi']}</span>
-                    </label>
-                  </div>
+                  <>
+                    <div className="flex items-center justify-center space-x-8 mb-6">
+                      <label className={`flex items-center space-x-3 cursor-pointer group ${satisfactionVote ? 'opacity-50' : ''}`}>
+                        <input
+                          type="radio"
+                          name="satisfaction"
+                          value="yes"
+                          checked={satisfactionVote === 'yes'}
+                          onChange={() => handleSatisfactionVote('yes')}
+                          disabled={satisfactionVote !== null}
+                          className="text-green-600 w-5 h-5"
+                        />
+                        <span className="text-slate-700 font-medium group-hover:text-green-600 transition-colors">{translations.yes[isEnglish ? 'en' : 'hi']}</span>
+                      </label>
+                      <label className={`flex items-center space-x-3 cursor-pointer group ${satisfactionVote ? 'opacity-50' : ''}`}>
+                        <input
+                          type="radio"
+                          name="satisfaction"
+                          value="no"
+                          checked={satisfactionVote === 'no'}
+                          onChange={() => handleSatisfactionVote('no')}
+                          disabled={satisfactionVote !== null}
+                          className="text-red-600 w-5 h-5"
+                        />
+                        <span className="text-slate-700 font-medium group-hover:text-red-600 transition-colors">{translations.no[isEnglish ? 'en' : 'hi']}</span>
+                      </label>
+                    </div>
+                    {satisfactionVote && (
+                      <div className="text-center mb-4">
+                        <p className="text-sm text-emerald-600 font-medium">
+                          {isEnglish ? `You voted: ${satisfactionVote === 'yes' ? 'Yes' : 'No'}` : `आपने वोट किया: ${satisfactionVote === 'yes' ? 'हाँ' : 'नहीं'}`}
+                        </p>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="text-center py-4">
                     <p className="text-slate-600">{translations.notLoggedIn[isEnglish ? 'en' : 'hi']}</p>
@@ -648,50 +734,17 @@ const AapkaKshetra: React.FC = () => {
                 <div className="flex items-center justify-center space-x-8 text-sm">
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
-                    <span className="text-emerald-600 font-medium">{translations.yes[isEnglish ? 'en' : 'hi']}: {candidateData.vidhayak_info.survey_score[0]?.yes_votes || 0}</span>
+                    <span className="text-emerald-600 font-medium">{translations.yes[isEnglish ? 'en' : 'hi']}: {currentSatisfactionYes || 0}</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 bg-rose-500 rounded-full"></div>
-                    <span className="text-rose-600 font-medium">{translations.no[isEnglish ? 'en' : 'hi']}: {candidateData.vidhayak_info.survey_score[0]?.no_votes || 0}</span>
+                    <span className="text-rose-600 font-medium">{translations.no[isEnglish ? 'en' : 'hi']}: {currentSatisfactionNo || 0}</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 bg-sky-500 rounded-full"></div>
-                    <span className="text-sky-600 font-medium">{translations.totalVotes[isEnglish ? 'en' : 'hi']}: {(candidateData.vidhayak_info.survey_score[0]?.yes_votes || 0) + (candidateData.vidhayak_info.survey_score[0]?.no_votes || 0)}</span>
+                    <span className="text-sky-600 font-medium">{translations.totalVotes[isEnglish ? 'en' : 'hi']}: {(currentSatisfactionYes || 0) + (currentSatisfactionNo || 0)}</span>
                   </div>
                 </div>
-
-                {/* Manifesto rating */}
-                {currentUser && (
-                  <div className="mt-6">
-                    <h4 className="font-semibold text-slate-800 mb-3">{isEnglish ? 'Rate the Manifesto (1-5)' : 'घोषणापत्र को रेट करें (1-5)'}</h4>
-                    <div className="flex items-center justify-center space-x-2">
-                      {[1,2,3,4,5].map(score => (
-                        <button
-                          key={score}
-                          onClick={() => setManifestoScore(score)}
-                          className={`w-10 h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center text-sm font-semibold ${
-                            manifestoScore === score ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-slate-300 hover:border-purple-400 hover:bg-purple-50 text-slate-600 hover:text-purple-700'
-                          }`}
-                        >
-                          {score}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Submit button */}
-                {currentUser && (
-                  <div className="text-center mt-6">
-                    <button
-                      onClick={handleQuestionnaireSubmit}
-                      disabled={!canSubmitQuestionnaire()}
-                      className="bg-emerald-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                    >
-                      {isEnglish ? 'Submit Responses' : 'प्रतिक्रियाएं सबमिट करें'}
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
             )}
@@ -742,6 +795,19 @@ const AapkaKshetra: React.FC = () => {
                   </div>
                 ))}
               </div>
+              
+              {/* Submit button - moved here after department ratings */}
+              {currentUser && (
+                <div className="text-center mt-8">
+                  <button
+                    onClick={handleQuestionnaireSubmit}
+                    disabled={!canSubmitQuestionnaire()}
+                    className="bg-emerald-600 text-white px-8 py-4 rounded-lg font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 text-lg"
+                  >
+                    {isEnglish ? 'Submit Responses' : 'प्रतिक्रियाएं सबमिट करें'}
+                  </button>
+                </div>
+              )}
             </div>
             )}
 

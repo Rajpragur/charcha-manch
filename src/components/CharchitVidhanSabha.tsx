@@ -58,6 +58,7 @@ interface CharchitVidhanSabhaProps {
     type: 'success' | 'error' | 'info';
   };
   closePopup: () => void;
+  refreshConstituencyData: () => Promise<void>;
 }
 
 export default function CharchitVidhanSabha({
@@ -70,7 +71,8 @@ export default function CharchitVidhanSabha({
   initializeConstituencyScores,
   handleShare,
   popup,
-  closePopup
+  closePopup,
+  refreshConstituencyData
 }: CharchitVidhanSabhaProps) {
   const { isEnglish } = useLanguage();
 
@@ -187,10 +189,10 @@ export default function CharchitVidhanSabha({
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                           <BarChart3 className="h-4 w-4" />
-                          <span className="text-xs font-medium uppercase tracking-wide">{isEnglish ? 'Experience' : 'अनुभव'}</span>
+                          <span className="text-xs font-medium uppercase tracking-wide">{isEnglish ? 'Age' : 'उम्र'}</span>
                         </div>
                         <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                          {isEnglish ? constituency.experience.en : constituency.experience.hi}
+                          {constituency.age}
                         </p>
                       </div>
                       
@@ -213,10 +215,10 @@ export default function CharchitVidhanSabha({
                           <div className="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                             <div 
                               className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-500"
-                              style={{ width: `${constituency.manifestoScore}%` }}
+                              style={{ width: `${constituency.manifestoScore / 5 * 100}%` }}
                             ></div>
                           </div>
-                          <span className="text-sm font-bold text-slate-900 dark:text-white">{constituency.manifestoScore}%</span>
+                          <span className="text-sm font-bold text-slate-900 dark:text-white">{constituency.manifestoScore} / 5</span>
                         </div>
                       </div>
                       

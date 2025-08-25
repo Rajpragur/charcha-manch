@@ -13,6 +13,7 @@ import {
   Calendar,
   MessageCircle,
   Star,
+  Database,
 } from 'lucide-react';
 
 interface CandidateData {
@@ -108,6 +109,7 @@ const Home: React.FC = () => {
   const [constituencies, setConstituencies] = useState<ConstituencyData[]>([]);
   const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(false);
 
   const [userProfile, setUserProfile] = useState<any>(null);
   const [userAchievements, setUserAchievements] = useState<any>(null);
@@ -131,23 +133,15 @@ const Home: React.FC = () => {
     type: 'info'
   });
 
-  // Load data on component mount
+  // Load data on component mount - completely automatic database initialization
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
         
-        // ALWAYS initialize constituency scores first to ensure database is ready
+        // Initialize constituency scores first to ensure database is ready
         console.log('🔄 Ensuring database is initialized...');
         await initializeConstituencyScores();
-        
-        // Double-check: if scores are still not loaded properly, force re-initialization
-        const scores = await FirebaseService.getAllConstituencyScores();
-        if (scores.length < 243) {
-          console.log('🔄 Database still incomplete after initialization, forcing re-initialization...');
-          await FirebaseService.initializeConstituencyScores();
-          localStorage.removeItem('constituencyScoresCache');
-        }
         
         // Load other data
         await Promise.all([
@@ -161,17 +155,13 @@ const Home: React.FC = () => {
         if (currentUser) {
           await loadUserVotesFromFirebase();
         }
+        
+        console.log('✅ All data loaded successfully - database is ready');
       } catch (error) {
         console.error('Error loading data:', error);
         
-        // If there's an error, try to initialize database anyway
-        try {
-          console.log('🔄 Error in data loading, attempting database initialization...');
-          await FirebaseService.initializeConstituencyScores();
-          localStorage.removeItem('constituencyScoresCache');
-        } catch (initError) {
-          console.error('Failed to initialize database after error:', initError);
-        }
+        // If there's an error, log it but don't re-initialize (could cause infinite loop)
+        console.error('Error in data loading, skipping database re-initialization to prevent infinite loop');
       } finally {
         setIsLoading(false);
       }
@@ -179,6 +169,47 @@ const Home: React.FC = () => {
 
     loadData();
   }, [currentUser]);
+
+  // One-time cleanup function - can be called manually to fix database
+  const performDatabaseCleanup = async () => {
+    try {
+      setIsLoading(true);
+      console.log('🧹 Performing one-time database cleanup...');
+      
+      // Clean up duplicates first
+      await FirebaseService.cleanupDuplicateConstituencyScores();
+      
+      // Then initialize any missing constituencies
+      await FirebaseService.initializeConstituencyScores();
+      
+      // Clear cache and reload
+      localStorage.removeItem('constituencyScoresCache');
+      await loadConstituencyScoresFromDatabase();
+      
+      showPopup(
+        isEnglish ? 'Database Cleaned' : 'डेटाबेस साफ किया गया',
+        isEnglish ? 'Database has been cleaned up and optimized.' : 'डेटाबेस साफ और अनुकूलित किया गया है।',
+        'success'
+      );
+    } catch (error) {
+      console.error('Error during database cleanup:', error);
+      showPopup(
+        isEnglish ? 'Cleanup Failed' : 'सफाई विफल',
+        isEnglish ? 'Failed to clean up database. Please try again.' : 'डेटाबेस साफ करने में विफल। कृपया पुनः प्रयास करें।',
+        'error'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Make cleanup function available globally for manual console execution
+  useEffect(() => {
+    // @ts-ignore
+    window.cleanupDatabase = performDatabaseCleanup;
+    // @ts-ignore
+    window.FirebaseService = FirebaseService;
+   }, []);
 
   // Load user votes when currentUser changes (login/logout)
   useEffect(() => {
@@ -339,51 +370,85 @@ const Home: React.FC = () => {
 
   // Initialize constituency scores in database if they don't exist
   const initializeConstituencyScores = async () => {
+    // Prevent multiple simultaneous initializations
+    if (isInitializing) {
+      return;
+    }
+    
     try {
+      setIsInitializing(true);
       console.log('🔄 Checking if constituency scores need initialization...');
       
       // Try to load scores first
       const scores = await FirebaseService.getAllConstituencyScores();
       console.log('📊 Current scores in database:', scores.length);
       
-      // More aggressive initialization - initialize if less than 243 or if there's any issue
-      if (scores.length === 0 || scores.length < 243 || scores.some(score => !score.satisfaction_yes && !score.satisfaction_no && !score.satisfaction_total)) {
-        console.log('📝 Database incomplete, empty, or has invalid data - initializing database...');
-        await FirebaseService.initializeConstituencyScores();
+      // Check if we have valid constituency scores (1-243)
+      const validConstituencies = scores.filter(score => 
+        score.constituency_id >= 1 && 
+        score.constituency_id <= 243 && 
+        score.constituency_id === Math.floor(score.constituency_id) // Ensure it's an integer
+      );
+      
+      console.log('✅ Valid constituencies found:', validConstituencies.length);
+      
+      // If we have more than 243 scores, there are duplicates - clean them up first
+      if (scores.length > 243) {
+        console.log('🧹 Found duplicate constituency scores, cleaning up database...');
+        await FirebaseService.cleanupDuplicateConstituencyScores();
         
-        // Clear cache and reload scores after initialization
-        localStorage.removeItem('constituencyScoresCache');
-        await loadConstituencyScoresFromDatabase();
-        
-        showPopup(
-          isEnglish ? 'Database Initialized' : 'डेटाबेस प्रारंभ किया गया',
-          isEnglish ? 'Constituency scores have been initialized in the database.' : 'निर्वाचन क्षेत्र के स्कोर डेटाबेस में प्रारंभ किए गए हैं।',
-          'success'
+        // Reload scores after cleanup
+        const cleanedScores = await FirebaseService.getAllConstituencyScores();
+        const cleanedValidConstituencies = cleanedScores.filter(score => 
+          score.constituency_id >= 1 && 
+          score.constituency_id <= 243 && 
+          score.constituency_id === Math.floor(score.constituency_id)
         );
+        
+        console.log('✅ After cleanup - Valid constituencies found:', cleanedValidConstituencies.length);
+        
+        if (cleanedValidConstituencies.length < 243) {
+          console.log('📝 Database still incomplete after cleanup - initializing missing constituencies...');
+          await FirebaseService.initializeConstituencyScores();
+        }
+      } else if (validConstituencies.length < 243) {
+        console.log('📝 Database incomplete - initializing constituency scores for constituencies 1-243...');
+        await FirebaseService.initializeConstituencyScores();
       } else {
-        console.log('✅ Constituency scores already exist in database, loading them...');
-        // Load the existing scores
-        await loadConstituencyScoresFromDatabase();
+        console.log('✅ Valid constituency scores already exist in database, loading them...');
+      }
+      
+      // Clear cache and reload scores
+      localStorage.removeItem('constituencyScoresCache');
+      await loadConstituencyScoresFromDatabase();
+      
+      if (scores.length > 243) {
+        console.log('✅ Database automatically cleaned and optimized');
+        // Don't show popup for automatic cleanup - it's seamless
       }
     } catch (error) {
       console.error('❌ Error initializing constituency scores:', error);
       
-      // If there's an error, ALWAYS try to initialize
-      console.log('🔄 Error occurred, forcing database initialization...');
-      try {
-        await FirebaseService.initializeConstituencyScores();
-        localStorage.removeItem('constituencyScoresCache');
-        await loadConstituencyScoresFromDatabase();
-      } catch (retryError) {
-        console.error('❌ Failed to initialize database on retry:', retryError);
-        showPopup(
-          isEnglish ? 'Error' : 'त्रुटि',
-          isEnglish ? 'Failed to initialize constituency scores. Please try again.' : 'निर्वाचन क्षेत्र के स्कोर प्रारंभ करने में विफल। कृपया पुनः प्रयास करें।',
-          'error'
-        );
+      // Only try to initialize if there's a real error, not just permission issues
+      if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' && !error.message.includes('permission')) {
+        console.log('🔄 Error occurred, attempting database initialization...');
+        try {
+          await FirebaseService.initializeConstituencyScores();
+          localStorage.removeItem('constituencyScoresCache');
+          await loadConstituencyScoresFromDatabase();
+        } catch (retryError) {
+          console.error('❌ Failed to initialize database on retry:', retryError);
+          // Don't show error popup for automatic initialization - just log it
+        }
+              } else {
+          console.log('⚠️ Permission error - skipping database initialization');
+          // Try to load existing data anyway
+          await loadConstituencyScoresFromDatabase();
+        }
+      } finally {
+        setIsInitializing(false);
       }
-    }
-  };
+    };
 
   // Load constituency scores from Firebase database with local caching
   const loadConstituencyScoresFromDatabase = async () => {
@@ -429,38 +494,38 @@ const Home: React.FC = () => {
         }
       }
       
-      // Use lightweight method to load only essential data
-      const essentials = await FirebaseService.getConstituencyEssentials();
-      console.log('📊 Essentials loaded from Firebase:', essentials.length, 'out of 243');
+      // Load constituency data including satisfaction votes for Charchit Vidhan Sabha
+      const constituencyData = await FirebaseService.getConstituencyDataWithSatisfaction();
+      console.log('📊 Constituency data with satisfaction loaded from Firebase:', constituencyData.length, 'out of 243');
       
-      // Try to cache the essentials (but don't fail if storage is full)
+      // Try to cache the data (but don't fail if storage is full)
       try {
         const cacheData = {
-          scores: essentials,
+          scores: constituencyData,
           timestamp: Date.now(),
           expiresAt: Date.now() + (5 * 60 * 1000) // Cache for 5 minutes
         };
         localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-        console.log('💾 Cached constituency essentials');
+        console.log('💾 Cached constituency data with satisfaction');
       } catch (storageError) {
-        console.warn('⚠️ Failed to cache essentials (storage full):', storageError);
+        console.warn('⚠️ Failed to cache constituency data (storage full):', storageError);
         // Continue without caching
       }
       
-      // Update constituencies with essentials from database
+      // Update constituencies with data from database including satisfaction votes
       setConstituencies(prev => {
         const updated = prev.map((constituency) => {
-          // Find essential data for this constituency
-          const essential = essentials.find(e => e.constituency_id === parseInt(constituency.id) + 1);
-          if (essential) {
-            console.log(`🏛️ Constituency ${constituency.id}: Interactions=${essential.interaction_count}, Manifesto=${essential.manifesto_average}`);
+          // Find data for this constituency
+          const data = constituencyData.find(d => d.constituency_id === parseInt(constituency.id) + 1);
+          if (data) {
+            console.log(`🏛️ Constituency ${constituency.id}: Interactions=${data.interaction_count}, Manifesto=${data.manifesto_average}, Yes=${data.satisfaction_yes}, No=${data.satisfaction_no}`);
             return {
               ...constituency,
-              satisfactionYes: 0, // Not loaded in essentials
-              satisfactionNo: 0,  // Not loaded in essentials
-              satisfactionTotal: 0, // Not loaded in essentials
-              interactionCount: essential.interaction_count || 0,
-              manifestoScore: essential.manifesto_average || 0
+              satisfactionYes: data.satisfaction_yes || 0,
+              satisfactionNo: data.satisfaction_no || 0,
+              satisfactionTotal: data.satisfaction_total || 0,
+              interactionCount: data.interaction_count || 0,
+              manifestoScore: data.manifesto_average || 0
             };
           }
           return constituency;
@@ -490,6 +555,16 @@ const Home: React.FC = () => {
     } catch (error) {
       console.error('❌ Error loading constituency scores from database:', error);
       // Continue with default values if database loading fails
+    }
+  };
+
+  // Refresh constituency data to show real-time updates (e.g., after satisfaction votes)
+  const refreshConstituencyData = async () => {
+    try {
+      console.log('🔄 Refreshing constituency data for real-time updates...');
+      await loadConstituencyScoresFromDatabase();
+    } catch (error) {
+      console.error('Error refreshing constituency data:', error);
     }
   };
 
@@ -810,6 +885,26 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
   const loadUserVotesFromFirebase = async () => {
     if (!currentUser) return;
     
+    // Check cache first to prevent repeated Firebase calls
+    const cacheKey = `userVotes_${currentUser.uid}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        const cacheData = JSON.parse(cached);
+        const now = Date.now();
+        
+        // Cache is valid for 10 minutes
+        if (now < cacheData.expiresAt) {
+          console.log('📦 Using cached user votes');
+          setUserSurveys(new Set(cacheData.votes));
+          return;
+        }
+      } catch (cacheError) {
+        console.warn('⚠️ User votes cache corrupted, clearing:', cacheError);
+        localStorage.removeItem(cacheKey);
+      }
+    }
+    
     try {
       console.log('🔄 Loading user votes from Firebase for user:', currentUser.uid);
       const { surveys } = await FirebaseService.loadUserInteractions(currentUser.uid);
@@ -825,6 +920,19 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
       
       // Update userSurveys state
       setUserSurveys(userVotedConstituencies);
+      
+      // Cache the user votes
+      try {
+        const cacheData = {
+          votes: Array.from(userVotedConstituencies),
+          timestamp: Date.now(),
+          expiresAt: Date.now() + (10 * 60 * 1000) // Cache for 10 minutes
+        };
+        localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        console.log('💾 Cached user votes');
+      } catch (storageError) {
+        console.warn('⚠️ Failed to cache user votes:', storageError);
+      }
       
     } catch (err) {
       console.error('❌ Error loading user votes from Firebase:', err);
@@ -922,6 +1030,49 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
                   className="w-15 h-15 lg:w-40 lg:h-40 md:w-30 md:h-30 sm:w-28 sm:h-28 rounded-full object-cover"
                 />
               </div>
+            </div>
+            
+            {/* Database Status and Cleanup */}
+            <div className="mt-6 text-center">
+              {globalStats && (
+                <div className="mb-4">
+                  <div className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium">
+                    {globalStats.total_constituencies > 243 ? (
+                      <>
+                        <span className="w-3 h-3 bg-red-500 rounded-full mr-2"></span>
+                        <span className="text-red-700">
+                          {isEnglish ? 'Database Issue Detected' : 'डेटाबेस समस्या पाई गई'}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="w-3 h-3 bg-green-500 rounded-full mr-2"></span>
+                        <span className="text-green-700">
+                          {isEnglish ? 'Database Healthy' : 'डेटाबेस स्वस्थ'}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {isEnglish ? `${globalStats.total_constituencies} constituencies found (expected: 243)` : `${globalStats.total_constituencies} निर्वाचन क्षेत्र मिले (अपेक्षित: 243)`}
+                  </p>
+                </div>
+              )}
+              
+              {globalStats && globalStats.total_constituencies > 243 && (
+                <div>
+                  <button
+                    onClick={performDatabaseCleanup}
+                    disabled={isLoading}
+                    className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 shadow-lg"
+                  >
+                    {isLoading ? '🧹 Cleaning Database...' : '🧹 Clean Database (Fix 16K+ Rows Issue)'}
+                  </button>
+                  <p className="text-sm text-gray-400 mt-2 max-w-md mx-auto">
+                    {isEnglish ? 'Click to clean up duplicate constituency scores and optimize database performance' : 'डुप्लिकेट निर्वाचन क्षेत्र स्कोर साफ करने और डेटाबेस प्रदर्शन अनुकूलित करने के लिए कृपया क्लिक करें'}
+                  </p>
+                </div>
+              )}
             </div>
             
             {/* Enhanced Search Dropdown */}
@@ -1158,18 +1309,45 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
           </div>
         </div>
       )}
-      <CharchitVidhanSabha 
-        constituencies={filteredAndSortedConstituencies}
-        isLoading={isLoading}
-        visibleCount={visibleCount}
-        hasUserSubmittedSurvey={hasUserSubmittedSurvey}
-        submitSatisfactionSurvey={submitSatisfactionSurvey}
-        loadMoreConstituencies={loadMoreConstituencies}
-        initializeConstituencyScores={initializeConstituencyScores}
-        handleShare={handleShare}
-        popup={popup}
-        closePopup={closePopup}
-      />
+      
+      {/* Loading State for Database Initialization */}
+      {isLoading && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+          <div className="bg-white rounded-xl shadow-lg p-12 border border-slate-200">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full mb-6 shadow-lg">
+              <Database className="h-10 w-10 text-white animate-pulse" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-800 mb-4">
+              {isEnglish ? 'Initializing Database...' : 'डेटाबेस प्रारंभ हो रहा है...'}
+            </h2>
+            <p className="text-slate-600 mb-6 max-w-md mx-auto">
+              {isEnglish ? 'Setting up constituency data and ensuring everything is ready. This may take a few moments.' : 'निर्वाचन क्षेत्र डेटा सेट कर रहा है और सब कुछ तैयार कर रहा है। इसमें कुछ क्षण लग सकते हैं।'}
+            </p>
+            <div className="flex items-center justify-center space-x-2">
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-bounce"></div>
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Main Content - Only show when not loading */}
+      {!isLoading && (
+        <CharchitVidhanSabha 
+          constituencies={filteredAndSortedConstituencies}
+          isLoading={isLoading}
+          visibleCount={visibleCount}
+          hasUserSubmittedSurvey={hasUserSubmittedSurvey}
+          submitSatisfactionSurvey={submitSatisfactionSurvey}
+          loadMoreConstituencies={loadMoreConstituencies}
+          initializeConstituencyScores={initializeConstituencyScores}
+          handleShare={handleShare}
+          popup={popup}
+          closePopup={closePopup}
+          refreshConstituencyData={refreshConstituencyData}
+        />
+      )}
     </div>
   );
 };

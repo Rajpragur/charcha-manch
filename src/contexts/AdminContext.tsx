@@ -20,14 +20,24 @@ export const useAdmin = () => {
 };
 
 export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, loading: authLoading } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [adminLevel, setAdminLevel] = useState<'none' | 'moderator' | 'admin' | 'super_admin'>('none');
   const [loading, setLoading] = useState(true);
 
   const checkAdminStatus = async () => {
+    console.log('🔍 Checking admin status for user:', currentUser?.uid);
+    console.log('🔍 Auth loading state:', authLoading);
+    
+    // Wait for authentication to finish loading
+    if (authLoading) {
+      console.log('⏳ Waiting for authentication to finish loading...');
+      return;
+    }
+    
     if (!currentUser) {
+      console.log('❌ No current user, setting admin status to false');
       setIsAdmin(false);
       setIsSuperAdmin(false);
       setAdminLevel('none');
@@ -36,17 +46,47 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     try {
-      // Use user_profiles collection instead of users collection
-      const userDoc = await getDoc(doc(db, 'user_profiles', currentUser.uid));
+      // First check the users collection for admin status
+      console.log('🔍 Checking users collection for UID:', currentUser.uid);
+      const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        // Check for admin role in user profile data
-        const role = userData.role || userData.admin_level || 'none';
+        console.log('✅ User document found in users collection:', userData);
         
+        // Check for admin role in users collection
+        const role = userData.role || userData.admin_level || 'none';
+        const isUserAdmin = userData.isAdmin || false;
+        
+        console.log('🔍 Role:', role, 'isAdmin:', isUserAdmin);
+        
+        if (isUserAdmin || role === 'moderator' || role === 'admin' || role === 'super_admin') {
+          console.log('✅ User is admin, setting admin status');
+          setAdminLevel(role);
+          setIsAdmin(true);
+          setIsSuperAdmin(role === 'super_admin');
+          setLoading(false);
+          console.log('✅ Admin status set successfully - Role:', role, 'isAdmin: true, isSuperAdmin:', role === 'super_admin');
+          return;
+        } else {
+          console.log('❌ User document exists but user is not admin');
+        }
+      } else {
+        console.log('❌ No user document found in users collection');
+      }
+
+      // Fallback: check user_profiles collection
+      console.log('🔍 Checking user_profiles collection as fallback');
+      const profileDoc = await getDoc(doc(db, 'user_profiles', currentUser.uid));
+      if (profileDoc.exists()) {
+        const profileData = profileDoc.data();
+        const role = profileData.role || profileData.admin_level || 'none';
+        
+        console.log('✅ Profile document found:', profileData);
         setAdminLevel(role);
         setIsAdmin(role === 'moderator' || role === 'admin' || role === 'super_admin');
         setIsSuperAdmin(role === 'super_admin');
       } else {
+        console.log('❌ No profile document found in user_profiles collection');
         // No profile found, check if user is admin by email (temporary solution)
         const adminEmails = [
           'rajpratapsinghgurjar@gmail.com',
@@ -54,17 +94,19 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ];
         
         if (currentUser.email && adminEmails.includes(currentUser.email)) {
+          console.log('✅ User is admin by email fallback');
           setAdminLevel('admin');
           setIsAdmin(true);
           setIsSuperAdmin(false);
         } else {
+          console.log('❌ User is not admin by any method');
           setIsAdmin(false);
           setIsSuperAdmin(false);
           setAdminLevel('none');
         }
       }
     } catch (error) {
-      console.error('Error checking admin status:', error);
+      console.error('❌ Error checking admin status:', error);
       // Fallback: check if user is admin by email
       if (currentUser.email) {
         const adminEmails = [
@@ -73,10 +115,12 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ];
         
         if (adminEmails.includes(currentUser.email)) {
+          console.log('✅ User is admin by email fallback (error case)');
           setAdminLevel('admin');
           setIsAdmin(true);
           setIsSuperAdmin(false);
         } else {
+          console.log('❌ User is not admin by email fallback (error case)');
           setIsAdmin(false);
           setIsSuperAdmin(false);
           setAdminLevel('none');
@@ -92,8 +136,29 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   useEffect(() => {
-    checkAdminStatus();
-  }, [currentUser]);
+    console.log('🔄 AdminContext useEffect triggered - authLoading:', authLoading, 'currentUser:', currentUser?.uid);
+    
+    // Only check admin status when authentication is not loading and we have a user
+    if (!authLoading) {
+      if (currentUser) {
+        console.log('✅ Auth finished loading, user found, checking admin status...');
+        checkAdminStatus();
+      } else {
+        console.log('❌ Auth finished loading, no user found, setting admin to false');
+        setIsAdmin(false);
+        setIsSuperAdmin(false);
+        setAdminLevel('none');
+        setLoading(false);
+      }
+    } else {
+      console.log('⏳ Auth still loading, waiting...');
+    }
+  }, [authLoading, currentUser]);
+
+  // Monitor admin status changes for debugging
+  useEffect(() => {
+    console.log('🔍 Admin status changed:', { isAdmin, isSuperAdmin, adminLevel, loading });
+  }, [isAdmin, isSuperAdmin, adminLevel, loading]);
 
   const value = {
     isAdmin,

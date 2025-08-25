@@ -523,13 +523,36 @@ export class FirebaseService {
       console.log('🔄 Initializing constituency scores for all constituencies...');
 
       const scoresRef = collection(db, 'constituency_scores');
-      const batch = writeBatch(db);
-
-      // Create scores for constituencies 1-243
+      
+      // First, check which constituencies already exist
+      const existingQuery = query(scoresRef, where('constituency_id', '>=', 1), where('constituency_id', '<=', 243));
+      const existingSnapshot = await getDocs(existingQuery);
+      
+      const existingIds = new Set(existingSnapshot.docs.map(doc => doc.data().constituency_id));
+      console.log(`📊 Found ${existingIds.size} existing constituencies out of 243`);
+      
+      // Only create missing constituencies
+      const missingConstituencies = [];
       for (let i = 1; i <= 243; i++) {
+        if (!existingIds.has(i)) {
+          missingConstituencies.push(i);
+        }
+      }
+      
+      if (missingConstituencies.length === 0) {
+        console.log('✅ All 243 constituencies already exist, no initialization needed');
+        return;
+      }
+      
+      console.log(`📝 Creating ${missingConstituencies.length} missing constituencies: ${missingConstituencies.join(', ')}`);
+      
+      const batch = writeBatch(db);
+      
+      // Create only missing constituencies
+      for (const constituencyId of missingConstituencies) {
         const scoreDoc = doc(scoresRef);
         batch.set(scoreDoc, {
-          constituency_id: i,
+          constituency_id: constituencyId,
           satisfaction_yes: 0,
           satisfaction_no: 0,
           satisfaction_total: 0,
@@ -541,7 +564,7 @@ export class FirebaseService {
       }
 
       await batch.commit();
-      console.log('✅ Successfully initialized constituency scores for all 243 constituencies');
+      console.log(`✅ Successfully created ${missingConstituencies.length} missing constituency scores`);
     } catch (error: any) {
       if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
         console.error('Permission denied initializing constituency scores');
@@ -573,6 +596,41 @@ export class FirebaseService {
         return [];
       }
       console.error('Error getting constituency essentials:', error);
+      return [];
+    }
+  }
+
+  // Get constituency data including satisfaction votes for Charchit Vidhan Sabha
+  static async getConstituencyDataWithSatisfaction(): Promise<{ 
+    constituency_id: number; 
+    manifesto_average: number; 
+    interaction_count: number;
+    satisfaction_yes: number;
+    satisfaction_no: number;
+    satisfaction_total: number;
+  }[]> {
+    try {
+      const scoresRef = collection(db, 'constituency_scores');
+      const q = query(scoresRef, orderBy('constituency_id', 'asc'));
+      const querySnapshot = await getDocs(q);
+
+      const data = querySnapshot.docs.map(doc => ({
+        constituency_id: doc.data().constituency_id,
+        manifesto_average: doc.data().manifesto_average || 0,
+        interaction_count: doc.data().interaction_count || 0,
+        satisfaction_yes: doc.data().satisfaction_yes || 0,
+        satisfaction_no: doc.data().satisfaction_no || 0,
+        satisfaction_total: doc.data().satisfaction_total || 0
+      }));
+
+      console.log(`📊 Loaded ${data.length} constituency data with satisfaction from database`);
+      return data;
+    } catch (error: any) {
+      if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
+        console.warn('Permission denied accessing constituency data with satisfaction, returning empty array');
+        return [];
+      }
+      console.error('Error getting constituency data with satisfaction:', error);
       return [];
     }
   }
@@ -649,6 +707,76 @@ export class FirebaseService {
         throw new Error('Permission denied: Cannot clear scores');
       }
       console.error('Error clearing constituency scores:', error);
+      throw error;
+    }
+  }
+
+  // Clean up duplicate constituency scores and keep only valid ones (1-243)
+  static async cleanupDuplicateConstituencyScores(): Promise<void> {
+    try {
+      console.log('🧹 Cleaning up duplicate constituency scores...');
+
+      const scoresRef = collection(db, 'constituency_scores');
+      const querySnapshot = await getDocs(scoresRef);
+
+      // Group by constituency_id to find duplicates
+      const constituencyGroups = new Map<number, any[]>();
+      querySnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        const constituencyId = data.constituency_id;
+        
+        if (!constituencyGroups.has(constituencyId)) {
+          constituencyGroups.set(constituencyId, []);
+        }
+        constituencyGroups.get(constituencyId)!.push({ doc, data });
+      });
+
+      const batch = writeBatch(db);
+      let deletedCount = 0;
+      let keptCount = 0;
+
+      // For each constituency, keep the best document and delete duplicates
+      for (const [constituencyId, docs] of constituencyGroups) {
+        if (constituencyId < 1 || constituencyId > 243) {
+          // Delete invalid constituency IDs
+          docs.forEach(({ doc }) => {
+            batch.delete(doc.ref);
+            deletedCount++;
+          });
+        } else if (docs.length > 1) {
+          // Keep the document with the most data, delete others
+          const bestDoc = docs.reduce((best, current) => {
+            const bestScore = (best.data.interaction_count || 0) + (best.data.manifesto_average || 0);
+            const currentScore = (current.data.interaction_count || 0) + (current.data.manifesto_average || 0);
+            return currentScore > bestScore ? current : best;
+          });
+          
+          docs.forEach(({ doc }) => {
+            if (doc.id !== bestDoc.doc.id) {
+              batch.delete(doc.ref);
+              deletedCount++;
+            } else {
+              keptCount++;
+            }
+          });
+        } else {
+          // Single document, keep it
+          keptCount++;
+        }
+      }
+
+      if (deletedCount > 0) {
+        await batch.commit();
+        console.log(`✅ Cleaned up ${deletedCount} duplicate/invalid documents, kept ${keptCount} valid documents`);
+      } else {
+        console.log('✅ No cleanup needed, all documents are valid');
+      }
+    } catch (error: any) {
+      if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
+        console.error('Permission denied cleaning up constituency scores');
+        throw new Error('Permission denied: Cannot cleanup scores');
+      }
+      console.error('Error cleaning up constituency scores:', error);
       throw error;
     }
   }
@@ -817,6 +945,52 @@ export class FirebaseService {
         throw new Error('Permission denied: Cannot update manifesto average');
       }
       console.error('Error updating manifesto average:', error);
+      throw error;
+    }
+  }
+
+  // Update satisfaction vote counts for a constituency
+  static async updateSatisfactionVote(constituencyId: number, vote: 'yes' | 'no'): Promise<void> {
+    try {
+      console.log(`🗳️ Updating satisfaction vote for constituency ${constituencyId}: ${vote}`);
+      
+      const scoresRef = collection(db, 'constituency_scores');
+      const q = query(scoresRef, where('constituency_id', '==', constituencyId));
+      const snapshot = await getDocs(q);
+      
+      if (!snapshot.empty) {
+        const docRef = doc(db, 'constituency_scores', snapshot.docs[0].id);
+        const currentData = snapshot.docs[0].data();
+        
+        const currentYesVotes = currentData.satisfaction_yes || 0;
+        const currentNoVotes = currentData.satisfaction_no || 0;
+        
+        // Update the appropriate vote count
+        const updateData: any = {
+          last_updated: serverTimestamp()
+        };
+        
+        if (vote === 'yes') {
+          updateData.satisfaction_yes = currentYesVotes + 1;
+        } else {
+          updateData.satisfaction_no = currentNoVotes + 1;
+        }
+        
+        // Update total satisfaction votes
+        updateData.satisfaction_total = (updateData.satisfaction_yes || currentYesVotes) + (updateData.satisfaction_no || currentNoVotes);
+        
+        await updateDoc(docRef, updateData);
+        
+        console.log(`✅ Updated constituency ${constituencyId} satisfaction votes: yes=${updateData.satisfaction_yes || currentYesVotes}, no=${updateData.satisfaction_no || currentNoVotes}, total=${updateData.satisfaction_total}`);
+      } else {
+        console.warn(`⚠️ No constituency score document found for constituency ${constituencyId}`);
+      }
+    } catch (error: any) {
+      if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
+        console.error('Permission denied updating satisfaction vote');
+        throw new Error('Permission denied: Cannot update satisfaction vote');
+      }
+      console.error('Error updating satisfaction vote:', error);
       throw error;
     }
   }

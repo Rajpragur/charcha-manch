@@ -12,6 +12,11 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
     
+    // Allow authenticated users to read and write satisfaction surveys (alternative collection name)
+    match /satisfaction_surveys/{surveyId} {
+      allow read, write: if request.auth != null;
+    }
+    
     // Allow authenticated users to read and write constituency interactions
     match /constituency_interactions/{interactionId} {
       allow read, write: if request.auth != null;
@@ -40,6 +45,31 @@ service cloud.firestore {
     
     // Allow authenticated users to read and write constituency scores
     match /constituency_scores/{scoreId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow authenticated users to read and write questionnaire submissions
+    match /questionnaire_submissions/{submissionId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow authenticated users to read and write manifesto scores
+    match /manifesto_scores/{scoreId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Users collection - for admin management
+    match /users/{userId} {
+      // Allow users to read their own document
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // Allow write for admin setup (this will be restricted later)
+      allow write: if request.auth != null;
+    }
+    
+    // Admin collection - for admin-specific data
+    match /admin/{docId} {
+      // Allow read/write for authenticated users during setup
+      // This will be restricted to actual admins later
       allow read, write: if request.auth != null;
     }
   }
