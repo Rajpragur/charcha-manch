@@ -103,6 +103,25 @@ export interface FirebaseManifestoAverageScore {
   created_at: Timestamp;
 }
 
+export interface FirebaseDiscussionPost {
+  id: string;
+  title: string;
+  content: string;
+  constituency: number;
+  userId: string;
+  createdAt: any;
+  updatedAt?: any;
+  status: 'published' | 'under_review' | 'removed';
+  likesCount?: number;
+  commentsCount?: number;
+}
+
+export interface FirebaseConstituency {
+  id: number;
+  name: string;
+  postCount: number;
+}
+
 // Firebase Service Class
 export class FirebaseService {
 
@@ -1251,8 +1270,8 @@ export class FirebaseService {
       } else {
         // Like: create like document and increase count
         await setDoc(likeRef, {
-          blogId,
-          userId,
+          blogId: blogId,
+          userId: userId,
           createdAt: serverTimestamp()
         });
         
@@ -1293,11 +1312,22 @@ export class FirebaseService {
   // Get user's liked blogs
   static async getUserLikedBlogs(userId: string): Promise<string[]> {
     try {
+      if (!userId) {
+        console.log('No user ID provided, returning empty array');
+        return [];
+      }
+      
       const likesRef = collection(db, 'blog_likes');
       const q = query(likesRef, where('userId', '==', userId));
       const querySnapshot = await getDocs(q);
       
+      console.log(`🔍 Found ${querySnapshot.size} likes for user ${userId}`);
+      querySnapshot.docs.forEach(doc => {
+        console.log('🔍 Like document:', doc.data());
+      });
+      
       const likedBlogIds = querySnapshot.docs.map(doc => doc.data().blogId);
+      console.log('🔍 Liked blog IDs:', likedBlogIds);
       return likedBlogIds;
     } catch (error: any) {
       console.error('Error getting user liked blogs:', error);
@@ -1316,6 +1346,188 @@ export class FirebaseService {
     } catch (error: any) {
       console.error('Error getting blog like count:', error);
       return 0;
+    }
+  }
+
+  // Increment blog view count (one per user)
+  static async incrementBlogViews(blogId: string, userId: string): Promise<void> {
+    try {
+      if (!userId) {
+        console.log('No user ID provided, cannot track view');
+        return;
+      }
+
+      const blogRef = doc(db, 'blogs', blogId);
+      const viewRef = doc(db, 'blog_views', `${blogId}_${userId}`);
+      
+      // Check if user has already viewed this blog
+      const viewDoc = await getDoc(viewRef);
+      if (viewDoc.exists()) {
+        console.log(`👁️ User ${userId} has already viewed blog ${blogId}`);
+        return;
+      }
+      
+      // Create view document to track this user's view
+      await setDoc(viewRef, {
+        blogId: blogId,
+        userId: userId,
+        createdAt: serverTimestamp()
+      });
+      
+      // Increment blog view count
+      const blogDoc = await getDoc(blogRef);
+      if (blogDoc.exists()) {
+        const currentViews = blogDoc.data().views || 0;
+        await updateDoc(blogRef, {
+          views: currentViews + 1,
+          updatedAt: serverTimestamp()
+        });
+        console.log(`✅ Incremented views for blog ${blogId} to ${currentViews + 1} (first view from user ${userId})`);
+      }
+    } catch (error: any) {
+      console.error('Error incrementing blog views:', error);
+    }
+  }
+
+  // Discussion Forum Methods
+  static async getDiscussionPosts(): Promise<any[]> {
+    try {
+      const postsRef = collection(db, 'discussion_posts');
+      const q = query(
+        postsRef,
+        where('status', 'in', ['published', 'under_review']),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+
+      const posts = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as FirebaseDiscussionPost[];
+
+      // Enrich posts with user and constituency data
+      const enrichedPosts = await Promise.all(
+        posts.map(async (post) => {
+          try {
+            // Get user profile
+            const userProfile = await this.getUserProfile(post.userId);
+            
+            // Get constituency name
+            const constituencyName = await this.getConstituencyName(post.constituency);
+            
+            return {
+              ...post,
+              userName: userProfile?.display_name || 'Anonymous',
+              userConstituency: userProfile?.constituency_id,
+              constituencyName: constituencyName || `Constituency ${post.constituency}`,
+              interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
+            };
+          } catch (error) {
+            console.error('Error enriching post:', error);
+            return {
+              ...post,
+              userName: 'Anonymous',
+              constituencyName: `Constituency ${post.constituency}`,
+              interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
+            };
+          }
+        })
+      );
+
+      return enrichedPosts;
+    } catch (error: any) {
+      console.error('Error getting discussion posts:', error);
+      return [];
+    }
+  }
+
+  static async getConstituenciesWithPostCounts(): Promise<FirebaseConstituency[]> {
+    try {
+      const postsRef = collection(db, 'discussion_posts');
+      const q = query(postsRef, where('status', '==', 'published'));
+      const querySnapshot = await getDocs(q);
+
+      // Count posts per constituency
+      const constituencyCounts = new Map<number, number>();
+      querySnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        const constituencyId = data.constituency;
+        constituencyCounts.set(constituencyId, (constituencyCounts.get(constituencyId) || 0) + 1);
+      });
+
+      // Convert to array format
+      const constituencies: FirebaseConstituency[] = [];
+      for (const [id, count] of constituencyCounts) {
+        constituencies.push({
+          id,
+          name: `Constituency ${id}`,
+          postCount: count
+        });
+      }
+
+      // Sort by post count (descending)
+      constituencies.sort((a, b) => b.postCount - a.postCount);
+
+      return constituencies;
+    } catch (error: any) {
+      console.error('Error getting constituencies with post counts:', error);
+      return [];
+    }
+  }
+
+  static async getConstituencyName(constituencyId: number): Promise<string | null> {
+    try {
+      // This would typically come from a constituencies collection
+      // For now, return a formatted name
+      return `Constituency ${constituencyId}`;
+    } catch (error) {
+      console.error('Error getting constituency name:', error);
+      return null;
+    }
+  }
+
+  static async removeDiscussionPost(postId: string): Promise<void> {
+    try {
+      const postRef = doc(db, 'discussion_posts', postId);
+      await updateDoc(postRef, {
+        status: 'removed',
+        updatedAt: serverTimestamp()
+      });
+      console.log(`✅ Post ${postId} marked as removed`);
+    } catch (error: any) {
+      console.error('Error removing discussion post:', error);
+      throw error;
+    }
+  }
+
+  static async approveDiscussionPost(postId: string): Promise<void> {
+    try {
+      const postRef = doc(db, 'discussion_posts', postId);
+      await updateDoc(postRef, {
+        status: 'published',
+        updatedAt: serverTimestamp()
+      });
+      console.log(`✅ Post ${postId} approved`);
+    } catch (error: any) {
+      console.error('Error approving discussion post:', error);
+      throw error;
+    }
+  }
+
+  static async createDiscussionPost(postData: Omit<FirebaseDiscussionPost, 'id'>): Promise<string> {
+    try {
+      const postsRef = collection(db, 'discussion_posts');
+      const newPost = await addDoc(postsRef, {
+        ...postData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      
+      console.log(`✅ Created discussion post with ID: ${newPost.id}`);
+      return newPost.id;
+    } catch (error: any) {
+      console.error('Error creating discussion post:', error);
+      throw error;
     }
   }
 }

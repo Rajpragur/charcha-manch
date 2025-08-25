@@ -5,6 +5,8 @@ import Home from './pages/Home';
 import About from './pages/About';
 import Contact from './pages/Contact';
 import BlogPost from './pages/BlogPost';
+import BlogDetail from './pages/BlogDetail';
+import DiscussionForum from './pages/DiscussionForum';
 import Constituency from './pages/Constituency';
 import ConstituencyDetails from './pages/ConstituencyDetails';
 import Dashboard from './pages/Dashboard';
@@ -62,6 +64,16 @@ const App: React.FC = () => {
                   <Route path="/blog" element={
                     <ConstituencyCheck>
                       <BlogPost />
+                    </ConstituencyCheck>
+                  } />
+                  <Route path="/blog/:blogId" element={
+                    <ConstituencyCheck>
+                      <BlogDetail />
+                    </ConstituencyCheck>
+                  } />
+                  <Route path="/discussion" element={
+                    <ConstituencyCheck>
+                      <DiscussionForum />
                     </ConstituencyCheck>
                   } />
                   <Route path="/constituency/:constituencySlug" element={

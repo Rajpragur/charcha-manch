@@ -66,7 +66,6 @@ interface User {
   isActive: boolean;
 }
 
-// Only allow the specific authorized admin UID to access admin setup
 const AUTHORIZED_ADMIN_UID = '4zCKNy2r4tNAMdtnLUINpmzuyU52';
 
 const AdminPanel: React.FC = () => {

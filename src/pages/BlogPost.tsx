@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar, User, Tag, ThumbsUp, MessageSquare, Eye, Clock, ArrowLeft, ArrowRight, Search, Loader } from 'lucide-react';
+import { Calendar, User, Tag, ThumbsUp, Eye, Clock, ArrowLeft, ArrowRight, Search, Loader } from 'lucide-react';
 import FirebaseService from '../services/firebaseService';
+import SignInPopup from '../components/SignInPopup';
 
 interface BlogPost {
   id: string;
@@ -24,6 +26,7 @@ interface BlogPost {
 }
 
 const BlogPost: React.FC = () => {
+  const navigate = useNavigate();
   const { isEnglish } = useLanguage();
   const { currentUser } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -32,10 +35,9 @@ const BlogPost: React.FC = () => {
   const [filteredPosts, setFilteredPosts] = useState<BlogPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedBlog, setSelectedBlog] = useState<BlogPost | null>(null);
-  const [showBlogDetail, setShowBlogDetail] = useState(false);
   const [likedBlogs, setLikedBlogs] = useState<Set<string>>(new Set());
   const [likeLoading, setLikeLoading] = useState<Set<string>>(new Set());
+  const [showSignInPopup, setShowSignInPopup] = useState(false);
 
   const content = {
     title: isEnglish ? 'Blog & News' : 'ब्लॉग और समाचार',
@@ -52,7 +54,7 @@ const BlogPost: React.FC = () => {
     readMore: isEnglish ? 'Read More' : 'और पढ़ें',
     views: isEnglish ? 'views' : 'दृश्य',
     likes: isEnglish ? 'likes' : 'लाइक',
-    comments: isEnglish ? 'comments' : 'टिप्पणियां',
+
     readTime: isEnglish ? 'min read' : 'मिनट पढ़ने में',
     by: isEnglish ? 'by' : 'द्वारा',
     featured: isEnglish ? 'Featured' : 'विशेष',
@@ -143,11 +145,16 @@ const BlogPost: React.FC = () => {
     const loadUserLikes = async () => {
       if (currentUser?.uid) {
         try {
+          console.log('🔍 Loading likes for user:', currentUser.uid);
           const likedBlogIds = await FirebaseService.getUserLikedBlogs(currentUser.uid);
           setLikedBlogs(new Set(likedBlogIds));
+          console.log('✅ Loaded likes:', likedBlogIds);
         } catch (error) {
-          console.error('Error loading user likes:', error);
+          console.error('❌ Error loading user likes:', error);
         }
+      } else {
+        console.log('👤 No user authenticated, clearing likes');
+        setLikedBlogs(new Set());
       }
     };
 
@@ -199,22 +206,16 @@ const BlogPost: React.FC = () => {
     }
   };
 
-  // Function to open blog detail
+  // Function to navigate to blog detail
   const openBlogDetail = (blog: BlogPost) => {
-    setSelectedBlog(blog);
-    setShowBlogDetail(true);
-  };
-
-  // Function to close blog detail
-  const closeBlogDetail = () => {
-    setShowBlogDetail(false);
-    setSelectedBlog(null);
+    navigate(`/blog/${blog.id}`);
   };
 
   // Function to handle blog likes
   const handleLike = async (blogId: string) => {
     if (!currentUser?.uid) {
-      alert('Please sign in to like blogs');
+      console.log('👤 No user authenticated, showing sign-in popup');
+      setShowSignInPopup(true);
       return;
     }
 
@@ -256,10 +257,7 @@ const BlogPost: React.FC = () => {
           )
         );
 
-        // Update selected blog if it's the same one
-        if (selectedBlog?.id === blogId) {
-          setSelectedBlog(prev => prev ? { ...prev, likes: result.newLikeCount } : null);
-        }
+
       } else {
         console.error('Failed to update like');
       }
@@ -423,7 +421,7 @@ const BlogPost: React.FC = () => {
               <>
                 {/* Featured Post */}
                 {filteredPosts.filter(post => post.featured).map((post) => (
-                  <div key={post.id} className="bg-white rounded-lg shadow-md overflow-hidden border border-slate-100">
+                  <div key={post.id} className="bg-white rounded-lg shadow-md overflow-hidden border border-slate-100 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => openBlogDetail(post)}>
                     <div className="p-6">
                       <div className="flex items-center space-x-2 mb-3">
                         <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs font-medium rounded-full">
@@ -459,52 +457,49 @@ const BlogPost: React.FC = () => {
                         </div>
                       </div>
                       
-                                              <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4 text-sm text-slate-500">
-                            <span className="flex items-center">
-                              <Eye className="h-4 w-4 mr-1" />
-                              {post.views || 0} {content.views}
-                            </span>
-                            <button 
-                              onClick={() => handleLike(post.id)}
-                              disabled={likeLoading.has(post.id)}
-                              className={`flex items-center space-x-1 px-1 py-1 rounded-md transition-colors ${
-                                likedBlogs.has(post.id) 
-                                  ? 'text-red-600 bg-red-50 hover:bg-red-100' 
-                                  : 'text-slate-500 hover:text-red-600 hover:bg-red-50'
-                              } ${likeLoading.has(post.id) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                              {likeLoading.has(post.id) ? (
-                                <Loader className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <ThumbsUp className={`h-4 w-4 ${likedBlogs.has(post.id) ? 'fill-current' : ''}`} />
-                              )}
-                              <span>{post.likes || 0}</span>
-                            </button>
-                            <span className="flex items-center">
-                              <MessageSquare className="h-4 w-4 mr-1" />
-                              {post.comments || 0} {content.comments}
-                            </span>
-                          </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4 text-sm text-slate-500">
+                          <span className="flex items-center">
+                            <Eye className="h-4 w-4 mr-1" />
+                            {post.views || 0} {content.views}
+                          </span>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleLike(post.id);
+                            }}
+                            disabled={likeLoading.has(post.id)}
+                            className={`flex items-center space-x-1 px-1 py-1 rounded-md transition-colors ${
+                              likedBlogs.has(post.id) 
+                                ? 'text-red-600 bg-red-50 hover:bg-red-100' 
+                                : 'text-slate-500 hover:text-red-600 hover:bg-red-50'
+                            } ${likeLoading.has(post.id) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            {likeLoading.has(post.id) ? (
+                              <Loader className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <ThumbsUp className={`h-4 w-4 ${likedBlogs.has(post.id) ? 'fill-current' : ''}`} />
+                            )}
+                            <span>{post.likes || 0}</span>
+                          </button>
                           
-                          <div className="flex items-center space-x-2">
-                            <button 
-                              onClick={() => handleShare(post)}
-                              className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
-                              title="Share blog"
-                            >
-                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-                              </svg>
-                            </button>
-                            <button 
-                              onClick={() => openBlogDetail(post)}
-                              className="bg-sky-600 text-white px-4 py-2 rounded-lg hover:bg-sky-700 transition-colors text-sm font-medium"
-                            >
-                              {content.readMore}
-                            </button>
-                          </div>
                         </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShare(post);
+                            }}
+                            className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                            title="Share blog"
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -512,7 +507,7 @@ const BlogPost: React.FC = () => {
                 {/* Regular Posts */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {filteredPosts.filter(post => !post.featured).map((post) => (
-                    <div key={post.id} className="bg-white rounded-lg shadow-md overflow-hidden border border-slate-100 hover:shadow-lg transition-shadow">
+                    <div key={post.id} className="bg-white rounded-lg shadow-md overflow-hidden border border-slate-100 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => openBlogDetail(post)}>
                       <div className="p-6">
                         <div className="flex items-center space-x-2 mb-3">
                           <span className="px-2 py-1 bg-sky-100 text-sky-800 text-xs font-medium rounded-full">
@@ -548,7 +543,10 @@ const BlogPost: React.FC = () => {
                               {post.views || 0}
                             </span>
                             <button 
-                              onClick={() => handleLike(post.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleLike(post.id);
+                              }}
                               disabled={likeLoading.has(post.id)}
                               className={`flex items-center space-x-1 px-1 py-1 rounded transition-colors ${
                                 likedBlogs.has(post.id) 
@@ -563,27 +561,21 @@ const BlogPost: React.FC = () => {
                               )}
                               <span>{post.likes || 0}</span>
                             </button>
-                            <span className="flex items-center">
-                              <MessageSquare className="h-3 w-3 mr-1" />
-                              {post.comments || 0}
-                            </span>
+
                           </div>
                           
                           <div className="flex items-center space-x-2">
                             <button 
-                              onClick={() => handleShare(post)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleShare(post);
+                              }}
                               className="p-1 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
                               title="Share blog"
                             >
                               <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
                               </svg>
-                            </button>
-                            <button 
-                              onClick={() => openBlogDetail(post)}
-                              className="bg-slate-100 text-slate-700 px-3 py-1 rounded-lg hover:bg-slate-200 transition-colors text-xs font-medium"
-                            >
-                              {content.readMore}
                             </button>
                           </div>
                         </div>
@@ -612,147 +604,11 @@ const BlogPost: React.FC = () => {
         </div>
       </div>
 
-      {/* Blog Detail Modal */}
-      {showBlogDetail && selectedBlog && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          onClick={closeBlogDetail}
-        >
-          <div 
-            className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                      selectedBlog.featured 
-                        ? 'bg-amber-100 text-amber-800' 
-                        : 'bg-sky-100 text-sky-800'
-                    }`}>
-                      {selectedBlog.featured ? content.featured : selectedBlog.category || 'General'}
-                    </span>
-                    {selectedBlog.featured && (
-                      <span className="px-3 py-1 bg-sky-100 text-sky-800 text-xs font-medium rounded-full">
-                        {selectedBlog.category || 'General'}
-                      </span>
-                    )}
-                  </div>
-                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
-                    {selectedBlog.title}
-                  </h1>
-                  <div className="flex items-center space-x-4 text-sm text-gray-500">
-                    <span className="flex items-center">
-                      <User className="h-4 w-4 mr-2" />
-                      {selectedBlog.author}
-                    </span>
-                    <span className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      {formatDate(selectedBlog.createdAt)}
-                    </span>
-                    <span className="flex items-center">
-                      <Clock className="h-4 w-4 mr-2" />
-                      {calculateReadingTime(selectedBlog.content)} {content.readTime}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  onClick={closeBlogDetail}
-                  className="ml-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Content */}
-            <div className="px-6 py-6">
-              {/* Blog Image */}
-              {selectedBlog.imageUrl && (
-                <div className="mb-6">
-                  <img 
-                    src={selectedBlog.imageUrl} 
-                    alt={selectedBlog.title}
-                    className="w-full h-64 object-cover rounded-lg"
-                  />
-                </div>
-              )}
-
-              {/* Blog Excerpt */}
-              {selectedBlog.excerpt && (
-                <div className="mb-6">
-                  <p className="text-lg text-gray-600 leading-relaxed italic">
-                    "{selectedBlog.excerpt}"
-                  </p>
-                </div>
-              )}
-
-              {/* Blog Content */}
-              <div className="prose prose-lg max-w-none">
-                <div className="text-gray-800 leading-relaxed text-lg whitespace-pre-wrap font-normal">
-                  {selectedBlog.content}
-                </div>
-              </div>
-
-              {/* Blog Footer */}
-              <div className="mt-8 pt-6 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-6 text-sm text-gray-500">
-                    <span className="flex items-center">
-                      <Eye className="h-4 w-4 mr-2" />
-                      {selectedBlog.views || 0} {content.views}
-                    </span>
-                    <span className="flex items-center">
-                      <ThumbsUp className="h-4 w-4 mr-2" />
-                      {selectedBlog.likes || 0} {content.likes}
-                    </span>
-                    <span className="flex items-center">
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      {selectedBlog.comments || 0} {content.comments}
-                    </span>
-                  </div>
-                  
-                  <div className="flex space-x-3">
-                    <button 
-                      onClick={() => handleLike(selectedBlog.id)}
-                      disabled={likeLoading.has(selectedBlog.id)}
-                      className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium flex items-center ${
-                        likedBlogs.has(selectedBlog.id)
-                          ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      } ${likeLoading.has(selectedBlog.id) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      {likeLoading.has(selectedBlog.id) ? (
-                        <Loader className="h-4 w-4 inline mr-2 animate-spin" />
-                      ) : (
-                        <ThumbsUp className={`h-4 w-4 inline mr-2 ${likedBlogs.has(selectedBlog.id) ? 'fill-current' : ''}`} />
-                      )}
-                      {content.like}
-                    </button>
-                    <button className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium">
-                      <MessageSquare className="h-4 w-4 inline mr-2" />
-                      {content.comment}
-                    </button>
-                    <button 
-                      onClick={() => handleShare(selectedBlog)}
-                      className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium"
-                    >
-                      <svg className="h-4 w-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-                      </svg>
-                      {content.share}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Sign In Popup */}
+      <SignInPopup 
+        isOpen={showSignInPopup} 
+        onClose={() => setShowSignInPopup(false)} 
+      />
     </div>
   );
 };
