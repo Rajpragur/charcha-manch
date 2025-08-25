@@ -13,7 +13,6 @@ import {
   BookOpen,
   Award,
   MessageSquare,
-  Info,
   Calendar,
   Users,
   BarChart3

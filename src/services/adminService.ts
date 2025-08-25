@@ -60,12 +60,20 @@ class AdminService {
     try {
       const usersRef = collection(db, 'users');
       const snapshot = await getDocs(usersRef);
-      return snapshot.docs.map(doc => ({
-        uid: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        lastLogin: doc.data().lastLogin?.toDate() || new Date(),
-      })) as AdminUser[];
+      return snapshot.docs.map(doc => {
+        const data = doc.data() as any;
+        return {
+          uid: doc.id,
+          email: data.email || '',
+          displayName: data.displayName || '',
+          role: data.role || 'user',
+          createdAt: data.createdAt?.toDate() || new Date(),
+          lastLogin: data.lastLogin?.toDate() || new Date(),
+          isActive: data.isActive !== false,
+          phoneNumber: data.phoneNumber,
+          profileImage: data.profileImage
+        } as AdminUser;
+      });
     } catch (error) {
       console.error('Error fetching users:', error);
       throw error;
@@ -79,9 +87,14 @@ class AdminService {
         const data = userDoc.data();
         return {
           uid: userDoc.id,
-          ...data,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          lastLogin: data.lastLogin?.toDate() || new Date(),
+          email: (data as any).email || '',
+          displayName: (data as any).displayName || '',
+          role: (data as any).role || 'user',
+          createdAt: (data as any).createdAt?.toDate() || new Date(),
+          lastLogin: (data as any).lastLogin?.toDate() || new Date(),
+          isActive: (data as any).isActive !== false,
+          phoneNumber: (data as any).phoneNumber,
+          profileImage: (data as any).profileImage
         } as AdminUser;
       }
       return null;
@@ -129,11 +142,19 @@ class AdminService {
     try {
       const constituenciesRef = collection(db, 'constituencies');
       const snapshot = await getDocs(constituenciesRef);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        lastUpdated: doc.data().lastUpdated?.toDate() || new Date(),
-      })) as AdminConstituency[];
+      return snapshot.docs.map(doc => {
+        const data = doc.data() as any;
+        return {
+          id: doc.id,
+          name: data.name || '',
+          state: data.state || '',
+          totalVoters: data.totalVoters || 0,
+          status: data.status || 'pending',
+          lastUpdated: data.lastUpdated?.toDate() || new Date(),
+          areaCode: data.areaCode,
+          description: data.description
+        } as AdminConstituency;
+      });
     } catch (error) {
       console.error('Error fetching constituencies:', error);
       throw error;
@@ -147,8 +168,13 @@ class AdminService {
         const data = constituencyDoc.data();
         return {
           id: constituencyDoc.id,
-          ...data,
-          lastUpdated: data.lastUpdated?.toDate() || new Date(),
+          name: (data as any).name || '',
+          state: (data as any).state || '',
+          totalVoters: (data as any).totalVoters || 0,
+          status: (data as any).status || 'pending',
+          lastUpdated: (data as any).lastUpdated?.toDate() || new Date(),
+          areaCode: (data as any).areaCode,
+          description: (data as any).description
         } as AdminConstituency;
       }
       return null;
@@ -266,23 +292,31 @@ class AdminService {
   }
 
   // Utility Methods
-  async searchUsers(query: string): Promise<AdminUser[]> {
+  async searchUsers(searchQuery: string): Promise<AdminUser[]> {
     try {
       const usersRef = collection(db, 'users');
       const q = query(
         usersRef,
-        where('displayName', '>=', query),
-        where('displayName', '<=', query + '\uf8ff'),
+        where('displayName', '>=', searchQuery),
+        where('displayName', '<=', searchQuery + '\uf8ff'),
         orderBy('displayName'),
         limit(20)
       );
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        uid: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        lastLogin: doc.data().lastLogin?.toDate() || new Date(),
-      })) as AdminUser[];
+      return snapshot.docs.map(doc => {
+        const data = doc.data() as any;
+        return {
+          uid: doc.id,
+          email: data.email || '',
+          displayName: data.displayName || '',
+          role: data.role || 'user',
+          createdAt: data.createdAt?.toDate() || new Date(),
+          lastLogin: data.lastLogin?.toDate() || new Date(),
+          isActive: data.isActive !== false,
+          phoneNumber: data.phoneNumber,
+          profileImage: data.profileImage
+        } as AdminUser;
+      });
     } catch (error) {
       console.error('Error searching users:', error);
       throw error;
@@ -294,12 +328,20 @@ class AdminService {
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('role', '==', role));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        uid: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        lastLogin: doc.data().lastLogin?.toDate() || new Date(),
-      })) as AdminUser[];
+      return snapshot.docs.map(doc => {
+        const data = doc.data() as any;
+        return {
+          uid: doc.id,
+          email: data.email || '',
+          displayName: data.displayName || '',
+          role: data.role || 'user',
+          createdAt: data.createdAt?.toDate() || new Date(),
+          lastLogin: data.lastLogin?.toDate() || new Date(),
+          isActive: data.isActive !== false,
+          phoneNumber: data.phoneNumber,
+          profileImage: data.profileImage
+        } as AdminUser;
+      });
     } catch (error) {
       console.error('Error fetching users by role:', error);
       throw error;

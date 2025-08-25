@@ -17,7 +17,7 @@ import { AdminProvider } from './contexts/AdminContext';
 import Signup from './components/Signup';
 import Signin from './components/Signin';
 import Onboarding from './components/Onboarding';
-import ProtectedAdminRoute from './components/ProtectedAdminRoute';
+
 import AdminPanel from './pages/AdminPanel';
 import AdminSetup from './pages/AdminSetup';
 import './App.css';

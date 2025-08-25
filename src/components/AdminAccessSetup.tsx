@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../configs/firebase';
 import { Shield, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 

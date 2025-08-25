@@ -394,67 +394,97 @@ const Home: React.FC = () => {
       const cacheKey = 'constituencyScoresCache';
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
-        const cacheData = JSON.parse(cached);
-        const now = Date.now();
-        
-        // Cache is valid for 5 minutes
-        if (now < cacheData.expiresAt) {
-          console.log('📦 Using cached constituency scores');
+        try {
+          const cacheData = JSON.parse(cached);
+          const now = Date.now();
           
-          // Update constituencies with cached scores
-          setConstituencies(prev => {
-            const updated = prev.map((constituency) => {
-              const score = cacheData.scores.find((s: any) => s.constituency_id === parseInt(constituency.id) + 1);
-              if (score) {
-                return {
-                  ...constituency,
-                  satisfactionYes: score.satisfaction_yes || 0,
-                  satisfactionNo: score.satisfaction_no || 0,
-                  satisfactionTotal: score.satisfaction_total || 0,
-                  interactionCount: score.interaction_count || 0
-                };
-              }
-              return constituency;
+          // Cache is valid for 5 minutes
+          if (now < cacheData.expiresAt) {
+            console.log('📦 Using cached constituency scores');
+            
+            // Update constituencies with cached scores
+            setConstituencies(prev => {
+              const updated = prev.map((constituency) => {
+                const score = cacheData.scores.find((s: any) => s.constituency_id === parseInt(constituency.id) + 1);
+                if (score) {
+                  return {
+                    ...constituency,
+                    satisfactionYes: score.satisfaction_yes || 0,
+                    satisfactionNo: score.satisfaction_no || 0,
+                    satisfactionTotal: score.satisfaction_total || 0,
+                    interactionCount: score.interaction_count || 0,
+                    manifestoScore: score.manifesto_average || 0
+                  };
+                }
+                return constituency;
+              });
+              return updated;
             });
-            return updated;
-          });
-          
-          return; // Use cached data, don't fetch from Firebase
+            
+            return; // Use cached data, don't fetch from Firebase
+          }
+        } catch (cacheError) {
+          console.warn('⚠️ Cache corrupted, clearing and fetching fresh data:', cacheError);
+          localStorage.removeItem(cacheKey);
         }
       }
       
-      // Load all constituency scores from Firebase
-      const scores = await FirebaseService.getAllConstituencyScores();
-      console.log('📊 Scores loaded from Firebase:', scores.length, 'out of 243');
+      // Use lightweight method to load only essential data
+      const essentials = await FirebaseService.getConstituencyEssentials();
+      console.log('📊 Essentials loaded from Firebase:', essentials.length, 'out of 243');
       
-      // Cache the scores
-      const cacheData = {
-        scores: scores,
-        timestamp: Date.now(),
-        expiresAt: Date.now() + (5 * 60 * 1000) // Cache for 5 minutes
-      };
-      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-      console.log('💾 Cached constituency scores');
+      // Try to cache the essentials (but don't fail if storage is full)
+      try {
+        const cacheData = {
+          scores: essentials,
+          timestamp: Date.now(),
+          expiresAt: Date.now() + (5 * 60 * 1000) // Cache for 5 minutes
+        };
+        localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        console.log('💾 Cached constituency essentials');
+      } catch (storageError) {
+        console.warn('⚠️ Failed to cache essentials (storage full):', storageError);
+        // Continue without caching
+      }
       
-      // Update constituencies with scores from database
+      // Update constituencies with essentials from database
       setConstituencies(prev => {
         const updated = prev.map((constituency) => {
-          // Find score for this constituency (constituency.id is string, need to match with constituency_id)
-          const score = scores.find(s => s.constituency_id === parseInt(constituency.id) + 1);
-          if (score) {
-            console.log(`🏛️ Constituency ${constituency.id}: Yes=${score.satisfaction_yes}, No=${score.satisfaction_no}, Total=${score.satisfaction_total}, Interactions=${score.interaction_count}`);
+          // Find essential data for this constituency
+          const essential = essentials.find(e => e.constituency_id === parseInt(constituency.id) + 1);
+          if (essential) {
+            console.log(`🏛️ Constituency ${constituency.id}: Interactions=${essential.interaction_count}, Manifesto=${essential.manifesto_average}`);
             return {
               ...constituency,
-              satisfactionYes: score.satisfaction_yes,
-              satisfactionNo: score.satisfaction_no,
-              satisfactionTotal: score.satisfaction_total,
-              interactionCount: score.interaction_count
+              satisfactionYes: 0, // Not loaded in essentials
+              satisfactionNo: 0,  // Not loaded in essentials
+              satisfactionTotal: 0, // Not loaded in essentials
+              interactionCount: essential.interaction_count || 0,
+              manifestoScore: essential.manifesto_average || 0
             };
           }
           return constituency;
         });
-        console.log('✅ Constituencies updated with database scores');
-        return updated;
+        
+        // Sort constituencies by interaction count immediately after updating
+        const sorted = updated.sort((a, b) => {
+          // Primary sort: by total interactions (highest first)
+          if (b.interactionCount !== a.interactionCount) {
+            return b.interactionCount - a.interactionCount;
+          }
+          // Secondary sort: alphabetically by English constituency name
+          return a.constituencyName.en.localeCompare(b.constituencyName.en);
+        });
+        
+        // Debug: Show top 5 constituencies by interaction count
+        console.log('🏆 Top 5 constituencies by interaction count:');
+        sorted.slice(0, 5).forEach((constituency, index) => {
+          console.log(`${index + 1}. ${constituency.constituencyName.en}: ${constituency.interactionCount} interactions`);
+        });
+        
+        console.log('✅ Constituencies updated and sorted by interaction count');
+        console.log(`📊 Total constituencies loaded: ${sorted.length}`);
+        return sorted;
       });
       
     } catch (error) {
@@ -1129,7 +1159,7 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
         </div>
       )}
       <CharchitVidhanSabha 
-        constituencies={constituencies}
+        constituencies={filteredAndSortedConstituencies}
         isLoading={isLoading}
         visibleCount={visibleCount}
         hasUserSubmittedSurvey={hasUserSubmittedSurvey}

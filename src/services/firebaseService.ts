@@ -1,13 +1,13 @@
-import { 
-  collection, 
-  doc, 
-  getDocs, 
-  getDoc, 
-  addDoc, 
-  updateDoc, 
-  query, 
-  where, 
-  orderBy, 
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  query,
+  where,
+  orderBy,
   limit,
   serverTimestamp,
   Timestamp,
@@ -103,7 +103,7 @@ export interface FirebaseManifestoAverageScore {
 
 // Firebase Service Class
 export class FirebaseService {
-  
+
   // User Profile Operations
   static async getUserProfile(userId: string): Promise<FirebaseUserProfile | null> {
     try {
@@ -236,18 +236,18 @@ export class FirebaseService {
     try {
       const surveysRef = collection(db, 'satisfaction_surveys');
       const interactionsRef = collection(db, 'constituency_interactions');
-      
+
       const surveysQuery = query(surveysRef, where('user_id', '==', userId));
       const interactionsQuery = query(interactionsRef, where('user_id', '==', userId));
-      
+
       const [surveysSnapshot, interactionsSnapshot] = await Promise.all([
         getDocs(surveysQuery),
         getDocs(interactionsQuery)
       ]);
-      
+
       const surveys = surveysSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as FirebaseSatisfactionSurvey);
       const interactions = interactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as FirebaseConstituencyInteraction);
-      
+
       return { surveys, interactions };
     } catch (error: any) {
       if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
@@ -272,12 +272,12 @@ export class FirebaseService {
       const statsRef = collection(db, 'global_stats');
       const q = query(statsRef, orderBy('last_calculated', 'desc'), limit(1));
       const querySnapshot = await getDocs(q);
-      
+
       if (!querySnapshot.empty) {
         const doc = querySnapshot.docs[0];
         return { id: doc.id, ...doc.data() } as FirebaseGlobalStats;
       }
-      
+
       // Return default stats if no data available
       return {
         id: 'default',
@@ -317,7 +317,7 @@ export class FirebaseService {
       const postsRef = collection(db, 'discussion_posts');
       const postsQuery = query(postsRef, where('user_id', '==', userId));
       const postsSnapshot = await getDocs(postsQuery);
-      
+
       return postsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } catch (error: any) {
       if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
@@ -335,7 +335,7 @@ export class FirebaseService {
       const referralsRef = collection(db, 'referrals');
       const referralsQuery = query(referralsRef, where('referred_by', '==', userId));
       const referralsSnapshot = await getDocs(referralsQuery);
-      
+
       return referralsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } catch (error: any) {
       if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
@@ -521,10 +521,10 @@ export class FirebaseService {
   static async initializeConstituencyScores(): Promise<void> {
     try {
       console.log('🔄 Initializing constituency scores for all constituencies...');
-      
+
       const scoresRef = collection(db, 'constituency_scores');
       const batch = writeBatch(db);
-      
+
       // Create scores for constituencies 1-243
       for (let i = 1; i <= 243; i++) {
         const scoreDoc = doc(scoresRef);
@@ -539,7 +539,7 @@ export class FirebaseService {
           created_at: serverTimestamp()
         });
       }
-      
+
       await batch.commit();
       console.log('✅ Successfully initialized constituency scores for all 243 constituencies');
     } catch (error: any) {
@@ -552,20 +552,45 @@ export class FirebaseService {
     }
   }
 
+  // Get only essential constituency data (manifesto scores and interaction counts) to reduce database load
+  static async getConstituencyEssentials(): Promise<{ constituency_id: number; manifesto_average: number; interaction_count: number }[]> {
+    try {
+      const scoresRef = collection(db, 'constituency_scores');
+      const q = query(scoresRef, orderBy('constituency_id', 'asc'));
+      const querySnapshot = await getDocs(q);
+
+      const essentials = querySnapshot.docs.map(doc => ({
+        constituency_id: doc.data().constituency_id,
+        manifesto_average: doc.data().manifesto_average || 0,
+        interaction_count: doc.data().interaction_count || 0
+      }));
+
+      console.log(`📊 Loaded ${essentials.length} constituency essentials from database`);
+      return essentials;
+    } catch (error: any) {
+      if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
+        console.warn('Permission denied accessing constituency essentials, returning empty array');
+        return [];
+      }
+      console.error('Error getting constituency essentials:', error);
+      return [];
+    }
+  }
+
   // Check database health and validate constituency scores
   static async checkDatabaseHealth(): Promise<{ isHealthy: boolean; validCount: number; totalCount: number; issues: string[] }> {
     try {
       const scoresRef = collection(db, 'constituency_scores');
       const querySnapshot = await getDocs(scoresRef);
       const totalCount = querySnapshot.docs.length;
-      
+
       const issues: string[] = [];
       let validCount = 0;
-      
+
       querySnapshot.docs.forEach(doc => {
         const data = doc.data();
         const constituencyId = data.constituency_id;
-        
+
         if (constituencyId < 1 || constituencyId > 243) {
           issues.push(`Invalid constituency_id: ${constituencyId}`);
         } else if (data.manifesto_average === undefined) {
@@ -574,9 +599,9 @@ export class FirebaseService {
           validCount++;
         }
       });
-      
+
       const isHealthy = validCount === 243 && issues.length === 0;
-      
+
       return {
         isHealthy,
         validCount,
@@ -607,15 +632,15 @@ export class FirebaseService {
   static async clearAllConstituencyScores(): Promise<void> {
     try {
       console.log('🗑️ Clearing all constituency scores...');
-      
+
       const scoresRef = collection(db, 'constituency_scores');
       const querySnapshot = await getDocs(scoresRef);
-      
+
       const batch = writeBatch(db);
       querySnapshot.docs.forEach(doc => {
         batch.delete(doc.ref);
       });
-      
+
       await batch.commit();
       console.log(`✅ Cleared ${querySnapshot.docs.length} constituency scores`);
     } catch (error: any) {
@@ -632,13 +657,13 @@ export class FirebaseService {
   static async migrateConstituencyScores(): Promise<void> {
     try {
       console.log('🔄 Migrating existing constituency scores to include manifesto_average...');
-      
+
       const scoresRef = collection(db, 'constituency_scores');
       const querySnapshot = await getDocs(scoresRef);
-      
+
       const batch = writeBatch(db);
       let updateCount = 0;
-      
+
       querySnapshot.docs.forEach(doc => {
         const data = doc.data();
         if (data.manifesto_average === undefined) {
@@ -648,7 +673,7 @@ export class FirebaseService {
           updateCount++;
         }
       });
-      
+
       if (updateCount > 0) {
         await batch.commit();
         console.log(`✅ Successfully migrated ${updateCount} constituency scores`);
@@ -671,12 +696,12 @@ export class FirebaseService {
       const scoresRef = collection(db, 'constituency_scores');
       const q = query(scoresRef, orderBy('constituency_id', 'asc'));
       const querySnapshot = await getDocs(q);
-      
+
       const scores = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as FirebaseConstituencyScores[];
-      
+
       console.log(`📊 Loaded ${scores.length} constituency scores from database`);
       return scores;
     } catch (error: any) {
@@ -695,7 +720,7 @@ export class FirebaseService {
       const scoresRef = collection(db, 'constituency_scores');
       const q = query(scoresRef, where('constituency_id', '==', constituencyId));
       const querySnapshot = await getDocs(q);
-      
+
       if (!querySnapshot.empty) {
         const doc = querySnapshot.docs[0];
         return { id: doc.id, ...doc.data() } as FirebaseConstituencyScores;
@@ -721,7 +746,7 @@ export class FirebaseService {
       const scoresRef = collection(db, 'constituency_scores');
       const q = query(scoresRef, where('constituency_id', '==', constituencyId));
       const querySnapshot = await getDocs(q);
-      
+
       if (!querySnapshot.empty) {
         // Update existing document
         const docRef = doc(db, 'constituency_scores', querySnapshot.docs[0].id);
@@ -760,13 +785,13 @@ export class FirebaseService {
         const currentCount: number = typeof existing.interaction_count === 'number' ? existing.interaction_count : 0;
         const currentAvg: number = typeof existing.manifesto_average === 'number' ? existing.manifesto_average : 0;
         const newCount = currentCount + 1;
-        
+
         let updatedAvg = currentAvg;
         // If newScore is 0, just increment count without changing average
         if (newScore > 0) {
           updatedAvg = Number(((currentAvg * currentCount + newScore) / newCount).toFixed(2));
         }
-        
+
         const docRef = doc(db, 'constituency_scores', docSnap.id);
         await updateDoc(docRef, {
           manifesto_average: updatedAvg,

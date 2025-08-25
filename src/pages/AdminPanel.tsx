@@ -9,17 +9,12 @@ import {
   BarChart3, 
   Settings, 
   Shield, 
-  FileText,
-  AlertTriangle,
   CheckCircle,
-  XCircle,
   Edit,
   Trash2,
   Plus,
   Search,
-  Filter,
-  Download,
-  RefreshCw
+  Download
 } from 'lucide-react';
 
 interface User {

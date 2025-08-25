@@ -52,13 +52,10 @@ const AapkaKshetra: React.FC = () => {
   const [satisfactionVote, setSatisfactionVote] = useState<'yes' | 'no' | null>(null);
   const [departmentRatings, setDepartmentRatings] = useState<Record<string, number>>({});
   const [showCharchaManch, setShowCharchaManch] = useState(false);
-  const [isConstituencyLocked, setIsConstituencyLocked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showConstituencySelector, setShowConstituencySelector] = useState(true);
   const [manifestoScore, setManifestoScore] = useState<number | null>(null);
   const [hasSubmittedQuestionnaire, setHasSubmittedQuestionnaire] = useState(false);
-  const [manifestoAverage, setManifestoAverage] = useState<number | null>(null);
-  const [manifestoCount, setManifestoCount] = useState<number | null>(null);
   const [constituencyId, setConstituencyId] = useState<number | null>(null);
 
   const translations = {
@@ -223,7 +220,7 @@ const AapkaKshetra: React.FC = () => {
       const userProfile = await FirebaseService.getUserProfile(currentUser.uid);
       if (userProfile?.constituency_id) {
         // User has already selected a constituency
-        setIsConstituencyLocked(true);
+        // setIsConstituencyLocked(true);
         setShowConstituencySelector(false);
         
         // Find constituency name by ID and set it
@@ -291,8 +288,8 @@ const AapkaKshetra: React.FC = () => {
       if (submitted) {
         const avg = await FirebaseService.getManifestoAverageScore(constituencyId);
         if (avg) {
-          setManifestoAverage(avg.average);
-          setManifestoCount(avg.count);
+          // setManifestoAverage(avg.average);
+          // setManifestoCount(avg.count);
         }
       }
     };
@@ -325,8 +322,8 @@ const AapkaKshetra: React.FC = () => {
       setHasSubmittedQuestionnaire(true);
       const avg = await FirebaseService.getManifestoAverageScore(constituencyId);
       if (avg) {
-        setManifestoAverage(avg.average);
-        setManifestoCount(avg.count);
+        // setManifestoAverage(avg.average);
+        // setManifestoCount(avg.count);
       }
       alert(isEnglish ? 'Thank you! Your responses have been submitted.' : 'धन्यवाद! आपकी प्रतिक्रियाएं सबमिट कर दी गई हैं।');
     } catch (e) {
@@ -354,7 +351,7 @@ const AapkaKshetra: React.FC = () => {
           constituency_id: constituencyId
         });
         
-        setIsConstituencyLocked(true);
+        // setIsConstituencyLocked(true);
         setShowConstituencySelector(false);
         
         // Show success message
