@@ -2,6 +2,8 @@ import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { User , LogOut, ArrowRight, Shield, Star } from 'lucide-react';
+import AdminDashboardWidget from '../components/AdminDashboardWidget';
+import AdminAccessChecker from '../components/AdminAccessChecker';
 
 const Dashboard: React.FC = () => {
   const { currentUser, logout } = useAuth();
@@ -44,6 +46,12 @@ const Dashboard: React.FC = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Admin Access Checker */}
+        <AdminAccessChecker />
+        
+        {/* Admin Widget */}
+        <AdminDashboardWidget />
+        
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6">

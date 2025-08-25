@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { supabase } from '../configs/supabase';
+import FirebaseService from '../services/firebaseService';
 import { 
   ArrowLeft, 
   MapPin, 
@@ -191,30 +191,8 @@ const ConstituencyDetails: React.FC = () => {
     try {
       setIsLoading(true);
       setError(null);
-
-      // Try to get constituency data from Supabase first
-      const { data: constituency, error: constituencyError } = await supabase
-        .from('constituencies')
-        .select(`
-          *,
-          candidates (*),
-          news (*)
-        `)
-        .eq('id', constituencyId)
-        .single();
-
-      if (constituencyError) {
-        console.error('Error loading constituency from Supabase:', constituencyError);
-        // Fallback: try to load from JSON files
-        await loadFromJsonFiles();
-        return;
-      }
-
-      if (constituency) {
-        setConstituencyData(constituency);
-      } else {
-        setError('Constituency not found');
-      }
+      // Use JSON files as the primary source for now
+      await loadFromJsonFiles();
     } catch (err) {
       console.error('Error loading constituency data:', err);
       setError('Failed to load constituency data');
@@ -225,15 +203,7 @@ const ConstituencyDetails: React.FC = () => {
 
   const loadSatisfactionResults = async () => {
     try {
-      const { data, error } = await supabase
-        .from('satisfaction_surveys')
-        .select('answer')
-        .eq('constituency_id', parseInt(constituencyId!));
-
-      if (error) throw error;
-      
-      const yesCount = data?.filter(s => s.answer === true).length || 0;
-      const noCount = data?.filter(s => s.answer === false).length || 0;
+      const { yesCount, noCount } = await FirebaseService.getSatisfactionResults(parseInt(constituencyId!));
       setSatisfactionResults({ yesCount, noCount });
     } catch (err) {
       console.error('Error loading satisfaction results:', err);
@@ -242,20 +212,13 @@ const ConstituencyDetails: React.FC = () => {
 
   const loadDepartmentRatings = async () => {
     try {
-      const { data, error } = await supabase
-        .from('department_ratings')
-        .select('department, rating')
-        .eq('constituency_id', parseInt(constituencyId!));
-
-      if (error) throw error;
-
-      // Group by department and calculate averages
+      const raw = await FirebaseService.getDepartmentRatings(parseInt(constituencyId!));
       const departmentMap = new Map<string, { total: number; count: number }>();
-      data?.forEach(rating => {
-        const existing = departmentMap.get(rating.department) || { total: 0, count: 0 };
-        existing.total += rating.rating;
+      raw.forEach(r => {
+        const existing = departmentMap.get(r.department) || { total: 0, count: 0 };
+        existing.total += r.rating;
         existing.count += 1;
-        departmentMap.set(rating.department, existing);
+        departmentMap.set(r.department, existing);
       });
 
       const ratings: DepartmentRating[] = [
@@ -281,19 +244,7 @@ const ConstituencyDetails: React.FC = () => {
 
   const loadUserRatings = async () => {
     try {
-      const { data, error } = await supabase
-        .from('department_ratings')
-        .select('department, rating')
-        .eq('constituency_id', parseInt(constituencyId!))
-        .eq('user_id', currentUser!.uid);
-
-      if (error) throw error;
-
-      const ratings: Record<string, number> = {};
-      data?.forEach(rating => {
-        ratings[rating.department] = rating.rating;
-      });
-
+      const ratings = await FirebaseService.getUserDepartmentRatings(currentUser!.uid, parseInt(constituencyId!));
       setUserRatings(ratings);
     } catch (err) {
       console.error('Error loading user ratings:', err);
@@ -302,22 +253,16 @@ const ConstituencyDetails: React.FC = () => {
 
   const submitSatisfactionSurvey = async (answer: boolean) => {
     if (!currentUser || !constituencyId) return;
-
     try {
-      const { error } = await supabase
-        .from('satisfaction_surveys')
-        .upsert({
-          user_id: currentUser.uid,
-          constituency_id: parseInt(constituencyId),
-          candidate_id: constituencyData?.candidates[0]?.id || 0,
-          question: 'Are you satisfied with your tenure of last 5 years?',
-          answer
-        });
-
-      if (error) throw error;
-
+      await FirebaseService.submitSatisfactionSurvey({
+        user_id: currentUser.uid,
+        constituency_id: parseInt(constituencyId),
+        candidate_id: constituencyData?.candidates[0]?.id || 0,
+        question: 'Are you satisfied with your tenure of last 5 years?',
+        answer
+      });
       setSatisfactionAnswer(answer);
-      loadSatisfactionResults(); // Refresh results
+      loadSatisfactionResults();
     } catch (err) {
       console.error('Error submitting satisfaction survey:', err);
     }
@@ -325,22 +270,15 @@ const ConstituencyDetails: React.FC = () => {
 
   const submitDepartmentRating = async (department: string, rating: number) => {
     if (!currentUser || !constituencyId) return;
-
     try {
-      const { error } = await supabase
-        .from('department_ratings')
-        .upsert({
-          user_id: currentUser.uid,
-          constituency_id: parseInt(constituencyId),
-          department,
-          rating,
-          created_at: new Date().toISOString()
-        });
-
-      if (error) throw error;
-
+      await FirebaseService.submitDepartmentRating({
+        user_id: currentUser.uid,
+        constituency_id: parseInt(constituencyId),
+        department: department as any,
+        rating: rating
+      });
       setUserRatings(prev => ({ ...prev, [department]: rating }));
-      loadDepartmentRatings(); // Refresh averages
+      loadDepartmentRatings();
     } catch (err) {
       console.error('Error submitting department rating:', err);
     }

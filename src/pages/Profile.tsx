@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Calendar, Shield, ArrowLeft, Edit3, Save, X, Vote, TrendingUp, MessageCircle, Star } from 'lucide-react';
-import { supabase } from '../configs/supabase';
+import { User, Mail, Calendar, Shield, ArrowLeft, Edit3, Save, X, Vote, TrendingUp, MessageCircle, Star, MapPin } from 'lucide-react';
+import FirebaseService from '../services/firebaseService';
 
 const Profile: React.FC = () => {
   const { currentUser } = useAuth();
@@ -20,6 +20,9 @@ const Profile: React.FC = () => {
     participationScore: 0
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [constituencies, setConstituencies] = useState<{ id: number; area_name: string }[]>([]);
+  const [userConstituencyId, setUserConstituencyId] = useState<number | null>(null);
+  const [selectedConstituencyId, setSelectedConstituencyId] = useState<number | null>(null);
 
   // Load user data on component mount
   useEffect(() => {
@@ -28,92 +31,64 @@ const Profile: React.FC = () => {
     }
   }, [currentUser]);
 
+  // Load constituencies for selection/display
+  useEffect(() => {
+    const loadConstituencies = async () => {
+      try {
+        const res = await fetch('/data/candidates_en.json');
+        const data: any[] = await res.json();
+        const list = data.map((c, idx) => ({ id: idx + 1, area_name: c.area_name }));
+        setConstituencies(list);
+      } catch (e) {
+        console.error('Error loading constituencies list in profile:', e);
+      }
+    };
+    loadConstituencies();
+  }, []);
+
   if (!currentUser) {
     navigate('/signin');
     return null;
   }
 
-  // Load user data from Supabase
+  // Load user data from Firebase
   const loadUserData = async () => {
     try {
       setIsLoading(true);
       
-      // Load user profile
-      const { data: profileData } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', currentUser.uid)
-        .single();
-
-      if (profileData) {
-        setDisplayName(profileData.display_name || '');
-        setBio(profileData.bio || '');
-        setFirstVoteYear(profileData.first_vote_year?.toString() || '');
-        setUserStats({
-          totalInteractions: profileData.total_interactions || 0,
-          satisfactionVotes: profileData.satisfaction_votes || 0,
-          shares: profileData.shares || 0,
-          views: profileData.views || 0,
-          level: 'Tier 1', // Everyone starts at Tier 1
-          participationScore: profileData.participation_score || 0
+      const profile = await FirebaseService.getUserProfile(currentUser.uid);
+      if (!profile) {
+        await FirebaseService.createUserProfile(currentUser.uid, {
+          display_name: currentUser.displayName || 'User',
+          bio: 'Active member of Charcha Manch',
+          first_vote_year: null as any,
+          tier_level: 1,
+          engagement_score: 0
         });
-      } else {
-        // Create a new profile if none exists
-        const { error: createError } = await supabase
-          .from('user_profiles')
-          .insert({
-            id: currentUser.uid,
-            display_name: currentUser.displayName || 'User',
-            bio: 'Active member of Charcha Manch',
-            first_vote_year: null,
-            level: 'Tier 1',
-            participation_score: 0,
-            total_interactions: 0,
-            satisfaction_votes: 0,
-            shares: 0,
-            views: 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-
-        if (createError) {
-          console.error('Error creating user profile:', createError);
-        } else {
-          // Set default values for new profile
-          setDisplayName(currentUser.displayName || 'User');
-          setBio('Active member of Charcha Manch');
-          setFirstVoteYear('');
-          setUserStats({
-            totalInteractions: 0,
-            satisfactionVotes: 0,
-            shares: 0,
-            views: 0,
-            level: 'Tier 1',
-            participationScore: 0
-          });
-        }
       }
 
-      // Load user interactions
-      const { data: interactions } = await supabase
-        .from('constituency_interactions')
-        .select('*')
-        .eq('user_id', currentUser.uid);
-
-      if (interactions) {
-        const totalInteractions = interactions.length;
-        const satisfactionVotes = interactions.filter(i => i.interaction_type === 'survey').length;
-        const shares = interactions.filter(i => i.interaction_type === 'share').length;
-        const views = interactions.filter(i => i.interaction_type === 'view').length;
-
-        setUserStats(prev => ({
-          ...prev,
-          totalInteractions,
-          satisfactionVotes,
-          shares,
-          views
-        }));
+      const updated = await FirebaseService.getUserProfile(currentUser.uid);
+      if (updated) {
+        setDisplayName(updated.display_name || '');
+        setBio(updated.bio || '');
+        setFirstVoteYear(updated.first_vote_year ? String(updated.first_vote_year) : '');
+        setUserConstituencyId(typeof updated.constituency_id === 'number' ? updated.constituency_id : null);
       }
+
+      const { interactions } = await FirebaseService.loadUserInteractions(currentUser.uid);
+      const totalInteractions = interactions.length;
+      const satisfactionVotes = interactions.filter(i => i.interaction_type === 'survey').length;
+      const shares = interactions.filter(i => i.interaction_type === 'share').length;
+      const views = interactions.filter(i => i.interaction_type === 'view').length;
+
+      setUserStats({
+        totalInteractions,
+        satisfactionVotes,
+        shares,
+        views,
+        level: 'Tier 1',
+        participationScore: updated?.engagement_score || 0
+      });
 
     } catch (err) {
       console.error('Error loading user data:', err);
@@ -122,27 +97,25 @@ const Profile: React.FC = () => {
     }
   };
 
+  const handleConfirmConstituency = async () => {
+    if (!currentUser || !selectedConstituencyId) return;
+    try {
+      await FirebaseService.updateUserProfile(currentUser.uid, { constituency_id: selectedConstituencyId });
+      setUserConstituencyId(selectedConstituencyId);
+      alert('Constituency saved and locked.');
+    } catch (e) {
+      console.error('Error saving constituency:', e);
+      alert('Failed to save constituency');
+    }
+  };
+
   const handleSave = async () => {
     try {
-      // Update user profile in Supabase
-      const { error } = await supabase
-        .from('user_profiles')
-        .upsert({
-          id: currentUser.uid,
-          display_name: displayName,
-          bio,
-          first_vote_year: firstVoteYear ? parseInt(firstVoteYear) : null,
-          level: 'Tier 1', // Always maintain Tier 1
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'id'
-        });
-
-      if (error) {
-        console.error('Error updating profile:', error);
-        alert('Failed to update profile');
-        return;
-      }
+      await FirebaseService.updateUserProfile(currentUser.uid, {
+        display_name: displayName,
+        bio,
+        first_vote_year: firstVoteYear ? parseInt(firstVoteYear) : undefined,
+      });
 
       // Refresh user data to show updated information
       await loadUserData();
@@ -163,30 +136,12 @@ const Profile: React.FC = () => {
         setBio('Active member of Charcha Manch');
         setFirstVoteYear('');
         
-        // Update in Supabase
-        const { error } = await supabase
-          .from('user_profiles')
-          .upsert({
-            id: currentUser.uid,
-            display_name: currentUser.displayName || 'User',
-            bio: 'Active member of Charcha Manch',
-            first_vote_year: null,
-            level: 'Tier 1',
-            participation_score: 0,
-            total_interactions: 0,
-            satisfaction_votes: 0,
-            shares: 0,
-            views: 0,
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'id'
-          });
-
-        if (error) {
-          console.error('Error resetting profile:', error);
-          alert('Failed to reset profile');
-          return;
-        }
+        await FirebaseService.updateUserProfile(currentUser.uid, {
+          display_name: currentUser.displayName || 'User',
+          bio: 'Active member of Charcha Manch',
+          first_vote_year: undefined,
+          engagement_score: 0,
+        });
 
         // Refresh user data
         await loadUserData();
@@ -201,17 +156,7 @@ const Profile: React.FC = () => {
   const handleDeleteProfile = async () => {
     if (window.confirm('Are you sure you want to delete your profile? This action cannot be undone and will remove all your data.')) {
       try {
-        // Delete profile from Supabase
-        const { error } = await supabase
-          .from('user_profiles')
-          .delete()
-          .eq('id', currentUser.uid);
-
-        if (error) {
-          console.error('Error deleting profile:', error);
-          alert('Failed to delete profile');
-          return;
-        }
+        await FirebaseService.deleteUserProfile(currentUser.uid);
 
         // Reset local state
         setDisplayName(currentUser.displayName || 'User');
@@ -240,6 +185,41 @@ const Profile: React.FC = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto"></div>
           <p className="mt-4 text-slate-600">Loading your profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If constituency not set, force only the constituency selection UI
+  if (!userConstituencyId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
+          <div className="text-center mb-6">
+            <MapPin className="h-10 w-10 text-green-600 mx-auto mb-2" />
+            <h1 className="text-2xl font-bold text-slate-800">Select Your Constituency</h1>
+            <p className="text-slate-600 mt-1">This can only be set once and cannot be changed later</p>
+          </div>
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-slate-700">Constituency</label>
+            <select
+              value={selectedConstituencyId || ''}
+              onChange={(e) => setSelectedConstituencyId(parseInt(e.target.value))}
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+            >
+              <option value="">Select constituency…</option>
+              {constituencies.map(c => (
+                <option key={c.id} value={c.id}>{c.area_name}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleConfirmConstituency}
+              disabled={!selectedConstituencyId}
+              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-lg font-medium hover:from-green-700 hover:to-emerald-700 disabled:opacity-50"
+            >
+              Save Constituency
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -317,6 +297,17 @@ const Profile: React.FC = () => {
                 <div className="mt-4 inline-flex items-center px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full">
                   <Shield className="h-3 w-3 mr-1" />
                   Verified Account
+                </div>
+                {/* Constituency display (locked) */}
+                <div className="mt-6 p-4 rounded-lg bg-slate-50 border border-slate-200 text-left">
+                  <div className="flex items-center mb-1 text-slate-700 text-sm">
+                    <MapPin className="h-4 w-4 mr-2 text-emerald-600" />
+                    Your Constituency
+                  </div>
+                  <div className="text-slate-900 font-semibold">
+                    {constituencies.find(c => c.id === userConstituencyId)?.area_name || `#${userConstituencyId}`}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">Locked · Contact support to request changes</div>
                 </div>
               </div>
             </div>

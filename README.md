@@ -208,57 +208,38 @@
 ---
 ##  Getting Started
 
-###  Prerequisites
+<code>❯ REPLACE-ME</code>
 
-Before getting started with charcha-manch, ensure your runtime environment meets the following requirements:
+### Prerequisites
 
-- **Programming Language:** TypeScript
-- **Package Manager:** Npm
+<code>❯ REPLACE-ME</code>
 
+### Installation
 
-###  Installation
+<code>❯ REPLACE-ME</code>
 
-Install charcha-manch using one of the following methods:
+### Usage
 
-**Build from source:**
+<code>❯ REPLACE-ME</code>
 
-1. Clone the charcha-manch repository:
-```sh
-❯ git clone https://github.com/Rajpragur/charcha-manch
-```
+### Testing
 
-2. Navigate to the project directory:
-```sh
-❯ cd charcha-manch
-```
+<code>❯ REPLACE-ME</code>
 
-3. Install the project dependencies:
+---
 
+## Firebase Setup
 
-**Using `npm`** &nbsp; [<img align="center" src="https://img.shields.io/badge/npm-CB3837.svg?style={badge_style}&logo=npm&logoColor=white" />](https://www.npmjs.com/)
+This project has been migrated from Supabase to Firebase. To complete the setup:
 
-```sh
-❯ npm install
-```
+1. **Follow the detailed guide**: [FIREBASE_SETUP.md](./FIREBASE_SETUP.md)
+2. **Key steps**:
+   - Create Firebase project and enable Firestore
+   - Set environment variables in `.env.local`
+   - Deploy security rules
+   - Run setup script for initial collections
 
-
-
-
-###  Usage
-Run charcha-manch using the following command:
-**Using `npm`** &nbsp; [<img align="center" src="https://img.shields.io/badge/npm-CB3837.svg?style={badge_style}&logo=npm&logoColor=white" />](https://www.npmjs.com/)
-
-```sh
-❯ npm start
-```
-
-###  Testing
-Run the test suite using the following command:
-**Using `npm`** &nbsp; [<img align="center" src="https://img.shields.io/badge/npm-CB3837.svg?style={badge_style}&logo=npm&logoColor=white" />](https://www.npmjs.com/)
-
-```sh
-❯ npm test
-```
+**Current Status**: ✅ Migration complete, ⚠️ Setup required for full functionality
 
 ---
 

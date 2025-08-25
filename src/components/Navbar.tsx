@@ -1,32 +1,36 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, User, ToggleRight, ToggleLeft, LogOut, Settings, LogIn, UserPlus } from "lucide-react";
+import { Menu, X, User, ToggleRight, ToggleLeft, LogOut, Settings, LogIn, UserPlus, Shield } from "lucide-react";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
+import { useAdmin } from "../contexts/AdminContext";
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const { isEnglish, toggleLanguage } = useLanguage();
   const { currentUser, logout } = useAuth();
+  const { isAdmin } = useAdmin();
   const profileRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   
   const navItems = isEnglish
     ? [
         { name: "Home", href: "/" },
+
         { name: "Constituencies", href: "/constituency/all-constituencies?showAll=true" },
         { name: "About", href: "/about" },
-        { name: "Aapka Kshetra", href: "/aapka-shetra" },
+        { name: "Aapka Kshetra", href: "/aapka-kshetra" },
         { name: "Forum", href: "/discussion-forum" },
         { name: "Blog", href: "/blog" },
         { name: "Contact", href: "/contact" },
       ]
     : [
         { name: "होम", href: "/" },
+
         { name: "निर्वाचन क्षेत्र", href: "/constituency/all-constituencies?showAll=true" },
         { name: "परिचय", href: "/about" },
-        { name: "आपका क्षेत्र", href: "/aapka-shetra" },
+        { name: "आपका क्षेत्र", href: "/aapka-kshetra" },
         { name: "चर्चा मंच", href: "/discussion-forum" },
         { name: "ब्लॉग", href: "/blog" },
         { name: "संपर्क", href: "/contact" },
@@ -149,6 +153,17 @@ const Navbar: React.FC = () => {
                           </div>
                           <span className="font-medium">{isEnglish ? "Settings" : "सेटिंग्स"}</span>
                         </Link>
+                        {isAdmin && (
+                          <Link
+                            to="/admin"
+                            className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-700 transition-all duration-200 rounded-lg mx-2"
+                          >
+                            <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mr-3">
+                              <Shield className="h-4 w-4 text-red-600" />
+                            </div>
+                            <span className="font-medium">{isEnglish ? "Admin Panel" : "एडमिन पैनल"}</span>
+                          </Link>
+                        )}
                         <div className="border-t border-gray-100 my-2"></div>
                         <button
                           onClick={handleLogout}

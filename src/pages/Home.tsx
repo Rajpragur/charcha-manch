@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { supabase } from '../configs/supabase';
+import FirebaseService from '../services/firebaseService';
+import CharchitVidhanSabha from '../components/CharchitVidhanSabha';
 import { 
   Search, 
   MapPin, 
@@ -12,11 +13,7 @@ import {
   Calendar,
   MessageCircle,
   Star,
-  Share2,
-  Loader2,
-  RefreshCw
 } from 'lucide-react';
-import PlaceholderImages from '../components/PlaceholderImages';
 
 interface CandidateData {
   area_name: string;
@@ -70,6 +67,7 @@ interface CandidateData {
 interface ConstituencyData {
   id: string;
   profileImage: string | undefined;
+  age: number;
   constituencyName: { en: string; hi: string };
   candidateName: { en: string; hi: string };
   partyName: { name: string; nameHi: string; color: string };
@@ -81,6 +79,7 @@ interface ConstituencyData {
   news: { title: { en: string; hi: string }; date: string };
   manifestoScore: number;
   interactionCount: number;
+  activePostCount: number;
   criminalCases: number;
   netWorth: number;
   attendance: string;
@@ -109,55 +108,127 @@ const Home: React.FC = () => {
   const [constituencies, setConstituencies] = useState<ConstituencyData[]>([]);
   const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [visibleConstituencies, setVisibleConstituencies] = useState(6);
+
   const [userProfile, setUserProfile] = useState<any>(null);
   const [userAchievements, setUserAchievements] = useState<any>(null);
   const [, setEnglishData] = useState<CandidateData[]>([]);
   const [, setHindiData] = useState<CandidateData[]>([]);
+  const [userSurveys, setUserSurveys] = useState<Set<string>>(new Set());
+
+
+  const [visibleCount, setVisibleCount] = useState(3); // Show 3 initially, then load 12 more each time
+
+  // Popup state
+  const [popup, setPopup] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
 
   // Load data on component mount
   useEffect(() => {
-    loadGlobalStats();
-    loadConstituencyData();
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // ALWAYS initialize constituency scores first to ensure database is ready
+        console.log('🔄 Ensuring database is initialized...');
+        await initializeConstituencyScores();
+        
+        // Double-check: if scores are still not loaded properly, force re-initialization
+        const scores = await FirebaseService.getAllConstituencyScores();
+        if (scores.length < 243) {
+          console.log('🔄 Database still incomplete after initialization, forcing re-initialization...');
+          await FirebaseService.initializeConstituencyScores();
+          localStorage.removeItem('constituencyScoresCache');
+        }
+        
+        // Load other data
+        await Promise.all([
+          loadGlobalStats(),
+          loadConstituencyData(),
+          loadUserProfile(),
+          loadUserAchievements()
+        ]);
+        
+        // Load user votes from Firebase if user is authenticated
+        if (currentUser) {
+          await loadUserVotesFromFirebase();
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+        
+        // If there's an error, try to initialize database anyway
+        try {
+          console.log('🔄 Error in data loading, attempting database initialization...');
+          await FirebaseService.initializeConstituencyScores();
+          localStorage.removeItem('constituencyScoresCache');
+        } catch (initError) {
+          console.error('Failed to initialize database after error:', initError);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [currentUser]);
+
+  // Load user votes when currentUser changes (login/logout)
+  useEffect(() => {
     if (currentUser) {
-      loadUserProfile();
-      loadUserAchievements();
+      loadUserVotesFromFirebase();
+    } else {
+      // Clear user votes when user logs out
+      setUserSurveys(new Set());
     }
   }, [currentUser]);
+
+  // Popup helper functions
+  const showPopup = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setPopup({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  const closePopup = () => {
+    setPopup(prev => ({ ...prev, isOpen: false }));
+  };
+
+  // Auto-close success popups after 3 seconds
+  useEffect(() => {
+    if (popup.isOpen && popup.type === 'success') {
+      const timer = setTimeout(() => {
+        closePopup();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [popup.isOpen, popup.type]);
 
   // Load global statistics (cached daily to minimize egress)
   const loadGlobalStats = async () => {
     try {
-      // Try to load from Supabase first
-      const { data: supabaseStats, error } = await supabase
-        .from('global_stats')
-        .select('*')
-        .order('last_calculated', { ascending: false })
-        .limit(1);
-
-      if (error) {
-        console.error('Error loading global stats from Supabase:', error);
-        // Fallback to 0 values
+      const stats = await FirebaseService.getGlobalStats();
+      if (stats) {
         setGlobalStats({
-          total_users: 0,
-          level1_users: 0,
-          level2_users: 0,
-          level3_users: 0,
-          level4_users: 0,
-          total_constituencies: 243
-        });
-      } else if (supabaseStats && supabaseStats.length > 0) {
-        // Use real data from Supabase
-        setGlobalStats({
-          total_users: supabaseStats[0].total_users || 0,
-          level1_users: supabaseStats[0].level1_users || 0,
-          level2_users: supabaseStats[0].level2_users || 0,
-          level3_users: supabaseStats[0].level3_users || 0,
-          level4_users: supabaseStats[0].level4_users || 0,
-          total_constituencies: supabaseStats[0].total_constituencies || 243
+          total_users: stats.total_users || 0,
+          level1_users: stats.level1_users || 0,
+          level2_users: stats.level2_users || 0,
+          level3_users: stats.level3_users || 0,
+          level4_users: stats.level4_users || 0,
+          total_constituencies: stats.total_constituencies || 243
         });
       } else {
-        // No data in Supabase, use 0 values
+        // No data in Firebase, use 0 values
         setGlobalStats({
           total_users: 0,
           level1_users: 0,
@@ -183,53 +254,9 @@ const Home: React.FC = () => {
 
 
 
-  // Refresh constituency data from Supabase
-  const refreshConstituencyData = async () => {
-    try {
-      // Load real-time data from Supabase
-      const [satisfactionData, newsData, interactionData] = await Promise.all([
-        supabase.from('satisfaction_surveys').select('*'),
-        supabase.from('constituency_news').select('*'),
-        supabase.from('constituency_charcha_stats').select('*')
-      ]);
 
-      // Update constituencies with real data
-      setConstituencies(prev => prev.map(constituency => {
-        const constituencyIndex = parseInt(constituency.id);
-        const constituencyIdForSupabase = constituencyIndex + 1;
-        
-        // Get satisfaction data
-        const constituencySatisfaction = satisfactionData.data?.filter(s => s.constituency_id === constituencyIdForSupabase);
-        const satisfactionYes = constituencySatisfaction?.filter(s => s.answer === true).length || 0;
-        const satisfactionNo = constituencySatisfaction?.filter(s => s.answer === false).length || 0;
-        const satisfactionTotal = satisfactionYes + satisfactionNo;
-        
-        // Get interaction data
-        const constituencyStats = interactionData.data?.find(s => s.constituency_id === constituencyIdForSupabase);
-        const interactionCount = constituencyStats?.total_interactions || 0;
-        
-        // Get news data
-        const constituencyNews = newsData.data?.find(n => n.constituency_id === constituencyIdForSupabase);
-        
-        return {
-          ...constituency,
-          satisfactionYes,
-          satisfactionNo,
-          satisfactionTotal,
-          interactionCount,
-          news: {
-            title: {
-              en: constituencyNews?.title || 'No news available',
-              hi: constituencyNews?.title_hi || 'कोई समाचार उपलब्ध नहीं'
-            },
-            date: constituencyNews?.published_date || 'No recent news'
-          }
-        };
-      }));
-    } catch (err) {
-      console.error('Error refreshing constituency data:', err);
-    }
-  };
+
+
 
   // Load constituency data from JSON files
   const loadConstituencyData = async () => {
@@ -244,138 +271,213 @@ const Home: React.FC = () => {
 
       const englishData: CandidateData[] = await englishResponse.json();
       const hindiData: CandidateData[] = await hindiResponse.json();
-
-      console.log('Data loading debug:', {
-        englishDataLength: englishData.length,
-        hindiDataLength: hindiData.length,
-        englishSample: englishData.slice(0, 3).map(c => c.area_name),
-        hindiSample: hindiData.slice(0, 3).map(c => c.area_name)
-      });
-
       setEnglishData(englishData);
       setHindiData(hindiData);
 
-      // Load real-time data from Supabase
-      const [satisfactionData, interactionData, newsData] = await Promise.all([
-        supabase.from('satisfaction_surveys').select('*'),
-        supabase.from('constituency_charcha_stats').select('*'),
-        supabase.from('constituency_news').select('*')
-      ]);
+      // Load constituency scores from Firebase database
+      await loadConstituencyScoresFromDatabase();
 
-      // Transform data to constituency format with real Supabase data
-      const transformedConstituencies = englishData.map((candidate, index) => {
-        // Find matching Hindi data by area name instead of index to ensure accuracy
-        const hindiCandidate = hindiData.find(h => h.area_name === candidate.area_name) || candidate;
-        
-        // Debug matching process
-        if (index < 3) {
-          console.log(`Matching constituency ${index}:`, {
-            englishArea: candidate.area_name,
-            hindiArea: hindiCandidate.area_name,
-            matched: hindiCandidate.area_name === candidate.area_name
-          });
-        }
-        
-        const constituencyIdForSupabase = index + 1;
-        
-        // Get real satisfaction data from Supabase
-        const constituencySatisfaction = satisfactionData.data?.filter(s => s.constituency_id === constituencyIdForSupabase);
-        const satisfactionYes = constituencySatisfaction?.filter(s => s.answer === true).length || 0;
-        const satisfactionNo = constituencySatisfaction?.filter(s => s.answer === false).length || 0;
-        const satisfactionTotal = satisfactionYes + satisfactionNo;
-        
-        // Get real interaction data from Supabase
-        const constituencyStats = interactionData.data?.find(s => s.constituency_id === constituencyIdForSupabase);
-        const interactionCount = constituencyStats?.total_interactions || 0;
-        
-        // Get real news data from Supabase
-        const constituencyNews = newsData.data?.find(n => n.constituency_id === constituencyIdForSupabase);
+      // Transform data into ConstituencyData format
+      const transformedData: ConstituencyData[] = englishData.map((candidate, index) => {
+        const hindiCandidate = hindiData[index];
+        const constituencyId = index.toString();
         
         return {
-          id: index.toString(),
-          profileImage: hindiCandidate.vidhayak_info.image_url, // Always use Hindi data for images
+          id: constituencyId,
+          profileImage: candidate.vidhayak_info.image_url,
           constituencyName: {
             en: candidate.area_name,
-            hi: hindiCandidate.area_name
+            hi: hindiCandidate?.area_name || candidate.area_name
           },
           candidateName: {
             en: candidate.vidhayak_info.name,
-            hi: hindiCandidate.vidhayak_info.name
+            hi: hindiCandidate?.vidhayak_info.name || candidate.vidhayak_info.name
           },
           partyName: {
             name: candidate.vidhayak_info.party_name,
-            nameHi: hindiCandidate.vidhayak_info.party_name,
+            nameHi: hindiCandidate?.vidhayak_info.party_name || candidate.vidhayak_info.party_name,
             color: getPartyColor(candidate.vidhayak_info.party_name)
           },
           experience: {
             en: candidate.vidhayak_info.experience,
-            hi: hindiCandidate.vidhayak_info.experience
+            hi: hindiCandidate?.vidhayak_info.experience || candidate.vidhayak_info.experience
           },
           education: {
             en: candidate.vidhayak_info.metadata.education,
-            hi: hindiCandidate.vidhayak_info.metadata.education
+            hi: hindiCandidate?.vidhayak_info.metadata.education || candidate.vidhayak_info.metadata.education
           },
-          satisfactionYes,
-          satisfactionNo,
-          satisfactionTotal,
+          satisfactionYes: 0,
+          satisfactionNo: 0,
+          satisfactionTotal: 0,
           news: {
             title: {
-              en: constituencyNews?.title || 'No news available',
-              hi: constituencyNews?.title_hi || 'कोई समाचार उपलब्ध नहीं'
+              en: 'No news available',
+              hi: 'कोई समाचार उपलब्ध नहीं'
             },
-            date: constituencyNews?.published_date || 'No recent news'
+            date: 'No date available'
           },
-          manifestoScore: candidate.vidhayak_info.manifesto_score || 0,
-          interactionCount,
-          criminalCases: candidate.vidhayak_info.metadata.criminal_cases || 0,
-          netWorth: candidate.vidhayak_info.metadata.net_worth || 0,
-          attendance: candidate.vidhayak_info.metadata.attendance || 'N/A',
-          questionsAsked: candidate.vidhayak_info.metadata.questions_asked || 'N/A',
-          fundsUtilization: candidate.vidhayak_info.metadata.funds_utilisation || 'N/A',
+          age: candidate.vidhayak_info.age,
+          manifestoScore: 0, // Set to 0 as per requirement - will be developed later
+          interactionCount: 0, // Will be updated from database
+          activePostCount: 0, // Set to 0 as per requirement - will be developed later
+          criminalCases: candidate.vidhayak_info.metadata.criminal_cases,
+          netWorth: candidate.vidhayak_info.metadata.net_worth,
+          attendance: candidate.vidhayak_info.metadata.attendance,
+          questionsAsked: candidate.vidhayak_info.metadata.questions_asked,
+          fundsUtilization: candidate.vidhayak_info.metadata.funds_utilisation,
           rawData: candidate
         };
       });
 
-      setConstituencies(transformedConstituencies);
-    } catch (err) {
-      console.error('Error loading constituency data:', err);
-    } finally {
+      setConstituencies(transformedData);
       setIsLoading(false);
+    } catch (error) {
+      console.error('Error loading constituency data:', error);
+      setIsLoading(false);
+    }
+  };
+
+  // Initialize constituency scores in database if they don't exist
+  const initializeConstituencyScores = async () => {
+    try {
+      console.log('🔄 Checking if constituency scores need initialization...');
+      
+      // Try to load scores first
+      const scores = await FirebaseService.getAllConstituencyScores();
+      console.log('📊 Current scores in database:', scores.length);
+      
+      // More aggressive initialization - initialize if less than 243 or if there's any issue
+      if (scores.length === 0 || scores.length < 243 || scores.some(score => !score.satisfaction_yes && !score.satisfaction_no && !score.satisfaction_total)) {
+        console.log('📝 Database incomplete, empty, or has invalid data - initializing database...');
+        await FirebaseService.initializeConstituencyScores();
+        
+        // Clear cache and reload scores after initialization
+        localStorage.removeItem('constituencyScoresCache');
+        await loadConstituencyScoresFromDatabase();
+        
+        showPopup(
+          isEnglish ? 'Database Initialized' : 'डेटाबेस प्रारंभ किया गया',
+          isEnglish ? 'Constituency scores have been initialized in the database.' : 'निर्वाचन क्षेत्र के स्कोर डेटाबेस में प्रारंभ किए गए हैं।',
+          'success'
+        );
+      } else {
+        console.log('✅ Constituency scores already exist in database, loading them...');
+        // Load the existing scores
+        await loadConstituencyScoresFromDatabase();
+      }
+    } catch (error) {
+      console.error('❌ Error initializing constituency scores:', error);
+      
+      // If there's an error, ALWAYS try to initialize
+      console.log('🔄 Error occurred, forcing database initialization...');
+      try {
+        await FirebaseService.initializeConstituencyScores();
+        localStorage.removeItem('constituencyScoresCache');
+        await loadConstituencyScoresFromDatabase();
+      } catch (retryError) {
+        console.error('❌ Failed to initialize database on retry:', retryError);
+        showPopup(
+          isEnglish ? 'Error' : 'त्रुटि',
+          isEnglish ? 'Failed to initialize constituency scores. Please try again.' : 'निर्वाचन क्षेत्र के स्कोर प्रारंभ करने में विफल। कृपया पुनः प्रयास करें।',
+          'error'
+        );
+      }
+    }
+  };
+
+  // Load constituency scores from Firebase database with local caching
+  const loadConstituencyScoresFromDatabase = async () => {
+    try {
+      console.log('🔄 Loading constituency scores from database...');
+      
+      // Check cache first
+      const cacheKey = 'constituencyScoresCache';
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const cacheData = JSON.parse(cached);
+        const now = Date.now();
+        
+        // Cache is valid for 5 minutes
+        if (now < cacheData.expiresAt) {
+          console.log('📦 Using cached constituency scores');
+          
+          // Update constituencies with cached scores
+          setConstituencies(prev => {
+            const updated = prev.map((constituency) => {
+              const score = cacheData.scores.find((s: any) => s.constituency_id === parseInt(constituency.id) + 1);
+              if (score) {
+                return {
+                  ...constituency,
+                  satisfactionYes: score.satisfaction_yes || 0,
+                  satisfactionNo: score.satisfaction_no || 0,
+                  satisfactionTotal: score.satisfaction_total || 0,
+                  interactionCount: score.interaction_count || 0
+                };
+              }
+              return constituency;
+            });
+            return updated;
+          });
+          
+          return; // Use cached data, don't fetch from Firebase
+        }
+      }
+      
+      // Load all constituency scores from Firebase
+      const scores = await FirebaseService.getAllConstituencyScores();
+      console.log('📊 Scores loaded from Firebase:', scores.length, 'out of 243');
+      
+      // Cache the scores
+      const cacheData = {
+        scores: scores,
+        timestamp: Date.now(),
+        expiresAt: Date.now() + (5 * 60 * 1000) // Cache for 5 minutes
+      };
+      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+      console.log('💾 Cached constituency scores');
+      
+      // Update constituencies with scores from database
+      setConstituencies(prev => {
+        const updated = prev.map((constituency) => {
+          // Find score for this constituency (constituency.id is string, need to match with constituency_id)
+          const score = scores.find(s => s.constituency_id === parseInt(constituency.id) + 1);
+          if (score) {
+            console.log(`🏛️ Constituency ${constituency.id}: Yes=${score.satisfaction_yes}, No=${score.satisfaction_no}, Total=${score.satisfaction_total}, Interactions=${score.interaction_count}`);
+            return {
+              ...constituency,
+              satisfactionYes: score.satisfaction_yes,
+              satisfactionNo: score.satisfaction_no,
+              satisfactionTotal: score.satisfaction_total,
+              interactionCount: score.interaction_count
+            };
+          }
+          return constituency;
+        });
+        console.log('✅ Constituencies updated with database scores');
+        return updated;
+      });
+      
+    } catch (error) {
+      console.error('❌ Error loading constituency scores from database:', error);
+      // Continue with default values if database loading fails
     }
   };
 
   // Load user profile
   const loadUserProfile = async () => {
     try {
-      // Try to load from Supabase first
-      const { data: profileData, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', currentUser?.uid)
-        .single();
-
-      if (error) {
-        console.error('Error loading user profile from Supabase:', error);
-        // Fallback to basic user info
+      if (!currentUser?.uid) return;
+      
+      const profile = await FirebaseService.getUserProfile(currentUser.uid);
+      if (profile) {
         setUserProfile({
-          id: currentUser?.uid || 'mock-user',
-          display_name: currentUser?.displayName || 'User',
-          bio: 'Active member of Charcha Manch',
-          first_vote_year: null,
-          referral_code: 'CHM' + Math.random().toString(36).substr(2, 6).toUpperCase(),
-          level: 'Tier 1',
-          participation_score: 0
-        });
-      } else if (profileData) {
-        // Use real data from Supabase
-        setUserProfile({
-          id: profileData.id,
-          display_name: profileData.display_name || currentUser?.displayName || 'User',
-          bio: profileData.bio || 'Active member of Charcha Manch',
-          first_vote_year: profileData.first_vote_year,
-          referral_code: profileData.referral_code || 'CHM' + Math.random().toString(36).substr(2, 6).toUpperCase(),
+          id: profile.id,
+          display_name: profile.display_name || currentUser?.displayName || 'User',
+          bio: profile.bio || 'Active member of Charcha Manch',
+          first_vote_year: profile.first_vote_year,
+          referral_code: profile.referral_code || 'CHM' + Math.random().toString(36).substr(2, 6).toUpperCase(),
           level: 'Tier 1', // Everyone starts at Tier 1
-          participation_score: profileData.participation_score || 0
+          participation_score: profile.engagement_score || 0
         });
       } else {
         // No profile data, create basic info
@@ -416,20 +518,16 @@ const Home: React.FC = () => {
         return;
       }
 
-      // Try to load from Supabase
-      const [interactionsResult, postsResult, referralsResult] = await Promise.all([
-        supabase.from('constituency_interactions').select('*').eq('user_id', currentUser.uid),
-        supabase.from('discussion_posts').select('*').eq('user_id', currentUser.uid),
-        supabase.from('referrals').select('*').eq('referred_by', currentUser.uid)
-      ]);
+      // Load from Firebase
+      const { surveys } = await FirebaseService.loadUserInteractions(currentUser.uid);
+      const posts = await FirebaseService.getUserPosts(currentUser.uid);
+      const referrals = await FirebaseService.getUserReferrals(currentUser.uid);
 
       // Calculate achievements from real data
-      const charchaonBhagidari = interactionsResult.data?.filter(i => 
-        ['survey', 'view', 'share'].includes(i.interaction_type)
-      ).length || 0;
+      const charchaonBhagidari = surveys.length; // For now, just count surveys
 
-      const naiCharchaPehel = postsResult.data?.length || 0;
-      const nagrikPrerak = referralsResult.data?.length || 0;
+      const naiCharchaPehel = posts.length;
+      const nagrikPrerak = referrals.length;
 
       setUserAchievements({
         charchaonBhagidari,
@@ -460,27 +558,17 @@ const Home: React.FC = () => {
     
     if (searchQuery.trim()) {
       const searchLower = searchQuery.toLowerCase();
-      console.log('Searching for:', searchLower);
       
       // Search in English data but maintain the same order
       filtered = filtered.filter(constituency => {
         const constituencyMatch = constituency.constituencyName.en.toLowerCase().includes(searchLower);
         const candidateMatch = constituency.candidateName.en.toLowerCase().includes(searchLower);
         const partyMatch = constituency.partyName.name.toLowerCase().includes(searchLower);
-        
-        if (constituencyMatch || candidateMatch || partyMatch) {
-          console.log('Match found:', {
-            constituency: constituency.constituencyName.en,
-            candidate: constituency.candidateName.en,
-            party: constituency.partyName.name,
-            searchQuery: searchLower
-          });
-        }
+
         
         return constituencyMatch || candidateMatch || partyMatch;
       });
       
-      console.log('Filtered results count:', filtered.length);
     }
 
     // Sort by real interaction count from Supabase (descending), then alphabetically by English name
@@ -500,14 +588,6 @@ const Home: React.FC = () => {
     setSearchQuery(query);
     setShowDropdown(true);
     
-    // Debug search input
-    if (query.trim()) {
-      console.log('Search input changed:', query);
-      console.log('Available constituencies:', constituencies.slice(0, 5).map(c => ({
-        en: c.constituencyName.en,
-        hi: c.constituencyName.hi
-      })));
-    }
   };
 
   // Handle constituency selection from dropdown
@@ -537,14 +617,15 @@ const Home: React.FC = () => {
     }
   };
 
-  // Show custom share options (Facebook, WhatsApp, Copy)
+  // Show custom share options (Facebook, WhatsApp, Copy, Twitter)
   const showShareOptions = (url: string, title: string) => {
     const shareData = {
       facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
       whatsapp: `https://wa.me/?text=${encodeURIComponent(title + ' ' + url)}`,
+      twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
       copy: url
     };
-
+    
     // Create share modal
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
@@ -557,6 +638,9 @@ const Home: React.FC = () => {
           </button>
           <button onclick="window.open('${shareData.whatsapp}', '_blank')" class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">
             WhatsApp
+          </button>
+          <button onclick="window.open('${shareData.twitter}', '_blank')" class="w-full bg-sky-500 text-white py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors">
+            Twitter
           </button>
           <button onclick="navigator.clipboard.writeText('${url}'); alert('${isEnglish ? 'Link copied!' : 'लिंक कॉपी हो गया!'}'); this.parentElement.parentElement.parentElement.remove();" class="w-full bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors">
             ${isEnglish ? 'Copy Link' : 'लिंक कॉपी करें'}
@@ -578,163 +662,193 @@ const Home: React.FC = () => {
     });
   };
 
-  // Track constituency interaction
-  const trackInteraction = async (constituencyId: string, interactionType: string) => {
-    if (!currentUser) return; // Only track for authenticated users
-    
-    try {
-      const constituencyIndex = parseInt(constituencyId);
-      const constituencyIdForSupabase = constituencyIndex + 1; // Convert to 1-based index
 
-      // Generate a proper UUID for user_id if currentUser.uid is not valid
-      let userId = currentUser.uid;
-      if (!userId || userId.length !== 36) {
-        // Generate a random UUID if the current one is invalid
-        userId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-          const r = Math.random() * 16 | 0;
-          const v = c === 'x' ? r : (r & 0x3 | 0x8);
-          return v.toString(16);
-        });
-      }
+// Fixed submitSatisfactionSurvey function - properly saves to Firebase
+const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean) => {
+  console.log('submitSatisfactionSurvey called with:', { constituencyId, answer, currentUser: !!currentUser });
+  
+  if (!currentUser) {
+    showPopup(
+      isEnglish ? 'Authentication Required' : 'प्रमाणीकरण आवश्यक है',
+      isEnglish ? 'Please sign in to submit your response' : 'कृपया अपनी प्रतिक्रिया देने के लिए साइन इन करें',
+      'info'
+    );
+    return;
+  }
 
-      // Insert interaction into Supabase
-      const { error: interactionError } = await supabase
-        .from('constituency_interactions')
-        .insert({
-          constituency_id: constituencyIdForSupabase,
-          interaction_type: interactionType,
-          user_id: userId
-        });
+  try {
+    const constituencyIndex = parseInt(constituencyId);
+    const constituencyIdForFirebase = constituencyIndex + 1; // Convert to 1-based index
+    const userId = currentUser.uid;
 
-      if (interactionError) {
-        console.error('Error inserting interaction:', interactionError);
-        return;
-      }
+    // Check if user has already submitted a survey for this constituency
+    const existingSurvey = await FirebaseService.checkExistingSurvey(userId, constituencyIdForFirebase);
 
-      // Update constituency_charcha_stats table
-      const { error: statsError } = await supabase
-        .from('constituency_charcha_stats')
-        .upsert({
-          constituency_id: constituencyIdForSupabase,
-          total_interactions: 1, // Will be updated by trigger
-          active_post_count: 0
-        }, {
-          onConflict: 'constituency_id'
-        });
-
-      if (statsError) {
-        console.error('Error updating stats:', statsError);
-      }
-
-      // Update local interaction count
-      setConstituencies(prev => prev.map(constituency => {
-        if (constituency.id === constituencyId) {
-          return {
-            ...constituency,
-            interactionCount: constituency.interactionCount + 1
-          };
-        }
-        return constituency;
-      }));
-
-      console.log(`Interaction tracked: ${interactionType} for constituency ${constituencyIdForSupabase}`);
-      
-      // Refresh data to show real-time updates
-      setTimeout(() => {
-        refreshConstituencyData();
-      }, 1000); // Small delay to ensure Supabase has processed the data
-    } catch (err) {
-      console.error('Error tracking interaction:', err);
-    }
-  };
-
-  // Submit satisfaction survey
-  const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean) => {
-    if (!currentUser) {
-      alert(isEnglish ? 'Please sign in to submit your response' : 'कृपया अपनी प्रतिक्रिया देने के लिए साइन इन करें');
+    if (existingSurvey) {
+      showPopup(
+        isEnglish ? 'Already Submitted' : 'पहले से जमा किया गया',
+        isEnglish ? 'You have already submitted a response for this constituency.' : 'आपने पहले ही इस निर्वाचन क्षेत्र के लिए प्रतिक्रिया दी है।',
+        'info'
+      );
       return;
     }
 
-    try {
-      const constituencyIndex = parseInt(constituencyId);
-      const constituencyIdForSupabase = constituencyIndex + 1; // Convert to 1-based index
+    // Submit survey response to Firebase
+    console.log('Inserting survey into database:', {
+      constituency_id: constituencyIdForFirebase,
+      user_id: userId,
+      question: 'Are you satisfied with your tenure of last 5 years?',
+      answer: answer
+    });
+    
+    await FirebaseService.submitSatisfactionSurvey({
+      constituency_id: constituencyIdForFirebase,
+      user_id: userId,
+      question: 'Are you satisfied with your tenure of last 5 years?',
+      answer: answer
+    });
 
-      // Generate a proper UUID for user_id if currentUser.uid is not valid
-      let userId = currentUser.uid;
-      if (!userId || userId.length !== 36) {
-        // Generate a random UUID if the current one is invalid
-        userId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-          const r = Math.random() * 16 | 0;
-          const v = c === 'x' ? r : (r & 0x3 | 0x8);
-          return v.toString(16);
-        });
+
+    // Get current scores first, then increment them
+    const currentScores = await FirebaseService.getConstituencyScores(constituencyIdForFirebase);
+    const currentYes = currentScores?.satisfaction_yes || 0;
+    const currentNo = currentScores?.satisfaction_no || 0;
+    const currentTotal = currentScores?.satisfaction_total || 0;
+    
+    console.log(`📊 Current scores for constituency ${constituencyIdForFirebase}: Yes=${currentYes}, No=${currentNo}, Total=${currentTotal}`);
+    
+    // Update constituency scores in Firebase with incremented values
+    await FirebaseService.updateConstituencyScores(constituencyIdForFirebase, {
+      satisfaction_yes: currentYes + (answer ? 1 : 0),
+      satisfaction_no: currentNo + (answer ? 0 : 1),
+      satisfaction_total: currentTotal + 1,
+      interaction_count: currentScores?.interaction_count || 0
+    });
+    
+    console.log(`✅ Updated constituency ${constituencyIdForFirebase}: Yes=${currentYes + (answer ? 1 : 0)}, No=${currentNo + (answer ? 0 : 1)}, Total=${currentTotal + 1}`);
+
+    // Clear cache to ensure fresh data
+    localStorage.removeItem('constituencyScoresCache');
+    
+    // Refresh constituency scores from database to get accurate counts
+    await loadConstituencyScoresFromDatabase();
+
+    // Update local state to reflect the new vote
+    setConstituencies(prev => prev.map(c => {
+      if (c.id === constituencyId) {
+        const newSatisfactionYes = c.satisfactionYes + (answer ? 1 : 0);
+        const newSatisfactionNo = c.satisfactionNo + (answer ? 0 : 1);
+        const newTotal = newSatisfactionYes + newSatisfactionNo;
+        
+        return {
+          ...c,
+          satisfactionYes: newSatisfactionYes,
+          satisfactionNo: newSatisfactionNo,
+          satisfactionTotal: newTotal
+        };
       }
+      return c;
+    }));
 
-      // Insert into Supabase
-      const { error } = await supabase
-        .from('satisfaction_surveys')
-        .upsert({
-          constituency_id: constituencyIdForSupabase,
-          user_id: userId,
-          question: 'Are you satisfied with your tenure of last 5 years?',
-          answer: answer
-        });
+    // Update user surveys tracking
+    setUserSurveys(prev => new Set([...prev, constituencyId]));
 
-      if (error) throw error;
+    // Show success message
+    showPopup(
+      isEnglish ? 'Success!' : 'सफलता!',
+      isEnglish ? 'Thank you for your response!' : 'आपकी प्रतिक्रिया के लिए धन्यवाद!',
+      'success'
+    );
 
-      // Track interaction
-      await trackInteraction(constituencyId, 'survey');
-
-      // Update local state
-      setConstituencies(prev => prev.map(constituency => {
-        if (constituency.id === constituencyId) {
-          const newSatisfactionYes = constituency.satisfactionYes + (answer ? 1 : 0);
-          const newSatisfactionNo = constituency.satisfactionNo + (answer ? 0 : 1);
-          const newTotal = newSatisfactionYes + newSatisfactionNo;
-          
-          return {
-            ...constituency,
-            satisfactionYes: newSatisfactionYes,
-            satisfactionNo: newSatisfactionNo,
-            satisfactionTotal: newTotal
-          };
-        }
-        return constituency;
-      }));
+  } catch (err) {
+    console.error('Error submitting satisfaction survey:', err);
+    showPopup(
+      isEnglish ? 'Error' : 'त्रुटि',
+      isEnglish ? 'Error submitting response. Please try again.' : 'प्रतिक्रिया जमा करने में त्रुटि। कृपया पुनः प्रयास करें।',
+      'error'
+    );
+  }
+};
+// Helper function to check if user has already submitted survey
+const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
+  // Check if user has already voted for this constituency
+  return userSurveys.has(constituencyId);
+};
 
 
-
-      // Show success message
-      alert(isEnglish ? 'Thank you for your response!' : 'आपकी प्रतिक्रिया के लिए धन्यवाद!');
+  // Load user votes from Firebase
+  const loadUserVotesFromFirebase = async () => {
+    if (!currentUser) return;
+    
+    try {
+      console.log('🔄 Loading user votes from Firebase for user:', currentUser.uid);
+      const { surveys } = await FirebaseService.loadUserInteractions(currentUser.uid);
+      
+      console.log('📊 Surveys found:', surveys);
+      
+      // Create a set of constituency IDs where user has voted
+      const userVotedConstituencies = new Set(
+        surveys.map(s => (s.constituency_id - 1).toString())
+      );
+      
+      console.log('🗳️ User voted constituencies:', Array.from(userVotedConstituencies));
+      
+      // Update userSurveys state
+      setUserSurveys(userVotedConstituencies);
+      
     } catch (err) {
-      console.error('Error submitting satisfaction survey:', err);
-      alert(isEnglish ? 'Error submitting response. Please try again.' : 'प्रतिक्रिया जमा करने में त्रुटि। कृपया पुनः प्रयास करें।');
+      console.error('❌ Error loading user votes from Firebase:', err);
+      // Initialize with empty set on error
+      setUserSurveys(new Set());
     }
+  };
+
+  // Load more constituencies
+  const loadMoreConstituencies = () => {
+    setVisibleCount(prev => Math.min(prev + 12, filteredAndSortedConstituencies.length));
   };
 
   // Get party color
   const getPartyColor = (partyName: string): string => {
     const partyColors: Record<string, string> = {
-      'Bharatiya Janata Party': 'bg-amber-600',
-      'Janata Dal (United)': 'bg-emerald-600',
-      'Rashtriya Janata Dal': 'bg-green-600',
-      'Indian national Congress': 'bg-blue-600',
-      'Communist Party of India': 'bg-red-500',
-      'Lok Janshakti Party': 'bg-purple-600',
-      'Hindustani Awam front (secular)': 'bg-green-600',
-      'Rashtriya Lok Samta Party': 'bg-blue-600',
-      'Bahujan Samaj Party': 'bg-blue-500',
-      'Jan Adhikar Party (democratic)': 'bg-orange-600',
-      'Communist Party of India (Marxist)': 'bg-rose-500',
-      'Communist Party of India (Marxist-Leninist) (Liberation)':'bg-red-600',
-      'All India Majlis-e-Itihadul Muslimeen':'bg-emerald-600',
-      'Independent': 'bg-yellow-600',
-      'NOTA': 'bg-gray-800'
+    'भारतीय जनता पार्टी': 'bg-amber-600',
+    'जनता दल (यूनाइटेड)': 'bg-emerald-600',
+    'राष्ट्रिया जनता दल': 'bg-green-600',
+    'भारतीय राष्ट्रीय कांग्रेस': 'bg-sky-600',
+    'कम्युनिस्ट पार्टी ऑफ इंडिया': 'bg-red-500',
+    'लोक जनशक्ति पार्टी': 'bg-purple-600',
+    'हिंदुस्तानी अवाम मोर्चा': 'bg-green-600',
+    'राष्ट्रीय लोक समता पार्टी': 'bg-blue-600',
+    'बहूजन समाज पार्टी': 'bg-blue-500',
+    'जन अधीकर पार्टी (लोकतांत्रिक)': 'bg-orange-600',
+    'कम्युनिस्ट पार्टी ऑफ इंडिया (मार्क्सवादी)': 'bg-rose-500',
+    'कम्युनिस्ट पार्टी ऑफ इंडिया (मार्क्सवादी-लेनिनवादी) (मुक्ति)': 'bg-red-600',
+    'हिंदुस्तानी अवाम मोर्चा (धर्मनिरपेक्ष)': 'bg-zinc-800',
+    'अखिल भारतीय मजलिस-ए-इटिहादुल मुस्लिमीन': 'bg-emerald-900',
+    'नोटा': 'bg-gray-600',
+
+    'Bharatiya Janata Party': 'bg-amber-600',
+    'Janata Dal (United)': 'bg-emerald-600',
+    'Rashtriya Janata Dal': 'bg-green-600',
+    'Indian National Congress': 'bg-sky-600',
+    'Communist Party of India': 'bg-red-500',
+    'Lok Janshakti Party': 'bg-purple-600',
+    'Hindustani Awam Front (Secular)': 'bg-green-600',
+    'Rashtriya Lok Samta Party': 'bg-blue-600',
+    'Bahujan Samaj Party': 'bg-blue-500',
+    'Jan Adhikar Party (Democratic)': 'bg-orange-600',
+    'Communist Party of India (Marxist)': 'bg-rose-500',
+    'Communist Party of India (Marxist-Leninist) (Liberation)': 'bg-red-600',
+    'All India Majlis-e-Itihadul Muslimeen': 'bg-emerald-900',
+    'Independent': 'bg-yellow-600',
+    'NOTA': 'bg-gray-600',
     };
+
     return partyColors[partyName] || 'bg-slate-600';
   };
 
-  const content = {
+
+    const content = {
     title: {
       en: 'Welcome to Charcha Manch',
       hi: 'चर्चा मंच में आपका स्वागत है'
@@ -918,7 +1032,7 @@ const Home: React.FC = () => {
               </div>
               <Link
                 to="/dashboard"
-                className="bg-white text-blue-600 px-6 py-3 rounded-lg font-medium hover:bg-blue-50 transition-colors"
+                className="bg-white text-blue-600 px-3 sm:px-6 py-3 sm:py-2 max-[340px]:text-xs max-[330px]:text-[8px] rounded-lg font-medium hover:bg-blue-50 transition-colors"
               >
                 {isEnglish ? 'Go to Dashboard' : 'डैशबोर्ड पर जाएं'}
               </Link>
@@ -1014,218 +1128,19 @@ const Home: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Charchit Vidhan Sabha Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            {isEnglish ? 'Charchit Vidhan Sabha' : 'चर्चित विधान सभा'}
-          </h2>
-          <p className="text-gray-600 mb-2">
-            {isEnglish ? 'Explore constituencies and their representatives' : 'निर्वाचन क्षेत्रों और उनके प्रतिनिधियों का अन्वेषण करें'}
-          </p>
-                      <div className="flex items-center space-x-4">
-              <div className="inline-flex items-center space-x-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm">
-                <TrendingUp className="h-4 w-4" />
-                <span>
-                  {isEnglish ? 'Sorted by interaction count (highest first)' : 'बातचीत की संख्या के अनुसार क्रमबद्ध (सर्वोच्च पहले)'}
-                </span>
-              </div>
-              <button
-                onClick={refreshConstituencyData}
-                className="inline-flex items-center space-x-2 bg-green-50 text-green-700 px-4 py-2 rounded-full text-sm hover:bg-green-100 transition-colors"
-              >
-                <RefreshCw className="h-4 w-4" />
-                <span>
-                  {isEnglish ? 'Refresh Data' : 'डेटा रिफ्रेश करें'}
-                </span>
-              </button>
-            </div>
-        </div>
-
-        {isLoading ? (
-          <div className="text-center py-12">
-            <Loader2 className="h-12 w-12 animate-spin text-green-500 mx-auto mb-4" />
-            <p className="text-gray-600">Loading constituencies...</p>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {filteredAndSortedConstituencies.slice(0, visibleConstituencies).map((constituency) => (
-                <div key={constituency.id} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
-                  {/* Party Color Header */}
-                  <div className={`${constituency.partyName.color} h-2`}></div>
-                  
-                  <div className="p-6">
-                    {/* Candidate Info */}
-                    <div className="flex items-center space-x-4 mb-4">
-                      {constituency.profileImage ? (
-                        <img 
-                          src={constituency.profileImage} 
-                          alt={isEnglish ? constituency.candidateName.en : constituency.candidateName.hi}
-                          className="w-16 h-16 rounded-full object-cover"
-                          onError={(e) => {
-                            // Fallback to placeholder if image fails to load
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                          }}
-                        />
-                      ) : null}
-                      {!constituency.profileImage && (
-                        <PlaceholderImages type="profile" size="md" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 truncate">
-                          {isEnglish ? constituency.constituencyName.en : constituency.constituencyName.hi}
-                        </h3>
-                        <p className="text-sm text-gray-600 truncate">
-                          {isEnglish ? constituency.candidateName.en : constituency.candidateName.hi}
-                        </p>
-                        <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium text-white mt-1 ${constituency.partyName.color}`}>
-                          {isEnglish ? constituency.partyName.name : constituency.partyName.nameHi}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Key Details */}
-                    <div className="space-y-3 mb-4">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">{isEnglish ? 'Experience' : 'अनुभव'}</span>
-                        <span className="font-medium">{isEnglish ? constituency.experience.en : constituency.experience.hi}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">{isEnglish ? 'Education' : 'शिक्षा'}</span>
-                        <span className="font-medium">{isEnglish ? constituency.education.en : constituency.education.hi}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">{isEnglish ? 'Manifesto Score' : 'घोषणापत्र स्कोर'}</span>
-                        <span className="font-medium">{constituency.manifestoScore || 0}%</span>
-                      </div>
-                    </div>
-
-                    {/* Satisfaction Survey */}
-                    <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                      <p className="text-sm text-gray-700 mb-2">
-                        {isEnglish ? 'Are you satisfied with your tenure of last 5 years?' : 'क्या आप पिछले 5 वर्षों के कार्यकाल से संतुष्ट हैं?'}
-                      </p>
-                      {constituency.satisfactionTotal > 0 ? (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-green-600">
-                              {isEnglish ? 'Yes' : 'हाँ'}: {constituency.satisfactionYes}
-                            </span>
-                            <span className="text-green-600 font-medium">
-                              {Math.round((constituency.satisfactionYes / constituency.satisfactionTotal) * 100)}%
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-red-600">
-                              {isEnglish ? 'No' : 'नहीं'}: {constituency.satisfactionNo}
-                            </span>
-                            <span className="text-red-600 font-medium">
-                              {Math.round((constituency.satisfactionNo / constituency.satisfactionTotal) * 100)}%
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${(constituency.satisfactionYes / constituency.satisfactionTotal) * 100}%` }}
-                            ></div>
-                          </div>
-                          <div className="text-xs text-gray-500 text-center">
-                            {isEnglish ? 'Total responses' : 'कुल प्रतिक्रियाएं'}: {constituency.satisfactionTotal}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-xs text-gray-500 text-center">
-                          {isEnglish ? 'No responses yet' : 'अभी तक कोई प्रतिक्रिया नहीं'}
-                        </div>
-                      )}
-                      
-                      {/* Interactive Yes/No Buttons */}
-                      <div className="flex space-x-2 mt-3">
-                        <button
-                          onClick={() => submitSatisfactionSurvey(constituency.id, true)}
-                          className="flex-1 bg-green-500 text-white py-2 px-3 rounded-lg hover:bg-green-600 transition-colors text-xs font-medium"
-                        >
-                          {isEnglish ? 'Yes' : 'हाँ'}
-                        </button>
-                        <button
-                          onClick={() => submitSatisfactionSurvey(constituency.id, false)}
-                          className="flex-1 bg-red-500 text-white py-2 px-3 rounded-lg hover:bg-red-600 transition-colors text-xs font-medium"
-                        >
-                          {isEnglish ? 'No' : 'नहीं'}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Latest News */}
-                    <div className="bg-blue-50 rounded-lg p-3 mb-4">
-                      <p className="text-sm text-blue-800 font-medium mb-1">
-                        {isEnglish ? 'Latest News' : 'ताजा समाचार'}
-                      </p>
-                      <p className="text-xs text-blue-700">
-                        {isEnglish ? constituency.news.title.en : constituency.news.title.hi}
-                      </p>
-                      <p className="text-xs text-blue-600 mt-1">{constituency.news.date}</p>
-                    </div>
-
-                    {/* Stats */}
-                    <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
-                      <span>{isEnglish ? 'Total interactions' : 'कुल बातचीत'}: {constituency.interactionCount || 0}</span>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex space-x-2">
-                      <Link
-                        to={`/constituency/${constituency.constituencyName.en.toLowerCase().replace(/\s+/g, '-')}-${constituency.id}?id=${constituency.id}`}
-                        onClick={() => trackInteraction(constituency.id, 'view')}
-                        className="flex-1 bg-green-600 text-white text-center py-2 px-4 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-                      >
-                        {isEnglish ? 'More Details' : 'अधिक विवरण'}
-                      </Link>
-                      <button
-                        onClick={() => {
-                          handleShare(constituency);
-                          trackInteraction(constituency.id, 'share');
-                        }}
-                        className="bg-gray-100 text-gray-700 p-2 rounded-lg hover:bg-gray-200 transition-colors"
-                      >
-                        <Share2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Load More Button */}
-            {visibleConstituencies < filteredAndSortedConstituencies.length && (
-              <div className="text-center">
-                <button
-                  onClick={() => setVisibleConstituencies(prev => prev + 6)}
-                  className="bg-green-600 text-white px-8 py-4 rounded-lg hover:bg-green-700 transition-colors font-medium text-lg"
-                >
-                  {isEnglish ? `Load More (${visibleConstituencies + 6} of ${filteredAndSortedConstituencies.length})` : `और लोड करें (${visibleConstituencies + 6} में से ${filteredAndSortedConstituencies.length})`}
-                </button>
-                <p className="text-sm text-gray-500 mt-2">
-                  {isEnglish ? 'Showing constituencies sorted by interaction count' : 'निर्वाचन क्षेत्रों को बातचीत की संख्या के अनुसार क्रमबद्ध किया गया है'}
-                </p>
-              </div>
-            )}
-
-            {/* Total Count */}
-            <div className="text-center mt-8 text-gray-600">
-              {isEnglish 
-                ? `Showing ${Math.min(visibleConstituencies, filteredAndSortedConstituencies.length)} of ${filteredAndSortedConstituencies.length} constituencies`
-                : `${filteredAndSortedConstituencies.length} में से ${Math.min(visibleConstituencies, filteredAndSortedConstituencies.length)} निर्वाचन क्षेत्र दिखा रहे हैं`
-              }
-            </div>
-          </>
-        )}
-      </div>
+      <CharchitVidhanSabha 
+        constituencies={constituencies}
+        isLoading={isLoading}
+        visibleCount={visibleCount}
+        hasUserSubmittedSurvey={hasUserSubmittedSurvey}
+        submitSatisfactionSurvey={submitSatisfactionSurvey}
+        loadMoreConstituencies={loadMoreConstituencies}
+        initializeConstituencyScores={initializeConstituencyScores}
+        handleShare={handleShare}
+        popup={popup}
+        closePopup={closePopup}
+      />
     </div>
   );
 };
-
 export default Home;

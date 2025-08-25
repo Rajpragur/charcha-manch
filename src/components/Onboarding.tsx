@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../configs/supabase';
+import FirebaseService from '../services/firebaseService';
 import { 
   MapPin, 
   Calendar, 
@@ -38,16 +38,22 @@ const Onboarding: React.FC = () => {
     loadConstituencies();
   }, []);
 
-  // Load constituencies from Supabase
+  // Load constituencies from JSON (derived from candidates data)
   const loadConstituencies = async () => {
     try {
-      const { data, error } = await supabase
-        .from('constituencies')
-        .select('id, area_name, area_name_hi, district')
-        .order('area_name');
-
-      if (error) throw error;
-      setConstituencies(data || []);
+      const [enRes, hiRes] = await Promise.all([
+        fetch('/data/candidates_en.json'),
+        fetch('/data/candidates.json')
+      ]);
+      const enData: any[] = await enRes.json();
+      const hiData: any[] = await hiRes.json();
+      const list: Constituency[] = enData.map((c, idx) => ({
+        id: idx + 1,
+        area_name: c.area_name,
+        area_name_hi: hiData[idx]?.area_name || c.area_name,
+        district: null
+      }));
+      setConstituencies(list);
     } catch (err) {
       console.error('Error loading constituencies:', err);
       setError('Failed to load constituencies');
@@ -85,24 +91,14 @@ const Onboarding: React.FC = () => {
     setError(null);
 
     try {
-      // Create or update user profile
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .upsert({
-          id: currentUser.uid,
-          display_name: displayName || currentUser.displayName || currentUser.email?.split('@')[0],
-          bio: bio,
-          first_vote_year: firstVoteYear,
-          constituency_id: selectedConstituency,
-          tier_level: 1,
-          engagement_score: 0,
-          updated_at: new Date().toISOString()
-        });
-
-      if (profileError) throw profileError;
-
-      // Update constituency user count
-      await updateConstituencyUserCount(selectedConstituency);
+      await FirebaseService.createUserProfile(currentUser.uid, {
+        display_name: displayName || currentUser.displayName || currentUser.email?.split('@')[0],
+        bio: bio,
+        first_vote_year: firstVoteYear || undefined,
+        constituency_id: selectedConstituency,
+        tier_level: 1,
+        engagement_score: 0
+      });
 
       // Redirect to dashboard
       navigate('/dashboard');
@@ -114,38 +110,7 @@ const Onboarding: React.FC = () => {
     }
   };
 
-  // Update constituency user count
-  const updateConstituencyUserCount = async (constituencyId: number) => {
-    try {
-      // Get current user count for this constituency
-      const { data: profiles } = await supabase
-        .from('user_profiles')
-        .select('tier_level')
-        .eq('constituency_id', constituencyId);
-
-      if (profiles) {
-        const level1Count = profiles.filter(p => p.tier_level === 1).length;
-        const level2Count = profiles.filter(p => p.tier_level === 2).length;
-        const level3Count = profiles.filter(p => p.tier_level === 3).length;
-        const level4Count = profiles.filter(p => p.tier_level === 4).length;
-
-        // Update constituency stats
-        await supabase
-          .from('constituencies')
-          .update({
-            total_users: profiles.length,
-            level1_users: level1Count,
-            level2_users: level2Count,
-            level3_users: level3Count,
-            level4_users: level4Count,
-            last_calculated: new Date().toISOString()
-          })
-          .eq('id', constituencyId);
-      }
-    } catch (err) {
-      console.error('Error updating constituency stats:', err);
-    }
-  };
+  // Update constituency user count (not needed in Firebase for now)
 
   // Next step validation
   const canProceedToNext = () => {
