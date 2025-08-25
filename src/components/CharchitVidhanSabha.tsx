@@ -71,8 +71,7 @@ export default function CharchitVidhanSabha({
   initializeConstituencyScores,
   handleShare,
   popup,
-  closePopup,
-  refreshConstituencyData
+  closePopup
 }: CharchitVidhanSabhaProps) {
   const { isEnglish } = useLanguage();
 

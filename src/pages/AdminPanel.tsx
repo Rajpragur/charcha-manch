@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
 import AdminStatusDebug from '../components/AdminStatusDebug';
-import { collection, getDocs, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, query } from 'firebase/firestore';
 import { db } from '../configs/firebase';
 import { 
   Users, 
@@ -14,7 +14,6 @@ import {
   Edit,
   Trash2,
   Plus,
-  Search,
   FileText,
   Newspaper,
   Eye,
@@ -73,10 +72,9 @@ const AUTHORIZED_ADMIN_UID = '4zCKNy2r4tNAMdtnLUINpmzuyU52';
 const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser, logout, loading: authLoading } = useAuth();
-  const { isAdmin, adminLevel, loading } = useAdmin();
+  const { isAdmin, loading } = useAdmin();
   
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [searchTerm, setSearchTerm] = useState('');
   
   // Real data from database
   const [blogs, setBlogs] = useState<Blog[]>([]);

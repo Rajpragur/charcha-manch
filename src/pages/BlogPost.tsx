@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar, User, Tag, ThumbsUp, MessageSquare, Eye, TrendingUp, Clock, ArrowLeft, ArrowRight, Search, Loader } from 'lucide-react';
+import { Calendar, User, Tag, ThumbsUp, MessageSquare, Eye, Clock, ArrowLeft, ArrowRight, Search, Loader } from 'lucide-react';
 import FirebaseService from '../services/firebaseService';
 
 interface BlogPost {
@@ -78,7 +78,7 @@ const BlogPost: React.FC = () => {
         
         // Test basic Firestore access first
         try {
-          const { collection, getDocs, query } = await import('firebase/firestore');
+          const { collection, getDocs } = await import('firebase/firestore');
           const { db } = await import('../configs/firebase');
           
           console.log('🔍 Testing basic Firestore access...');
@@ -301,41 +301,6 @@ const BlogPost: React.FC = () => {
         alert('Blog link copied to clipboard!');
       });
     }
-  };
-
-  // Helper function to copy to clipboard
-  const copyToClipboard = (text: string) => {
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(text).then(() => {
-        alert('Blog link copied to clipboard!');
-      }).catch(() => {
-        fallbackCopyToClipboard(text);
-      });
-    } else {
-      fallbackCopyToClipboard(text);
-    }
-  };
-
-  // Fallback copy method for older browsers
-  const fallbackCopyToClipboard = (text: string) => {
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    textArea.style.position = 'fixed';
-    textArea.style.left = '-999999px';
-    textArea.style.top = '-999999px';
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    
-    try {
-      document.execCommand('copy');
-      alert('Blog link copied to clipboard!');
-    } catch (err) {
-      console.error('Fallback copy failed:', err);
-      alert('Failed to copy link. Please copy manually: ' + text);
-    }
-    
-    document.body.removeChild(textArea);
   };
 
   // Get unique categories from blogs
