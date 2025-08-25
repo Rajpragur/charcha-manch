@@ -28,6 +28,9 @@ interface CreatePostProps {
 interface Constituency {
   id: number;
   name: string;
+  area_name?: string;
+  area_name_hi?: string;
+  district?: string;
 }
 
 interface MediaFile {
@@ -78,8 +81,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
     guidelinesText: isEnglish ? 'Keep discussions respectful, constructive, and focused on local community issues.' : 'चर्चाओं को सम्मानजनक, रचनात्मक और स्थानीय समुदाय के मुद्दों पर केंद्रित रखें।'
   };
 
-  // Real constituency names for Bihar
-  const realConstituencies = [
+  const fallbackConstituencies = [
     { id: 1, name: 'Bhabua' },
     { id: 2, name: 'Chainpur' },
     { id: 3, name: 'Buxar' },
@@ -89,27 +91,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
     { id: 7, name: 'Jagdishpur' },
     { id: 8, name: 'Shahpur' },
     { id: 9, name: 'Barhara' },
-    { id: 10, name: 'Brahmpur' },
-    { id: 11, name: 'Mokama' },
-    { id: 12, name: 'Bakhtiarpur' },
-    { id: 13, name: 'Digha' },
-    { id: 14, name: 'Bankipur' },
-    { id: 15, name: 'Kumhrar' },
-    { id: 16, name: 'Patna Sahib' },
-    { id: 17, name: 'Fatuha' },
-    { id: 18, name: 'Danapur' },
-    { id: 19, name: 'Maner' },
-    { id: 20, name: 'Phulwari' },
-    { id: 21, name: 'Bikram' },
-    { id: 22, name: 'Sandesh' },
-    { id: 23, name: 'Barh' },
-    { id: 24, name: 'Bakhtiarpur' },
-    { id: 25, name: 'Mokama' },
-    { id: 26, name: 'Barh' },
-    { id: 27, name: 'Bakhtiarpur' },
-    { id: 28, name: 'Mokama' },
-    { id: 29, name: 'Barh' },
-    { id: 30, name: 'Bakhtiarpur' }
+    { id: 10, name: 'Brahmpur' }
   ];
 
   // Fetch constituencies on component mount
@@ -125,7 +107,11 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
       const userProfile = FirebaseService.getUserProfile(currentUser.uid);
       userProfile.then(profile => {
         if (profile?.constituency_id) {
-          setSelectedConstituency(profile.constituency_id);
+          // Find the constituency in our list by ID
+          const userConstituency = constituencies.find(c => c.id === profile.constituency_id);
+          if (userConstituency) {
+            setSelectedConstituency(userConstituency.id);
+          }
         }
       });
     }
@@ -134,11 +120,53 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
   const fetchConstituencies = async () => {
     try {
       setIsLoading(true);
-      // Use real constituency names
-      setConstituencies(realConstituencies);
+      
+      // Try to fetch from database first
+      const dbConstituencies = await FirebaseService.getAllConstituencies();
+      
+      if (dbConstituencies.length > 0) {
+        setConstituencies(dbConstituencies);
+        console.log(`✅ Loaded ${dbConstituencies.length} constituencies from database`);
+      } else {
+        // Fallback to candidates.json if database is empty
+        try {
+          const response = await fetch('/data/candidates_en.json');
+          if (response.ok) {
+            const candidatesData = await response.json();
+            
+            // Extract unique constituency names and create constituency objects
+            const constituencyMap = new Map();
+            candidatesData.forEach((candidate: any, index: number) => {
+              if (candidate.area_name && !constituencyMap.has(candidate.area_name)) {
+                constituencyMap.set(candidate.area_name, {
+                  id: index + 1,
+                  name: candidate.area_name,
+                  area_name: candidate.area_name,
+                  area_name_hi: candidate.area_name
+                });
+              }
+            });
+            
+            const constituenciesFromFile = Array.from(constituencyMap.values())
+              .sort((a, b) => a.name.localeCompare(b.name));
+            
+            if (constituenciesFromFile.length > 0) {
+              setConstituencies(constituenciesFromFile);
+              console.log(`✅ Loaded ${constituenciesFromFile.length} constituencies from candidates_en.json`);
+            } else {
+              setConstituencies(fallbackConstituencies);
+            }
+          } else {
+            setConstituencies(fallbackConstituencies);
+          }
+        } catch (error) {
+          console.error('Error fetching from candidates.json:', error);
+          setConstituencies(fallbackConstituencies);
+        }
+      }
     } catch (error) {
       console.error('Error fetching constituencies:', error);
-      toast.error('Failed to load constituencies');
+      setConstituencies(fallbackConstituencies);
     } finally {
       setIsLoading(false);
     }
@@ -260,7 +288,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
 
       // Get constituency name
       const constituency = constituencies.find(c => c.id === selectedConstituency);
-      const constituencyName = constituency?.name || `Constituency ${selectedConstituency}`;
+      const constituencyName = constituency?.name || constituency?.area_name || `Constituency ${selectedConstituency}`;
 
       // Create the post first to get the ID
       const postData = {

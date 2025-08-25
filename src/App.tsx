@@ -23,6 +23,7 @@ import Onboarding from './components/Onboarding';
 import AdminPanel from './pages/AdminPanel';
 import AdminSetup from './pages/AdminSetup';
 import BlogCreate from './pages/BlogCreate';
+import PostDetail from './pages/PostDetail';
 import ConstituencyCheck from './components/ConstituencyCheck';
 import './App.css';
 
@@ -74,6 +75,11 @@ const App: React.FC = () => {
                   <Route path="/discussion" element={
                     <ConstituencyCheck>
                       <DiscussionForum />
+                    </ConstituencyCheck>
+                  } />
+                  <Route path="/post/:postId" element={
+                    <ConstituencyCheck>
+                      <PostDetail />
                     </ConstituencyCheck>
                   } />
                   <Route path="/constituency/:constituencySlug" element={

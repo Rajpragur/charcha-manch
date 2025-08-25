@@ -13,7 +13,8 @@ import {
   limit,
   serverTimestamp,
   Timestamp,
-  writeBatch
+  writeBatch,
+  increment
 } from 'firebase/firestore';
 import { db } from '../configs/firebase';
 import { storage } from '../configs/firebase';
@@ -1406,11 +1407,8 @@ export class FirebaseService {
   static async getDiscussionPosts(): Promise<any[]> {
     try {
       const postsRef = collection(db, 'discussion_posts');
-      const q = query(
-        postsRef,
-        where('status', 'in', ['published', 'under_review']),
-        orderBy('createdAt', 'desc')
-      );
+      // Simplified query to avoid index requirements
+      const q = query(postsRef, orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
 
       const posts = querySnapshot.docs.map(doc => ({
@@ -1418,9 +1416,14 @@ export class FirebaseService {
         ...doc.data()
       })) as FirebaseDiscussionPost[];
 
+      // Filter posts by status after fetching
+      const filteredPosts = posts.filter(post => 
+        post.status === 'published' || post.status === 'under_review'
+      );
+
       // Enrich posts with user and constituency data
       const enrichedPosts = await Promise.all(
-        posts.map(async (post) => {
+        filteredPosts.map(async (post) => {
           try {
             // Get user profile
             const userProfile = await this.getUserProfile(post.userId);
@@ -1496,6 +1499,61 @@ export class FirebaseService {
     } catch (error) {
       console.error('Error getting constituency name:', error);
       return null;
+    }
+  }
+
+  static async getAllConstituencies(): Promise<{ id: number; name: string; area_name?: string; area_name_hi?: string; district?: string }[]> {
+    try {
+      const constituenciesRef = collection(db, 'constituencies');
+      const snapshot = await getDocs(constituenciesRef);
+      
+      if (snapshot.empty) {
+        console.log('No constituencies found in database, returning empty array');
+        return [];
+      }
+      
+      const constituencies = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: parseInt(doc.id),
+          name: data.area_name || data.name || `Constituency ${doc.id}`,
+          area_name: data.area_name,
+          area_name_hi: data.area_name_hi,
+          district: data.district
+        };
+      });
+
+      // Sort by name for better user experience
+      constituencies.sort((a, b) => a.name.localeCompare(b.name));
+      
+      console.log(`✅ Fetched ${constituencies.length} constituencies from database`);
+      return constituencies;
+    } catch (error: any) {
+      console.error('Error fetching constituencies:', error);
+      // Fallback to hardcoded list if database fails
+      return [];
+    }
+  }
+
+  static async searchConstituencies(searchTerm: string): Promise<{ id: number; name: string; area_name?: string; area_name_hi?: string; district?: string }[]> {
+    try {
+      const constituencies = await this.getAllConstituencies();
+      
+      if (!searchTerm.trim()) {
+        return constituencies;
+      }
+      
+      const searchLower = searchTerm.toLowerCase();
+      const filtered = constituencies.filter(constituency => 
+        constituency.name.toLowerCase().includes(searchLower) ||
+        constituency.area_name?.toLowerCase().includes(searchLower) ||
+        constituency.district?.toLowerCase().includes(searchLower)
+      );
+      
+      return filtered;
+    } catch (error: any) {
+      console.error('Error searching constituencies:', error);
+      return [];
     }
   }
 
@@ -1595,6 +1653,301 @@ export class FirebaseService {
     } catch (error: any) {
       console.error('Error updating discussion post:', error);
       throw error;
+    }
+  }
+
+  // Add comment to a post
+  static async addComment(postId: string, comment: {
+    userId: string;
+    userName: string;
+    content: string;
+    constituencyName: string;
+  }): Promise<void> {
+    try {
+      const commentsRef = collection(db, 'comments');
+      const newComment = {
+        postId,
+        ...comment,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+      
+      await addDoc(commentsRef, newComment);
+      
+      // Update post comment count
+      const postRef = doc(db, 'discussion_posts', postId);
+      await updateDoc(postRef, {
+        commentsCount: increment(1),
+        updatedAt: serverTimestamp()
+      });
+      
+      console.log('✅ Comment added successfully');
+    } catch (error: any) {
+      console.error('Error adding comment:', error);
+      throw error;
+    }
+  }
+
+  // Get comments for a post
+  static async getComments(postId: string): Promise<any[]> {
+    try {
+      const commentsRef = collection(db, 'comments');
+      const q = query(
+        commentsRef,
+        where('postId', '==', postId),
+        orderBy('createdAt', 'asc')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const comments: any[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const commentData = doc.data();
+        comments.push({
+          id: doc.id,
+          ...commentData
+        });
+      });
+      
+      return comments;
+    } catch (error: any) {
+      console.error('Error fetching comments:', error);
+      throw error;
+    }
+  }
+
+  // Like a post (one like per user)
+  static async likePost(postId: string, userId: string): Promise<void> {
+    try {
+      const postRef = doc(db, 'discussion_posts', postId);
+      
+      // Check if user already liked the post
+      const likesRef = collection(db, 'post_likes');
+      const likeQuery = query(
+        likesRef,
+        where('postId', '==', postId),
+        where('userId', '==', userId)
+      );
+      
+      const existingLike = await getDocs(likeQuery);
+      
+      if (existingLike.empty) {
+        // Add like (only one per user)
+        await addDoc(likesRef, {
+          postId,
+          userId,
+          createdAt: serverTimestamp()
+        });
+        
+        // Update post like count
+        await updateDoc(postRef, {
+          likesCount: increment(1),
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        // Remove like
+        const likeDoc = existingLike.docs[0];
+        await deleteDoc(doc(db, 'post_likes', likeDoc.id));
+        
+        // Update post like count
+        await updateDoc(postRef, {
+          likesCount: increment(-1),
+          updatedAt: serverTimestamp()
+        });
+      }
+      
+      console.log('✅ Post like updated successfully');
+    } catch (error: any) {
+      console.error('Error updating post like:', error);
+      throw error;
+    }
+  }
+
+
+
+  // Check if user has liked a post
+  static async hasUserLikedPost(postId: string, userId: string): Promise<boolean> {
+    try {
+      const likesRef = collection(db, 'post_likes');
+      const likeQuery = query(
+        likesRef,
+        where('postId', '==', postId),
+        where('userId', '==', userId)
+      );
+      
+      const existingLike = await getDocs(likeQuery);
+      return !existingLike.empty;
+    } catch (error: any) {
+      console.error('Error checking user like:', error);
+      return false;
+    }
+  }
+
+  // Add reply to a comment
+  static async addReply(_commentId: string, reply: {
+    userId: string;
+    userName: string;
+    content: string;
+    constituencyName: string;
+    parentCommentId: string;
+  }): Promise<void> {
+    try {
+      const repliesRef = collection(db, 'comment_replies');
+      const newReply = {
+        ...reply,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+      
+      await addDoc(repliesRef, newReply);
+      
+      console.log('✅ Reply added successfully');
+    } catch (error: any) {
+      console.error('Error adding reply:', error);
+      throw error;
+    }
+  }
+
+  // Get replies for a comment
+  static async getReplies(commentId: string): Promise<any[]> {
+    try {
+      const repliesRef = collection(db, 'comment_replies');
+      const q = query(
+        repliesRef,
+        where('parentCommentId', '==', commentId),
+        orderBy('createdAt', 'asc')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const replies: any[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const replyData = doc.data();
+        replies.push({
+          id: doc.id,
+          ...replyData
+        });
+      });
+      
+      return replies;
+    } catch (error: any) {
+      console.error('Error fetching replies:', error);
+      throw error;
+    }
+  }
+
+
+
+  // Get discussion posts by constituency
+  static async getDiscussionPostsByConstituency(constituencyId: number): Promise<any[]> {
+    try {
+      const postsRef = collection(db, 'discussion_posts');
+      const q = query(
+        postsRef, 
+        where('constituency', '==', constituencyId),
+        where('status', 'in', ['published', 'under_review']),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+
+      const posts = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as FirebaseDiscussionPost[];
+
+      // Enrich posts with user data
+      const enrichedPosts = await Promise.all(
+        posts.map(async (post) => {
+          try {
+            const userProfile = await this.getUserProfile(post.userId);
+            return {
+              ...post,
+              userName: userProfile?.display_name || 'Anonymous',
+              interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
+            };
+          } catch (error) {
+            console.error('Error enriching post:', error);
+            return {
+              ...post,
+              userName: 'Anonymous',
+              interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
+            };
+          }
+        })
+      );
+
+      return enrichedPosts;
+    } catch (error: any) {
+      console.error('Error getting discussion posts by constituency:', error);
+      return [];
+    }
+  }
+
+  // Search discussion posts
+  static async searchDiscussionPosts(searchTerm: string, constituencyId?: number): Promise<any[]> {
+    try {
+      const postsRef = collection(db, 'discussion_posts');
+      let q;
+      
+      if (constituencyId) {
+        q = query(
+          postsRef,
+          where('constituency', '==', constituencyId),
+          where('status', 'in', ['published', 'under_review']),
+          orderBy('createdAt', 'desc')
+        );
+      } else {
+        q = query(
+          postsRef,
+          where('status', 'in', ['published', 'under_review']),
+          orderBy('createdAt', 'desc')
+        );
+      }
+
+      const querySnapshot = await getDocs(q);
+      const posts = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as FirebaseDiscussionPost[];
+
+      // Filter by search term
+      const filteredPosts = posts.filter(post => {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          post.title.toLowerCase().includes(searchLower) ||
+          post.content.toLowerCase().includes(searchLower) ||
+          post.tags.some(tag => tag.toLowerCase().includes(searchLower))
+        );
+      });
+
+      // Enrich posts
+      const enrichedPosts = await Promise.all(
+        filteredPosts.map(async (post) => {
+          try {
+            const userProfile = await this.getUserProfile(post.userId);
+            const constituencyName = await this.getConstituencyName(post.constituency);
+            return {
+              ...post,
+              userName: userProfile?.display_name || 'Anonymous',
+              constituencyName: constituencyName || `Constituency ${post.constituency}`,
+              interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
+            };
+          } catch (error) {
+            console.error('Error enriching post:', error);
+            return {
+              ...post,
+              userName: 'Anonymous',
+              constituencyName: `Constituency ${post.constituency}`,
+              interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
+            };
+          }
+        })
+      );
+
+      return enrichedPosts;
+    } catch (error: any) {
+      console.error('Error searching discussion posts:', error);
+      return [];
     }
   }
 }
