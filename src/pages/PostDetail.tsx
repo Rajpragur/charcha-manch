@@ -17,7 +17,8 @@ import {
   Home,
   Clock,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Check
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import FirebaseService from '../services/firebaseService';
@@ -82,6 +83,8 @@ const PostDetail: React.FC = () => {
   const [isSubmittingReply, setIsSubmittingReply] = useState<{ [commentId: string]: boolean }>({});
   const [showReplyInput, setShowReplyInput] = useState<{ [commentId: string]: boolean }>({});
   const [expandedComments, setExpandedComments] = useState<{ [commentId: string]: boolean }>({});
+  const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
+  const [userConstituency, setUserConstituency] = useState<string | null>(null);
 
   const content = {
     backToForum: isEnglish ? 'Back to Forum' : 'फोरम पर वापस जाएं',
@@ -96,6 +99,7 @@ const PostDetail: React.FC = () => {
     noComments: isEnglish ? 'No comments yet. Be the first to comment!' : 'अभी तक कोई टिप्पणी नहीं। पहली टिप्पणी करने वाले बनें!',
     comments: isEnglish ? 'Comments' : 'टिप्पणियां',
     signInToComment: isEnglish ? 'Please sign in to comment' : 'टिप्पणी करने के लिए साइन इन करें',
+    commentingFrom: isEnglish ? 'Commenting from:' : 'टिप्पणी कर रहे हैं:',
     signInToLike: isEnglish ? 'Please sign in to like posts' : 'पोस्ट को लाइक करने के लिए साइन इन करें',
     signInToDislike: isEnglish ? 'Please sign in to dislike posts' : 'पोस्ट को डिसलाइक करने के लिए साइन इन करें',
     delete: isEnglish ? 'Delete' : 'हटाएं',
@@ -141,6 +145,9 @@ const PostDetail: React.FC = () => {
         const hasLiked = await FirebaseService.hasUserLikedPost(postId!, currentUser.uid);
         const hasDisliked = await FirebaseService.hasUserDislikedPost(postId!, currentUser.uid);
         setUserReaction({ liked: hasLiked, disliked: hasDisliked });
+        
+        // Fetch user's constituency
+        await fetchUserConstituency();
       }
       
       // Fetch replies for all comments
@@ -156,6 +163,20 @@ const PostDetail: React.FC = () => {
       toast.error('Failed to load post');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchUserConstituency = async () => {
+    if (!currentUser?.uid) return;
+    
+    try {
+      const userProfile = await FirebaseService.getUserProfile(currentUser.uid);
+      if (userProfile?.constituency_id) {
+        const constituencyName = await FirebaseService.getConstituencyName(userProfile.constituency_id);
+        setUserConstituency(constituencyName);
+      }
+    } catch (error) {
+      console.error('Error fetching user constituency:', error);
     }
   };
 
@@ -178,7 +199,7 @@ const PostDetail: React.FC = () => {
         userId: currentUser.uid,
         userName: currentUser.displayName || 'User',
         content: commentContent,
-        constituencyName: post?.constituencyName || 'Unknown'
+        constituencyName: userConstituency || post?.constituencyName || 'Unknown'
       });
       
       setCommentText('');
@@ -282,7 +303,7 @@ const PostDetail: React.FC = () => {
         userId: currentUser.uid,
         userName: currentUser.displayName || 'User',
         content: replyContent,
-        constituencyName: post?.constituencyName || 'Unknown',
+        constituencyName: userConstituency || post?.constituencyName || 'Unknown',
         parentCommentId: commentId
       });
       
@@ -308,6 +329,71 @@ const PostDetail: React.FC = () => {
 
   const toggleReplies = (commentId: string) => {
     setExpandedComments(prev => ({ ...prev, [commentId]: !prev[commentId] }));
+  };
+
+  // Handle share functionality
+  const handleShare = async () => {
+    if (!post) return;
+    
+    const postUrl = `${window.location.origin}/post/${post.id}`;
+    const postTitle = `${post.titlefirst} ${post.titlesecond}`;
+    
+    try {
+      // Check if navigator.share is available and supported
+      if (navigator.share && navigator.canShare) {
+        const shareData = {
+          title: postTitle,
+          text: `Check out this discussion: ${post.content.substring(0, 100)}...`,
+          url: postUrl
+        };
+        
+        if (navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          return;
+        }
+      }
+      
+      // Fallback to copying to clipboard
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(postUrl);
+        setCopiedPostId(post.id);
+        toast.success('Post URL copied to clipboard!');
+        
+        // Reset copied state after 2 seconds
+        setTimeout(() => setCopiedPostId(null), 2000);
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = postUrl;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        setCopiedPostId(post.id);
+        toast.success('Post URL copied to clipboard!');
+        setTimeout(() => setCopiedPostId(null), 2000);
+      }
+    } catch (error) {
+      console.error('Error sharing post:', error);
+      
+      // Final fallback - try to copy using execCommand
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = postUrl;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        setCopiedPostId(post.id);
+        toast.success('Post URL copied to clipboard!');
+        setTimeout(() => setCopiedPostId(null), 2000);
+      } catch (fallbackError) {
+        console.error('Fallback copy failed:', fallbackError);
+        toast.error('Failed to share post. Please copy the URL manually.');
+      }
+    }
   };
 
   // Handle comment deletion
@@ -425,42 +511,42 @@ const PostDetail: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-6 pb-24 lg:pb-6">
+      <div className="max-w-3xl mx-auto px-3 py-4 pb-20 lg:pb-4">
         {/* Post Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
+          className="mb-4"
         >
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
             {post.status === 'removed' ? (
               <div className="p-8 text-center">
                 <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
                 <p className="text-gray-600 text-lg">{content.postRemoved}</p>
               </div>
             ) : (
-              <div className="p-6">
+              <div className="p-4">
                 {/* Post Header */}
-                <div className="flex items-start justify-between mb-5">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-[#014e5c] to-[#01798e] rounded-full flex items-center justify-center">
-                      <User className="h-6 w-6 text-white" />
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-10 h-10 bg-gradient-to-br from-[#014e5c] to-[#01798e] rounded-full flex items-center justify-center">
+                      <User className="h-5 w-5 text-white" />
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 text-lg">{post.userName || 'User'}</h3>
-                      <div className="flex items-center space-x-2 text-sm text-gray-500">
-                        <MapPin className="h-4 w-4" />
-                        <span>{post.constituencyName || `Constituency ${post.constituency}`}</span>
-                        <span>•</span>
-                        <Clock className="h-4 w-4" />
-                        <span>{formatRelativeTime(post.createdAt)}</span>
+                                          <div>
+                        <h3 className="font-semibold text-gray-900 text-base">{post.userName || 'User'}</h3>
+                        <div className="flex items-center space-x-2 text-xs text-gray-500">
+                          <MapPin className="h-3 w-3" />
+                          <span>{post.constituencyName || `Constituency ${post.constituency}`}</span>
+                          <span>•</span>
+                          <Clock className="h-3 w-3" />
+                          <span>{formatRelativeTime(post.createdAt)}</span>
+                        </div>
                       </div>
-                    </div>
                   </div>
                   
                   {/* Status Badge */}
                   {post.status === 'under_review' && (
-                    <span className="px-3 py-1 bg-yellow-50 text-yellow-700 border border-yellow-200 text-xs font-medium rounded-full flex items-center gap-1">
+                    <span className="px-2 py-1 bg-yellow-50 text-yellow-700 border border-yellow-200 text-xs font-medium rounded-full flex items-center gap-1">
                       <Shield className="h-3 w-3" />
                       {content.underReview}
                     </span>
@@ -529,10 +615,17 @@ const PostDetail: React.FC = () => {
                     </button>
 
                     <button 
+                      onClick={handleShare}
                       className="text-gray-500 hover:text-[#014e5c] hover:bg-[#014e5c]/10 p-2 rounded-lg transition-colors flex items-center space-x-2"
                     >
-                      <Share2 className="h-5 w-5" />
-                      <span className="font-medium">{content.share}</span>
+                      {copiedPostId === post.id ? (
+                        <Check className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <Share2 className="h-5 w-5" />
+                      )}
+                      <span className="font-medium">
+                        {copiedPostId === post.id ? (isEnglish ? 'Copied!' : 'कॉपी किया!') : content.share}
+                      </span>
                     </button>
                   </div>
                   
@@ -548,7 +641,7 @@ const PostDetail: React.FC = () => {
 
         {/* Comments Section */}
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 bg-[#014e5c]/5">
+          <div className="p-6 border-b border-gray-100 bg-white">
             <h2 className="text-xl font-semibold text-[#014e5c] mb-4">{content.comments}</h2>
             
             {/* Comment Input */}

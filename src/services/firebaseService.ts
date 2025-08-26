@@ -113,10 +113,13 @@ export interface FirebaseManifestoAverageScore {
 export interface FirebaseDiscussionPost {
   id: string;
   title: string;
+  titlefirst: string;
+  titlesecond: string;
   content: string;
   constituency: number;
   constituencyName: string;
   userId: string;
+  userName?: string;
   createdAt: any;
   updatedAt?: any;
   status: 'published' | 'under_review' | 'removed';
@@ -1433,7 +1436,7 @@ export class FirebaseService {
             
             return {
               ...post,
-              userName: userProfile?.display_name || 'User',
+              userName: post.userName || userProfile?.display_name || 'User',
               userConstituency: userProfile?.constituency_id,
               constituencyName: constituencyName || `Constituency ${post.constituency}`,
               interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
@@ -1442,7 +1445,7 @@ export class FirebaseService {
             console.error('Error enriching post:', error);
             return {
               ...post,
-              userName: 'User',
+              userName: post.userName || 'User',
               constituencyName: `Constituency ${post.constituency}`,
               interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
             };

@@ -459,32 +459,59 @@ const DiscussionForum: React.FC = () => {
     const postTitle = 'Check out this discussion on Charcha Manch';
     
     try {
-      if (navigator.share) {
-        // Use native sharing if available (mobile)
-        await navigator.share({
+      // Check if navigator.share is available and supported
+      if (navigator.share && navigator.canShare) {
+        const shareData = {
           title: postTitle,
           text: 'I found an interesting discussion on Charcha Manch',
           url: postUrl
-        });
-      } else {
-        // Fallback to copying to clipboard
+        };
+        
+        if (navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          return;
+        }
+      }
+      
+      // Fallback to copying to clipboard
+      if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(postUrl);
         setCopiedPostId(postId);
         toast.success('Post URL copied to clipboard!');
         
         // Reset copied state after 2 seconds
         setTimeout(() => setCopiedPostId(null), 2000);
-      }
-    } catch (error) {
-      console.error('Error sharing post:', error);
-      // Fallback to copying to clipboard
-      try {
-        await navigator.clipboard.writeText(postUrl);
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = postUrl;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
         setCopiedPostId(postId);
         toast.success('Post URL copied to clipboard!');
         setTimeout(() => setCopiedPostId(null), 2000);
-      } catch (clipboardError) {
-        toast.error('Failed to share post');
+      }
+    } catch (error) {
+      console.error('Error sharing post:', error);
+      
+      // Final fallback - try to copy using execCommand
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = postUrl;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        setCopiedPostId(postId);
+        toast.success('Post URL copied to clipboard!');
+        setTimeout(() => setCopiedPostId(null), 2000);
+      } catch (fallbackError) {
+        console.error('Fallback copy failed:', fallbackError);
+        toast.error('Failed to share post. Please copy the URL manually.');
       }
     }
   };
