@@ -60,10 +60,9 @@ service cloud.firestore {
     
     // Users collection - for admin management
     match /users/{userId} {
-      // Allow authenticated users to read users collection (admin check handled in app)
-      allow read: if request.auth != null;
-      // Allow write for admin setup (this will be restricted later)
-      allow write: if request.auth != null;
+      // Allow authenticated users to read and write users collection during setup
+      // This will be restricted to actual admins later
+      allow read, write: if request.auth != null;
     }
     
     // Admin collection - for admin-specific data

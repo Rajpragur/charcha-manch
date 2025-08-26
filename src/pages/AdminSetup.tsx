@@ -3,7 +3,6 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../configs/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
-import AdminStatusDebug from '../components/AdminStatusDebug';
 import { Shield, CheckCircle, AlertCircle, Loader, ArrowRight, Users, Settings, BarChart3 } from 'lucide-react';
 
 const AdminSetup: React.FC = () => {
@@ -12,10 +11,7 @@ const AdminSetup: React.FC = () => {
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
   const { currentUser } = useAuth();
-  const { checkAdminStatus } = useAdmin();
-
-  // Only allow the specific authorized admin UID to access this page
-  const AUTHORIZED_ADMIN_UID = '4zCKNy2r4tNAMdtnLUINpmzuyU52';
+  const { isAdmin, checkAdminStatus } = useAdmin();
 
   const setupAdminAccess = async () => {
     if (!uidOrEmail.trim()) {
@@ -24,8 +20,15 @@ const AdminSetup: React.FC = () => {
       return;
     }
 
-    if (!currentUser || currentUser.uid !== AUTHORIZED_ADMIN_UID) {
-      setMessage('Only the authorized system administrator can grant admin access');
+    if (!currentUser) {
+      setMessage('Please sign in to grant admin access');
+      setMessageType('error');
+      return;
+    }
+    
+    // TEMPORARY: Allow first admin setup without requiring existing admin access
+    if (!isAdmin && !isFirstAdminSetup) {
+      setMessage('Only users with admin access can grant admin access to others');
       setMessageType('error');
       return;
     }
@@ -92,7 +95,28 @@ const AdminSetup: React.FC = () => {
   };
 
   // Check if current user is authorized to access admin setup
-  if (!currentUser || currentUser.uid !== AUTHORIZED_ADMIN_UID) {
+  // TEMPORARY: Allow first admin setup without requiring existing admin access
+  const isFirstAdminSetup = true; // Set this to false once you have your first admin
+  
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="text-center mb-12">
+            <div className="mx-auto w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
+              <AlertCircle className="h-10 w-10 text-red-600" />
+            </div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">Authentication Required</h1>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Please sign in to access the admin setup page.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!isAdmin && !isFirstAdminSetup) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className="max-w-4xl mx-auto px-4 py-8">
@@ -102,8 +126,8 @@ const AdminSetup: React.FC = () => {
             </div>
             <h1 className="text-4xl font-bold text-gray-900 mb-4">Access Denied</h1>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Only the authorized system administrator can access this page. 
-              If you need admin access, please contact the system administrator.
+              Only users with admin access can access this page. 
+              If you need admin access, please contact an existing administrator.
             </p>
           </div>
         </div>
@@ -121,7 +145,10 @@ const AdminSetup: React.FC = () => {
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Charcha Manch Admin Setup</h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Set up admin access for your Charcha Manch application. Only the authorized system administrator can grant admin privileges to other users.
+            {isFirstAdminSetup 
+              ? 'Set up the first admin user for your Charcha Manch application. This will create the initial administrator account.'
+              : 'Set up admin access for your Charcha Manch application. Any existing admin can grant admin privileges to other users.'
+            }
           </p>
           
           {/* Security Warning */}
@@ -131,7 +158,7 @@ const AdminSetup: React.FC = () => {
               <span className="text-sm font-medium text-yellow-800">Restricted Access</span>
             </div>
             <p className="text-sm text-yellow-700">
-              This page is restricted to the authorized system administrator only. 
+              This page is restricted to users with admin access only. 
               Unauthorized access attempts will be blocked.
             </p>
           </div>
@@ -155,7 +182,7 @@ const AdminSetup: React.FC = () => {
                 <span className="text-sm font-medium text-green-800">Authorized Administrator Access</span>
               </div>
               <p className="text-sm text-green-700 mt-2">
-                You are the authorized system administrator. You can grant admin access to other users who need administrative privileges.
+                You have admin access. You can grant admin access to other users who need administrative privileges.
               </p>
             </div>
             
@@ -298,9 +325,6 @@ const AdminSetup: React.FC = () => {
           </div>
         </div>
       </div>
-      
-      {/* Admin Status Debug Component */}
-      <AdminStatusDebug />
     </div>
   );
 };

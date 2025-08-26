@@ -45,8 +45,31 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return;
     }
 
+    // FIRST: Check if user is admin by email (immediate access)
+    if (currentUser.email) {
+      const adminEmails = [
+        'rajpragur@gmail.com',
+        'admin@charchagram.com',
+        'harsh171517@gmail.com',
+        'connect.charchagram@gmail.com',
+        'rajpragur2@gmail.com'
+      ];
+      
+      if (adminEmails.includes(currentUser.email)) {
+        console.log('✅ User is admin by email (immediate access):', currentUser.email);
+        setAdminLevel('admin');
+        setIsAdmin(true);
+        setIsSuperAdmin(false);
+        setLoading(false);
+        console.log('✅ Admin status set by email - Role: admin, isAdmin: true, isSuperAdmin: false');
+        return;
+      } else {
+        console.log('❌ User email not in admin list:', currentUser.email);
+      }
+    }
+
     try {
-      // First check the users collection for admin status
+      // SECOND: Check the users collection for admin status
       console.log('🔍 Checking users collection for UID:', currentUser.uid);
       const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
       if (userDoc.exists()) {
@@ -80,38 +103,39 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (profileDoc.exists()) {
         const profileData = profileDoc.data();
         const role = profileData.role || profileData.admin_level || 'none';
+        const isProfileAdmin = profileData.isAdmin || false;
+        
+        console.log('🔍 Profile fields:', Object.keys(profileData));
+        console.log('🔍 Role field:', profileData.role);
+        console.log('🔍 Admin level field:', profileData.admin_level);
+        console.log('🔍 IsAdmin field:', profileData.isAdmin);
+        console.log('🔍 Final role determined:', role);
+        console.log('🔍 IsProfileAdmin:', isProfileAdmin);
         
         console.log('✅ Profile document found:', profileData);
         setAdminLevel(role);
-        setIsAdmin(role === 'moderator' || role === 'admin' || role === 'super_admin');
+        setIsAdmin(isProfileAdmin || role === 'moderator' || role === 'admin' || role === 'super_admin');
         setIsSuperAdmin(role === 'super_admin');
+        setLoading(false);
+        console.log('✅ Admin status set from profile - Role:', role, 'isAdmin:', isProfileAdmin || role === 'moderator' || role === 'admin' || role === 'super_admin');
+        return;
       } else {
         console.log('❌ No profile document found in user_profiles collection');
-        // No profile found, check if user is admin by email (temporary solution)
-        const adminEmails = [
-          'rajpratapsinghgurjar@gmail.com',
-          'admin@charchagram.com'
-        ];
-        
-        if (currentUser.email && adminEmails.includes(currentUser.email)) {
-          console.log('✅ User is admin by email fallback');
-          setAdminLevel('admin');
-          setIsAdmin(true);
-          setIsSuperAdmin(false);
-        } else {
-          console.log('❌ User is not admin by any method');
-          setIsAdmin(false);
-          setIsSuperAdmin(false);
-          setAdminLevel('none');
-        }
       }
+
+      // No admin status found by any method
+      console.log('❌ User is not admin by any method');
+      setIsAdmin(false);
+      setIsSuperAdmin(false);
+      setAdminLevel('none');
     } catch (error) {
       console.error('❌ Error checking admin status:', error);
       // Fallback: check if user is admin by email
       if (currentUser.email) {
         const adminEmails = [
           'rajpratapsinghgurjar@gmail.com',
-          'admin@charchagram.com'
+          'admin@charchagram.com',
+          'rajpratapsinghgurjar@gmail.com' // Your email for admin access
         ];
         
         if (adminEmails.includes(currentUser.email)) {

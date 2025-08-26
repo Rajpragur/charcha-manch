@@ -66,8 +66,6 @@ interface User {
   isActive: boolean;
 }
 
-const AUTHORIZED_ADMIN_UID = '4zCKNy2r4tNAMdtnLUINpmzuyU52';
-
 const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser, logout, loading: authLoading } = useAuth();
@@ -90,8 +88,11 @@ const AdminPanel: React.FC = () => {
     if (isAdmin) {
       console.log('✅ User is admin, loading admin data');
       loadAdminData();
+    } else {
+      console.log('❌ User is not admin, redirecting to home');
+      navigate('/');
     }
-  }, [loading, isAdmin, authLoading]);
+  }, [loading, isAdmin, authLoading, navigate]);
 
   const loadAdminData = async () => {
     try {
@@ -346,7 +347,7 @@ const AdminPanel: React.FC = () => {
             You don't have permission to access the admin panel.
           </p>
           <div className="space-y-3">
-            {currentUser?.uid === AUTHORIZED_ADMIN_UID ? (
+            {isAdmin ? (
               <button
                 onClick={() => navigate('/admin-setup')}
                 className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
