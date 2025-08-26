@@ -19,9 +19,12 @@ import {
   Share2,
   Award,
   Heart,
-  Menu,
   Home,
-  MessageSquare as ChatBubble
+  MessageCircle as ChatBubble,
+  Trash2,
+  MoreVertical,
+  ThumbsDown,
+  Check
 } from 'lucide-react';
 import Fuse from 'fuse.js';
 import toast from 'react-hot-toast';
@@ -30,6 +33,8 @@ import CreatePost from '../components/CreatePost';
 
 interface DiscussionPost {
   id: string;
+  titlefirst: string;
+  titlesecond: string;
   title: string;
   content: string;
   constituency: number;
@@ -73,14 +78,17 @@ const DiscussionForum: React.FC = () => {
 
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [showConstituencyFilter, setShowConstituencyFilter] = useState(false);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
+
   const [activeTab, setActiveTab] = useState<'home' | 'discussion' | 'area'>('discussion');
-  const [commentText, setCommentText] = useState<{ [postId: string]: string }>({});
+
   const [showComments, setShowComments] = useState<{ [postId: string]: boolean }>({});
-  const [userReactions, setUserReactions] = useState<{ [postId: string]: { liked: boolean } }>({});
+  const [userReactions, setUserReactions] = useState<{ [postId: string]: { liked: boolean; disliked: boolean } }>({});
+  const [showPostMenu, setShowPostMenu] = useState<{ [postId: string]: boolean }>({});
+  const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
 
   const content = {
-    title: isEnglish ? 'CharchaManch' : 'चर्चा मंच',
+    titlefirst: isEnglish ? 'Charcha' : 'चर्चा',
+    titlesecond: isEnglish ? 'Manch' : 'मंच',
     subtitle: isEnglish ? 'Platform for Dialogue and Community Cooperation' : 'संवाद और सामुदायिक सहयोग का मंच',
     createPost: isEnglish ? 'New Discussion' : 'नई चर्चा',
     searchPlaceholder: isEnglish ? 'Search discussions, issues, candidates...' : 'चर्चा, मुद्दे, उम्मीदवार खोजें...',
@@ -95,10 +103,14 @@ const DiscussionForum: React.FC = () => {
     comment: isEnglish ? 'Comment' : 'टिप्पणी करे',
     share: isEnglish ? 'Share' : 'साझा',
     home: isEnglish ? 'Home' : 'होम',
-    discussion: isEnglish ? 'Discussion Forum' : 'चर्चा मंच',
+    discussion: isEnglish ? 'Charcha Manch' : 'चर्चा मंच',
     area: isEnglish ? 'Your Area' : 'आपका क्षेत्र',
     reply: isEnglish ? 'Reply' : 'जवाब दें',
-    save: isEnglish ? 'Save' : 'सहेजें'
+    save: isEnglish ? 'Save' : 'सहेजें',
+    delete: isEnglish ? 'Delete' : 'हटाएं',
+    deleteConfirm: isEnglish ? 'Are you sure you want to delete this post? This action cannot be undone.' : 'क्या आप वाकई इस पोस्ट को हटाना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।',
+    postDeleted: isEnglish ? 'Post deleted successfully' : 'पोस्ट सफलतापूर्वक हटा दी गई',
+    deleteFailed: isEnglish ? 'Failed to delete post' : 'पोस्ट हटाने में विफल'
   };
 
   // Fuse.js instance for fuzzy search
@@ -167,39 +179,49 @@ const DiscussionForum: React.FC = () => {
     fetchData();
   };
 
-  // Handle comment submission
-  const handleCommentSubmit = async (postId: string) => {
+  // Handle post deletion
+  const handleDeletePost = async (postId: string) => {
     if (!currentUser?.uid) {
-      toast.error('Please sign in to comment');
+      toast.error('Please sign in to delete posts');
       return;
     }
 
-    const commentContent = commentText[postId]?.trim();
-    if (!commentContent) {
-      toast.error('Please write a comment');
-      return;
-    }
-
-    try {
-      const currentPost = posts.find(p => p.id === postId);
-      
-      await FirebaseService.addComment(postId, {
-        userId: currentUser.uid,
-        userName: currentUser.displayName || 'Anonymous',
-        content: commentContent,
-        constituencyName: currentPost?.constituencyName || 'Unknown'
-      });
-      
-      setCommentText(prev => ({ ...prev, [postId]: '' }));
-      toast.success('Comment posted successfully!');
-      
-      // Refresh posts to show new comment count
-      fetchData();
-    } catch (error) {
-      console.error('Error posting comment:', error);
-      toast.error('Failed to post comment');
+    if (window.confirm(content.deleteConfirm)) {
+      try {
+        await FirebaseService.deleteDiscussionPost(postId, currentUser.uid);
+        toast.success(content.postDeleted);
+        fetchData(); // Refresh the posts
+      } catch (error: any) {
+        console.error('Error deleting post:', error);
+        toast.error(error.message || content.deleteFailed);
+      }
     }
   };
+
+  // Toggle post menu
+  const togglePostMenu = (postId: string) => {
+    setShowPostMenu(prev => ({
+      ...prev,
+      [postId]: !prev[postId]
+    }));
+  };
+
+  // Close post menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.post-menu')) {
+        setShowPostMenu({});
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+
 
   // Fetch data function
   const fetchData = async () => {
@@ -216,10 +238,11 @@ const DiscussionForum: React.FC = () => {
       
       // Fetch user reactions for all posts if logged in
       if (currentUser?.uid) {
-        const reactions: { [postId: string]: { liked: boolean } } = {};
+        const reactions: { [postId: string]: { liked: boolean; disliked: boolean } } = {};
         for (const post of fetchedPosts) {
           const hasLiked = await FirebaseService.hasUserLikedPost(post.id, currentUser.uid);
-          reactions[post.id] = { liked: hasLiked };
+          const hasDisliked = await FirebaseService.hasUserDislikedPost(post.id, currentUser.uid);
+          reactions[post.id] = { liked: hasLiked, disliked: hasDisliked };
         }
         setUserReactions(reactions);
       }
@@ -240,7 +263,7 @@ const DiscussionForum: React.FC = () => {
     
     if (diffInSeconds < 60) return isEnglish ? 'just now' : 'अभी';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} ${isEnglish ? 'min ago' : 'मिनट पहले'}`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} ${isEnglish ? 'hours ago' : 'घंटे पहले'}`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} ${isEnglish ? 'hour ago' : 'घंटे पहले'}`;
     if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} ${isEnglish ? 'days ago' : 'दिन पहले'}`;
     return postDate.toLocaleDateString();
   };
@@ -269,7 +292,7 @@ const DiscussionForum: React.FC = () => {
       // Update local state
       setUserReactions(prev => ({
         ...prev,
-        [postId]: { liked: !currentLikeState }
+        [postId]: { liked: !currentLikeState, disliked: false }
       }));
       
       setPosts(prev => prev.map(post => 
@@ -279,163 +302,203 @@ const DiscussionForum: React.FC = () => {
       ));
       
       toast.success(!currentLikeState ? 'Post liked!' : 'Post unliked');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating like:', error);
       toast.error('Failed to update like');
     }
   };
 
+  // Handle dislike
+  const handleDislike = async (postId: string) => {
+    if (!currentUser?.uid) {
+      toast.error('Please sign in to dislike posts');
+      return;
+    }
+
+    try {
+      await FirebaseService.dislikePost(postId, currentUser.uid);
+      
+      // Get current dislike state
+      const currentDislikeState = userReactions[postId]?.disliked || false;
+      
+      // Update local state
+      setUserReactions(prev => ({
+        ...prev,
+        [postId]: { liked: false, disliked: !currentDislikeState }
+      }));
+      
+      setPosts(prev => prev.map(post => 
+        post.id === postId 
+          ? { ...post, dislikesCount: (post.dislikesCount || 0) + (currentDislikeState ? -1 : 1) }
+          : post
+      ));
+      
+      toast.success(!currentDislikeState ? 'Post disliked!' : 'Post undisliked');
+    } catch (error: any) {
+      console.error('Error updating dislike:', error);
+      toast.error('Failed to update dislike');
+    }
+  };
+
+  // Handle share functionality
+  const handleShare = async (postId: string) => {
+    const postUrl = `${window.location.origin}/post/${postId}`;
+    const postTitle = 'Check out this discussion on Charcha Manch';
+    
+    try {
+      if (navigator.share) {
+        // Use native sharing if available (mobile)
+        await navigator.share({
+          title: postTitle,
+          text: 'I found an interesting discussion on Charcha Manch',
+          url: postUrl
+        });
+      } else {
+        // Fallback to copying to clipboard
+        await navigator.clipboard.writeText(postUrl);
+        setCopiedPostId(postId);
+        toast.success('Post URL copied to clipboard!');
+        
+        // Reset copied state after 2 seconds
+        setTimeout(() => setCopiedPostId(null), 2000);
+      }
+    } catch (error) {
+      console.error('Error sharing post:', error);
+      // Fallback to copying to clipboard
+      try {
+        await navigator.clipboard.writeText(postUrl);
+        setCopiedPostId(postId);
+        toast.success('Post URL copied to clipboard!');
+        setTimeout(() => setCopiedPostId(null), 2000);
+      } catch (clipboardError) {
+        toast.error('Failed to share post');
+      }
+    }
+  };
 
 
-  // Navigate to post detail page
+
   const handlePostClick = (postId: string) => {
     navigate(`/post/${postId}`);
   };
 
+
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Mobile Header */}
-      <div className="lg:hidden bg-white border-b border-gray-200 sticky top-0 z-20">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-red-500 rounded-lg flex items-center justify-center">
-              <span className="text-white text-xs font-bold">CM</span>
-            </div>
-            <span className="text-lg font-bold text-gray-900">CHARCHAGRAM</span>
-          </div>
-          <div className="flex items-center space-x-3">
-            <button className="p-2 hover:bg-gray-100 rounded-full">
-              <User className="w-5 h-5 text-gray-600" />
-            </button>
-            <button 
-              className="p-2 hover:bg-gray-100 rounded-full"
-              onClick={() => setShowMobileMenu(!showMobileMenu)}
-            >
-              <Menu className="w-5 h-5 text-gray-600" />
-            </button>
-          </div>
-        </div>
+    <div className="min-h-screen bg-[#c1cad1]">
+      {/* Gap with background color - Mobile */}
+      <div className="lg:hidden h-4 bg-[#c1cad1]"></div>
+      
+      {/* Main Title Card - Mobile */}
+      <div className="text-center lg:hidden bg-white mx-4 rounded-xl shadow-sm border border-gray-200 p-3">
+        <h1 className="text-3xl font-bold bg-[#014e5c] bg-clip-text text-transparent mb-2">
+          {content.titlefirst} <span className="text-[#dc3b21]">{content.titlesecond}</span>
+        </h1>
+        <p className="text-gray-600 text-lg">{content.subtitle}</p>
       </div>
 
-      {/* Desktop Header */}
-      <div className="hidden lg:block bg-white border-b border-gray-200 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-red-500 rounded-lg flex items-center justify-center">
-                <span className="text-white text-sm font-bold">CM</span>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">CHARCHAGRAM</h1>
-                <p className="text-gray-600">{content.subtitle}</p>
-              </div>
+      {/* Main Title Section */}
+      <div className="hidden lg:block max-w-7xl mx-auto px-4 lg:px-6 py-6">
+            <div className="flex items-center justify-center flex-col">
+                <h1 className="text-4xl lg:text-5xl font-bold text-[#004030] mb-4">
+                    {content.titlefirst} <span className="text-[#dc3b21]">{content.titlesecond}</span>
+                </h1>
+                <p className="text-xl lg:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+                    {content.subtitle}
+                </p>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="mt-10 flex items-center justify-center flex-col">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setShowCreatePost(true)}
-                className="bg-gradient-to-r from-green-500 to-red-500 text-white px-6 py-2 rounded-full hover:from-green-600 hover:to-red-600 transition-all duration-200 font-medium flex items-center space-x-2 shadow-lg"
+                className="bg-[#014e5c] text-white px-6 py-2 rounded-full hover:from-green-600 hover:to-red-600 transition-all duration-200 font-medium flex items-center space-x-2 shadow-lg"
               >
                 <Plus className="w-4 h-4" />
                 <span>{content.createPost}</span>
               </motion.button>
             </div>
+        {/* Search Bar Section */}
+        <div className="max-w-5xl mx-auto mt-8">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <input
+              type="text"
+              placeholder={content.searchPlaceholder}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 text-lg transition-all duration-200 bg-white shadow-sm"
+            />
           </div>
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      {showMobileMenu && (
-        <div className="lg:hidden bg-white border-b border-gray-200">
-          <div className="px-4 py-3 space-y-3">
-            <button className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded-lg">
-              Profile
-            </button>
-            <button className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded-lg">
-              Settings
-            </button>
-            <button className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded-lg">
-              Help
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Main Title Card - Mobile */}
-      <div className="lg:hidden bg-white mx-4 mt-4 rounded-xl shadow-sm border border-gray-200 p-6">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-green-500 to-red-500 bg-clip-text text-transparent mb-2">
-          {content.title}
-        </h1>
-        <p className="text-gray-600 text-lg">{content.subtitle}</p>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 lg:px-6 py-4 lg:py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Left Sidebar - Desktop Only */}
-          <div className="hidden lg:block lg:col-span-1 space-y-6">
-            {/* Constituency Filter */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
-                <Filter className="w-5 h-5 text-gray-600" />
-                <span>{content.selectConstituency}</span>
-              </h3>
-              <div className="space-y-2">
+      <div className="max-w-7xl mx-auto px-4 lg:px-6 py-4 lg:py-6 pb-24 lg:pb-6">
+        {/* Constituency Filter - Desktop */}
+        <div className="hidden lg:block mb-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+              <Filter className="w-5 h-5 text-gray-600" />
+              <span>{content.selectConstituency}</span>
+            </h3>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => handleConstituencyChange(null)}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  selectedConstituency === null
+                    ? 'bg-green-100 text-green-700 border border-green-200'
+                    : 'text-gray-700 hover:bg-gray-50 border border-gray-200'
+                }`}
+              >
+                {content.allConstituencies}
+              </button>
+              {constituencies.map((constituency) => (
                 <button
-                  onClick={() => handleConstituencyChange(null)}
-                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                    selectedConstituency === null
-                      ? 'bg-green-100 text-green-700 border border-green-200'
-                      : 'text-gray-700 hover:bg-gray-50'
+                  key={constituency.id}
+                  onClick={() => handleConstituencyChange(constituency.id)}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    selectedConstituency === constituency.id
+                      ? 'bg-[#014e5c] text-white'
+                      : 'text-gray-700 hover:bg-gray-50 border border-gray-200'
                   }`}
                 >
-                  {content.allConstituencies}
+                  {constituency.name}
                 </button>
-                {constituencies.map((constituency) => (
-                  <button
-                    key={constituency.id}
-                    onClick={() => handleConstituencyChange(constituency.id)}
-                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                      selectedConstituency === constituency.id
-                        ? 'bg-green-100 text-green-700 border border-green-200'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {constituency.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Sort Options */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Sort by</h3>
-              <div className="space-y-2">
-                {[
-                  { key: 'recent', label: 'Latest', icon: Clock },
-                  { key: 'trending', label: 'Trending', icon: Flame },
-                  { key: 'interactions', label: 'Most Active', icon: TrendingUp },
-                  { key: 'top', label: 'Top', icon: Award }
-                ].map((option) => (
-                  <button
-                    key={option.key}
-                    onClick={() => setSortBy(option.key as any)}
-                    className={`w-full flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 ${
-                      sortBy === option.key
-                        ? 'bg-green-100 text-green-700 border border-green-200'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <option.icon className={`w-4 h-4 ${sortBy === option.key ? 'text-green-600' : 'text-gray-500'}`} />
-                    <span className="font-medium">{option.label}</span>
-                  </button>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
+        </div>
 
-          {/* Main Content */}
-          <div className="lg:col-span-3 space-y-4 lg:space-y-6">
+        {/* Sort Options - Desktop */}
+        <div className="hidden lg:block mb-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Sort by</h3>
+            <div className="flex flex-wrap gap-3">
+              {[
+                { key: 'recent', label: 'Latest', icon: Clock },
+                { key: 'trending', label: 'Trending', icon: Flame },
+                { key: 'interactions', label: 'Most Active', icon: TrendingUp },
+                { key: 'top', label: 'Top', icon: Award }
+              ].map((option) => (
+                <button
+                  key={option.key}
+                  onClick={() => setSortBy(option.key as any)}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                    sortBy === option.key
+                      ? 'bg-green-100 text-green-700 border border-green-200'
+                      : 'text-gray-700 hover:bg-gray-50 border border-gray-200'
+                  }`}
+                >
+                  <option.icon className={`w-4 h-4 ${sortBy === option.key ? 'text-green-600' : 'text-gray-500'}`} />
+                  <span className="font-medium">{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="space-y-4 lg:space-y-6 mb-4">
             {/* Constituency Filter - Mobile */}
             <div className="lg:hidden bg-white rounded-xl shadow-sm border border-gray-200 p-4">
               <button
@@ -484,15 +547,15 @@ const DiscussionForum: React.FC = () => {
             </div>
 
             {/* Search Bar */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
+            <div className="lg:hidden bg-white rounded-xl shadow-sm border border-gray-200 p-2">
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
                   placeholder={content.searchPlaceholder}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg"
+                  className="w-full pl-12 pr-2 py-1 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg"
                 />
               </div>
             </div>
@@ -511,7 +574,7 @@ const DiscussionForum: React.FC = () => {
                   <p className="text-gray-600 mb-6">{content.noPostsDescription}</p>
                   <button
                     onClick={() => setShowCreatePost(true)}
-                    className="bg-gradient-to-r from-green-500 to-red-500 text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-red-600 transition-all duration-200 font-medium"
+                    className="bg-[#004e5c] text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-red-600 transition-all duration-200 font-medium"
                   >
                     {content.createPost}
                   </button>
@@ -538,11 +601,11 @@ const DiscussionForum: React.FC = () => {
                           {/* Post Header */}
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-red-500 rounded-full flex items-center justify-center">
-                                <User className="h-5 w-5 text-white" />
+                              <div className="w-10 h-10 bg-[#014e5c] rounded-full flex items-center justify-center">
+                                <User className="h-4 w-4 text-white" />
                               </div>
                               <div>
-                                <h3 className="font-semibold text-gray-900">{post.userName || 'Anonymous'}</h3>
+                                <h3 className="font-semibold text-gray-900">{post.userName || 'User'}</h3>
                                 <div className="flex items-center space-x-2 text-sm text-gray-500">
                                   <MapPin className="h-4 w-4" />
                                   <span>{post.constituencyName || `Constituency ${post.constituency}`}</span>
@@ -552,24 +615,67 @@ const DiscussionForum: React.FC = () => {
                               </div>
                             </div>
                             
-                            {/* Status Badge */}
-                            {post.status === 'under_review' && (
-                              <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full flex items-center">
-                                <Shield className="h-3 w-3 mr-1" />
-                                {content.underReview}
-                              </span>
-                            )}
+                            <div className="flex items-center space-x-2">
+                              {/* Status Badge */}
+                              {post.status === 'under_review' && (
+                                <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full flex items-center">
+                                  <Shield className="h-3 w-3 mr-1" />
+                                  {content.underReview}
+                                </span>
+                              )}
+                              
+                              {/* Post Menu (only show for post owner) */}
+                              {currentUser?.uid === post.userId && (
+                                <div className="relative post-menu">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      togglePostMenu(post.id);
+                                    }}
+                                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                                  >
+                                    <MoreVertical className="h-4 w-4 text-gray-500" />
+                                  </button>
+                                  
+                                  {showPostMenu[post.id] && (
+                                    <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[120px]">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeletePost(post.id);
+                                          setShowPostMenu(prev => ({ ...prev, [post.id]: false }));
+                                        }}
+                                        className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                        <span>{content.delete}</span>
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           {/* Post Content */}
                           <div className="mb-4">
+                            {/* Poster Name - Above Title */}
+                            <div className="mb-2">
+                              <span className="text-sm text-gray-600">
+                                {isEnglish ? `Posted by ${post.userName || 'User'}` : `${post.userName || 'उपयोगकर्ता'} द्वारा पोस्ट किया गया`}
+                              </span>
+                            </div>
+                            
+                            {/* Post Title - More Prominent */}
                             <h2 
-                              className="text-lg lg:text-xl font-bold text-gray-900 mb-3 hover:text-green-600 transition-colors cursor-pointer"
+                              className="text-xl lg:text-2xl font-bold text-gray-900 mb-4 hover:text-green-600 transition-colors cursor-pointer leading-tight"
                               onClick={() => handlePostClick(post.id)}
                             >
-                              {post.title}
+                              {post.titlefirst} {post.titlesecond}
                             </h2>
-                            <p className="text-gray-700 leading-relaxed mb-4">{post.content}</p>
+                            
+                            {/* Post Content */}
+                            <p className="text-gray-700 leading-relaxed mb-4 text-base">{post.content}</p>
                             
                             {/* Tags */}
                             {post.tags && post.tags.length > 0 && (
@@ -594,22 +700,54 @@ const DiscussionForum: React.FC = () => {
                                   e.stopPropagation();
                                   handleLike(post.id);
                                 }}
+                                disabled={userReactions[post.id]?.disliked}
                                 className={`flex items-center space-x-2 p-2 rounded-lg transition-colors ${
                                   userReactions[post.id]?.liked 
                                     ? 'text-red-500 bg-red-50' 
+                                    : userReactions[post.id]?.disliked
+                                    ? 'text-gray-300 cursor-not-allowed'
                                     : 'text-gray-500 hover:text-red-500 hover:bg-red-50'
                                 }`}
                               >
-                                <Heart className={`h-5 w-5 ${userReactions[post.id]?.liked ? 'fill-current' : ''}`} />
+                                <Heart className={`h-4 w-4 ${userReactions[post.id]?.liked ? 'fill-current' : ''}`} />
                                 <span className="text-sm font-medium">{post.likesCount || 0}</span>
                               </button>
 
                               <button 
-                                onClick={(e) => e.stopPropagation()}
-                                className="flex items-center space-x-2 text-gray-500 hover:text-green-500 hover:bg-green-50 p-2 rounded-lg transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDislike(post.id);
+                                }}
+                                disabled={userReactions[post.id]?.liked}
+                                className={`flex items-center space-x-2 p-2 rounded-lg transition-colors ${
+                                  userReactions[post.id]?.disliked 
+                                    ? 'text-blue-500 bg-blue-50' 
+                                    : userReactions[post.id]?.liked
+                                    ? 'text-gray-300 cursor-not-allowed'
+                                    : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50'
+                                }`}
                               >
-                                <Share2 className="h-5 w-5" />
-                                <span className="text-sm font-medium">{content.share}</span>
+                                <ThumbsDown className={`h-4 w-4 ${userReactions[post.id]?.disliked ? 'fill-current' : ''}`} />
+                                <span className="text-sm font-medium">{post.dislikesCount || 0}</span>
+                              </button>
+
+                              {/* Share Button */}
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleShare(post.id);
+                                }}
+                                className="flex items-center space-x-2 p-2 rounded-lg transition-colors text-gray-500 hover:text-green-600 hover:bg-green-50"
+                                title={isEnglish ? 'Share this post' : 'इस पोस्ट को शेयर करें'}
+                              >
+                                {copiedPostId === post.id ? (
+                                  <Check className="h-5 w-5 text-green-600" />
+                                ) : (
+                                  <Share2 className="h-5 w-5" />
+                                )}
+                                <span className="text-sm font-medium">
+                                  {copiedPostId === post.id ? (isEnglish ? 'Copied!' : 'कॉपी किया!') : (isEnglish ? 'Share' : 'शेयर')}
+                                </span>
                               </button>
                             </div>
                             
@@ -617,36 +755,8 @@ const DiscussionForum: React.FC = () => {
                               onClick={() => toggleComments(post.id)}
                               className="text-sm text-gray-500 hover:text-green-600 transition-colors"
                             >
-                              {showComments[post.id] ? 'Hide Comments' : `Show ${post.commentsCount || 0} Comments`}
+                            {showComments[post.id] ? isEnglish ? 'Hide Comments' : 'टिप्पणियाँ छुपाएं' : isEnglish ? `Show ${post.commentsCount || 0} Comments` : `${post.commentsCount || 0} टिप्पणियाँ दिखाएं `}
                             </button>
-                          </div>
-
-                          {/* Comment Input */}
-                          <div className="mt-4 pt-4 border-t border-gray-100">
-                            <div className="flex space-x-3">
-                              <div className="flex-1">
-                                <input
-                                  type="text"
-                                  placeholder={content.writeComment}
-                                  value={commentText[post.id] || ''}
-                                  onChange={(e) => setCommentText(prev => ({
-                                    ...prev,
-                                    [post.id]: e.target.value
-                                  }))}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                />
-                              </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCommentSubmit(post.id);
-                                }}
-                                className="px-6 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
-                              >
-                                {content.comment}
-                              </button>
-                            </div>
                           </div>
 
                           {/* Comments Section */}
@@ -666,55 +776,51 @@ const DiscussionForum: React.FC = () => {
                   ))}
                 </AnimatePresence>
               )}
-            </div>
-          </div>
+                        </div>
         </div>
       </div>
 
       {/* Floating Action Button - Mobile */}
-      <div className="lg:hidden fixed bottom-6 right-6 z-30">
+      <div className="lg:hidden fixed bottom-24 right-4 z-30">
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowCreatePost(true)}
-          className="w-16 h-16 bg-gray-800 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center"
+          className="w-14 h-14 bg-[#014e5c] text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center"
         >
           <Plus className="w-6 h-6" />
         </motion.button>
-        <div className="absolute -top-2 -right-2 bg-white text-gray-800 text-xs px-2 py-1 rounded-full border border-gray-200 whitespace-nowrap">
-          {content.createPost}
-        </div>
       </div>
 
       {/* Bottom Navigation - Mobile */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20">
-        <div className="flex items-center justify-around py-2">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20 shadow-lg">
+        <div className="flex items-center justify-around py-3 px-2">
           <button
-            onClick={() => setActiveTab('home')}
+            onClick={() => navigate('/')}
             className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
-              activeTab === 'home' ? 'text-green-600 bg-green-50' : 'text-gray-500'
+              activeTab === 'home' ? 'text-[#014e5c] bg-[#014e5c]/10' : 'text-gray-500'
             }`}
           >
             <Home className="w-5 h-5" />
-            <span className="text-xs">{content.home}</span>
+            <span className="text-xs font-medium">{content.home}</span>
           </button>
           <button
             onClick={() => setActiveTab('discussion')}
             className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
-              activeTab === 'discussion' ? 'text-green-600 bg-green-50' : 'text-gray-500'
+              activeTab === 'discussion' ? 'text-[#014e5c] bg-[#014e5c]/10' : 'text-gray-500'
             }`}
           >
             <ChatBubble className="w-5 h-5" />
-            <span className="text-xs">{content.discussion}</span>
+            <span className="text-xs font-medium">{content.discussion}</span>
           </button>
           <button
-            onClick={() => setActiveTab('area')}
+            onClick={() => navigate('/aapka-kshetra')}
             className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
-              activeTab === 'area' ? 'text-green-600 bg-green-50' : 'text-gray-500'
+              activeTab === 'area' ? 'text-[#014e5c] bg-[#014e5c]/10' : 'text-gray-500'
             }`}
           >
             <MapPin className="w-5 h-5" />
-            <span className="text-xs">{content.area}</span>
+            <span className="text-xs font-medium">{content.area}</span>
           </button>
         </div>
       </div>

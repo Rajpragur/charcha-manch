@@ -1433,7 +1433,7 @@ export class FirebaseService {
             
             return {
               ...post,
-              userName: userProfile?.display_name || 'Anonymous',
+              userName: userProfile?.display_name || 'User',
               userConstituency: userProfile?.constituency_id,
               constituencyName: constituencyName || `Constituency ${post.constituency}`,
               interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
@@ -1442,7 +1442,7 @@ export class FirebaseService {
             console.error('Error enriching post:', error);
             return {
               ...post,
-              userName: 'Anonymous',
+              userName: 'User',
               constituencyName: `Constituency ${post.constituency}`,
               interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
             };
@@ -1500,17 +1500,41 @@ export class FirebaseService {
 
   static async getConstituencyName(constituencyId: number): Promise<string | null> {
     try {
-      // This would typically come from a constituencies collection
-      // For now, return a formatted name
+      // First try to get from merged_candidates.json
+      const constituencies = await this.loadConstituenciesFromJSON();
+      const constituency = constituencies.find(c => c.id === constituencyId);
+      
+      if (constituency) {
+        return constituency.name;
+      }
+      
+      // Fallback to database if JSON file fails
+      const constituenciesRef = collection(db, 'constituencies');
+      const constituencyQuery = query(constituenciesRef, where('id', '==', constituencyId));
+      const constituencySnapshot = await getDocs(constituencyQuery);
+      
+      if (!constituencySnapshot.empty) {
+        const constituencyData = constituencySnapshot.docs[0].data();
+        return constituencyData.area_name || constituencyData.name || `Constituency ${constituencyId}`;
+      }
+      
       return `Constituency ${constituencyId}`;
     } catch (error) {
       console.error('Error getting constituency name:', error);
-      return null;
+      return `Constituency ${constituencyId}`;
     }
   }
 
   static async getAllConstituencies(): Promise<{ id: number; name: string; area_name?: string; area_name_hi?: string; district?: string }[]> {
     try {
+      // First try to load from merged_candidates.json
+      const constituencies = await this.loadConstituenciesFromJSON();
+      if (constituencies.length > 0) {
+        console.log(`✅ Loaded ${constituencies.length} constituencies from merged_candidates.json`);
+        return constituencies;
+      }
+
+      // Fallback to database if JSON file fails
       const constituenciesRef = collection(db, 'constituencies');
       const snapshot = await getDocs(constituenciesRef);
       
@@ -1519,7 +1543,7 @@ export class FirebaseService {
         return [];
       }
       
-      const constituencies = snapshot.docs.map(doc => {
+      const dbConstituencies = snapshot.docs.map(doc => {
         const data = doc.data();
         return {
           id: parseInt(doc.id),
@@ -1531,14 +1555,59 @@ export class FirebaseService {
       });
 
       // Sort by name for better user experience
-      constituencies.sort((a, b) => a.name.localeCompare(b.name));
+      dbConstituencies.sort((a, b) => a.name.localeCompare(b.name));
       
-      console.log(`✅ Fetched ${constituencies.length} constituencies from database`);
-      return constituencies;
+      console.log(`✅ Fetched ${dbConstituencies.length} constituencies from database`);
+      return dbConstituencies;
     } catch (error: any) {
       console.error('Error fetching constituencies:', error);
-      // Fallback to hardcoded list if database fails
+      // Fallback to hardcoded list if everything fails
       return [];
+    }
+  }
+
+  // Load constituencies from merged_candidates.json file
+  static async loadConstituenciesFromJSON(): Promise<{ id: number; name: string; area_name?: string; area_name_hi?: string; district?: string }[]> {
+    try {
+      const response = await fetch('/data/merged_candidates.json');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch merged_candidates.json: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid data format: expected array');
+      }
+      
+      const constituencies = data.map((item: any) => ({
+        id: item.id,
+        name: item.area_name?.en || `Constituency ${item.id}`,
+        area_name: item.area_name?.en || '',
+        area_name_hi: item.area_name?.hi || '',
+        district: item.district || ''
+      }));
+
+      // Sort by name for better user experience
+      constituencies.sort((a, b) => a.name.localeCompare(b.name));
+      
+      console.log(`✅ Successfully loaded ${constituencies.length} constituencies from merged_candidates.json`);
+      return constituencies;
+    } catch (error: any) {
+      console.error('Error loading constituencies from JSON:', error);
+      return [];
+    }
+  }
+
+  // Get constituency name by ID from merged_candidates.json
+  static async getConstituencyNameById(constituencyId: number): Promise<string> {
+    try {
+      const constituencies = await this.loadConstituenciesFromJSON();
+      const constituency = constituencies.find(c => c.id === constituencyId);
+      return constituency?.name || `Constituency ${constituencyId}`;
+    } catch (error: any) {
+      console.error('Error getting constituency name by ID:', error);
+      return `Constituency ${constituencyId}`;
     }
   }
 
@@ -1594,6 +1663,14 @@ export class FirebaseService {
 
   static async createDiscussionPost(postData: Omit<FirebaseDiscussionPost, 'id'>): Promise<string> {
     try {
+      // Validate that the constituency exists in merged_candidates.json
+      const constituencies = await this.loadConstituenciesFromJSON();
+      const constituencyExists = constituencies.some(c => c.id === postData.constituency);
+      
+      if (!constituencyExists) {
+        throw new Error(`Constituency ID ${postData.constituency} is not valid. Only constituencies from the official list are allowed.`);
+      }
+      
       const postsRef = collection(db, 'discussion_posts');
       const newPost = await addDoc(postsRef, {
         ...postData,
@@ -1730,9 +1807,11 @@ export class FirebaseService {
     }
   }
 
-  // Like a post (one like per user)
+  // Like a post (one like per user, removes any existing dislike)
   static async likePost(postId: string, userId: string): Promise<void> {
     try {
+      console.log(`🔍 Starting like operation for post ${postId} by user ${userId}`);
+      
       const postRef = doc(db, 'discussion_posts', postId);
       
       // Check if user already liked the post
@@ -1744,8 +1823,35 @@ export class FirebaseService {
       );
       
       const existingLike = await getDocs(likeQuery);
+      console.log(`🔍 Existing like check: ${existingLike.empty ? 'No existing like' : 'User already liked'}`);
       
       if (existingLike.empty) {
+        // Check if user has disliked the post and remove it first
+        const dislikesRef = collection(db, 'post_dislikes');
+        const dislikeQuery = query(
+          dislikesRef,
+          where('postId', '==', postId),
+          where('userId', '==', userId)
+        );
+        
+        const existingDislike = await getDocs(dislikeQuery);
+        console.log(`🔍 Existing dislike check: ${existingDislike.empty ? 'No existing dislike' : 'User already disliked'}`);
+        
+        if (!existingDislike.empty) {
+          console.log('🔍 Removing existing dislike before adding like');
+          // Remove existing dislike
+          const dislikeDoc = existingDislike.docs[0];
+          await deleteDoc(doc(db, 'post_dislikes', dislikeDoc.id));
+          
+          // Update post dislike count
+          await updateDoc(postRef, {
+            dislikesCount: increment(-1),
+            updatedAt: serverTimestamp()
+          });
+          console.log('✅ Existing dislike removed and count updated');
+        }
+        
+        console.log('🔍 Adding new like');
         // Add like (only one per user)
         await addDoc(likesRef, {
           postId,
@@ -1758,7 +1864,9 @@ export class FirebaseService {
           likesCount: increment(1),
           updatedAt: serverTimestamp()
         });
+        console.log('✅ New like added and count updated');
       } else {
+        console.log('🔍 Removing existing like');
         // Remove like
         const likeDoc = existingLike.docs[0];
         await deleteDoc(doc(db, 'post_likes', likeDoc.id));
@@ -1768,11 +1876,17 @@ export class FirebaseService {
           likesCount: increment(-1),
           updatedAt: serverTimestamp()
         });
+        console.log('✅ Existing like removed and count updated');
       }
       
       console.log('✅ Post like updated successfully');
     } catch (error: any) {
-      console.error('Error updating post like:', error);
+      console.error('❌ Error updating post like:', error);
+      console.error('❌ Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
       throw error;
     }
   }
@@ -1794,6 +1908,340 @@ export class FirebaseService {
     } catch (error: any) {
       console.error('Error checking user like:', error);
       return false;
+    }
+  }
+
+  // Dislike a post (one dislike per user, removes any existing like)
+  static async dislikePost(postId: string, userId: string): Promise<void> {
+    try {
+      console.log(`🔍 Starting dislike operation for post ${postId} by user ${userId}`);
+      
+      const postRef = doc(db, 'discussion_posts', postId);
+      
+      // Check if user already disliked the post
+      const dislikesRef = collection(db, 'post_dislikes');
+      const dislikeQuery = query(
+        dislikesRef,
+        where('postId', '==', postId),
+        where('userId', '==', userId)
+      );
+      
+      const existingDislike = await getDocs(dislikeQuery);
+      console.log(`🔍 Existing dislike check: ${existingDislike.empty ? 'No existing dislike' : 'User already disliked'}`);
+      
+      if (existingDislike.empty) {
+        // Check if user has liked the post and remove it first
+        const likesRef = collection(db, 'post_likes');
+        const likeQuery = query(
+          likesRef,
+          where('postId', '==', postId),
+          where('userId', '==', userId)
+        );
+        
+        const existingLike = await getDocs(likeQuery);
+        console.log(`🔍 Existing like check: ${existingLike.empty ? 'No existing like' : 'User already liked'}`);
+        
+        if (!existingLike.empty) {
+          console.log('🔍 Removing existing like before adding dislike');
+          // Remove existing like
+          const likeDoc = existingLike.docs[0];
+          await deleteDoc(doc(db, 'post_likes', likeDoc.id));
+          
+          // Update post like count
+          await updateDoc(postRef, {
+            likesCount: increment(-1),
+            updatedAt: serverTimestamp()
+          });
+          console.log('✅ Existing like removed and count updated');
+        }
+        
+        console.log('🔍 Adding new dislike');
+        // Add dislike (only one per user)
+        await addDoc(dislikesRef, {
+          postId,
+          userId,
+          createdAt: serverTimestamp()
+        });
+        
+        // Update post dislike count
+        await updateDoc(postRef, {
+          dislikesCount: increment(1),
+          updatedAt: serverTimestamp()
+        });
+        console.log('✅ New dislike added and count updated');
+      } else {
+        console.log('🔍 Removing existing dislike');
+        // Remove dislike
+        const dislikeDoc = existingDislike.docs[0];
+        await deleteDoc(doc(db, 'post_dislikes', dislikeDoc.id));
+        
+        // Update post dislike count
+        await updateDoc(postRef, {
+          dislikesCount: increment(-1),
+          updatedAt: serverTimestamp()
+        });
+        console.log('✅ Existing dislike removed and count updated');
+      }
+      
+      console.log('✅ Post dislike updated successfully');
+    } catch (error: any) {
+      console.error('❌ Error updating post dislike:', error);
+      console.error('❌ Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  // Check if user has disliked a post
+  static async hasUserDislikedPost(postId: string, userId: string): Promise<boolean> {
+    try {
+      const dislikesRef = collection(db, 'post_dislikes');
+      const dislikeQuery = query(
+        dislikesRef,
+        where('postId', '==', postId),
+        where('userId', '==', userId)
+      );
+      
+      const existingDislike = await getDocs(dislikeQuery);
+      return !existingDislike.empty;
+    } catch (error: any) {
+      console.error('Error checking user dislike:', error);
+      return false;
+    }
+  }
+
+  // Test Firebase connectivity and permissions
+  static async testFirebaseAccess(): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log('🔍 Testing Firebase access...');
+      
+      // Test reading from discussion_posts
+      const postsRef = collection(db, 'discussion_posts');
+      const postsSnapshot = await getDocs(postsRef);
+      console.log('✅ Successfully read from discussion_posts:', postsSnapshot.size, 'posts found');
+      
+      // Test reading from post_likes
+      const likesRef = collection(db, 'post_likes');
+      const likesSnapshot = await getDocs(likesRef);
+      console.log('✅ Successfully read from post_likes:', likesSnapshot.size, 'likes found');
+      
+      // Test reading from post_dislikes
+      const dislikesRef = collection(db, 'post_dislikes');
+      const dislikesSnapshot = await getDocs(dislikesRef);
+      console.log('✅ Successfully read from post_dislikes:', dislikesSnapshot.size, 'dislikes found');
+      
+      // Test writing to post_likes (this will test permissions)
+      const testLikeData = {
+        postId: 'test-post-id',
+        userId: 'test-user-id',
+        createdAt: serverTimestamp()
+      };
+      
+      try {
+        const testLikeRef = await addDoc(likesRef, testLikeData);
+        console.log('✅ Successfully wrote to post_likes, test document ID:', testLikeRef.id);
+        
+        // Clean up test document
+        await deleteDoc(doc(db, 'post_likes', testLikeRef.id));
+        console.log('✅ Successfully cleaned up test document');
+        
+        return { success: true };
+      } catch (writeError: any) {
+        console.error('❌ Failed to write to post_likes:', writeError);
+        return { success: false, error: `Write permission denied: ${writeError.message}` };
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Firebase access test failed:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Delete a discussion post (only by post owner or admin)
+  static async deleteDiscussionPost(postId: string, userId: string): Promise<void> {
+    try {
+      console.log(`🔍 Attempting to delete post ${postId} by user ${userId}`);
+      
+      const postRef = doc(db, 'discussion_posts', postId);
+      const postDoc = await getDoc(postRef);
+      
+      if (!postDoc.exists()) {
+        throw new Error('Post not found');
+      }
+      
+      const postData = postDoc.data();
+      console.log(`🔍 Post data:`, postData);
+      console.log(`🔍 Checking permissions: post owner: ${postData.userId}, current user: ${userId}`);
+      
+      // Check if user is the post owner or an admin
+      if (postData.userId !== userId) {
+        // Check if user is admin (you can implement admin check here)
+        // For now, only post owner can delete
+        throw new Error('Only post owner can delete this post');
+      }
+      
+      console.log(`✅ Permission check passed, proceeding with deletion`);
+      
+      // Use a single batch for all operations to ensure atomicity
+      const batch = writeBatch(db);
+      
+      // Delete all comments for this post
+      const commentsRef = collection(db, 'comments');
+      const commentsQuery = query(commentsRef, where('postId', '==', postId));
+      const commentsSnapshot = await getDocs(commentsQuery);
+      
+      console.log(`🔍 Found ${commentsSnapshot.docs.length} comments to delete`);
+      commentsSnapshot.docs.forEach(commentDoc => {
+        batch.delete(commentDoc.ref);
+      });
+      
+      // Delete all likes for this post
+      const likesRef = collection(db, 'post_likes');
+      const likesQuery = query(likesRef, where('postId', '==', postId));
+      const likesSnapshot = await getDocs(likesQuery);
+      
+      console.log(`🔍 Found ${likesSnapshot.docs.length} likes to delete`);
+      likesSnapshot.docs.forEach(likeDoc => {
+        batch.delete(likeDoc.ref);
+      });
+
+      // Delete all dislikes for this post
+      const dislikesRef = collection(db, 'post_dislikes');
+      const dislikesQuery = query(dislikesRef, where('postId', '==', postId));
+      const dislikesSnapshot = await getDocs(dislikesQuery);
+      
+      console.log(`🔍 Found ${dislikesSnapshot.docs.length} dislikes to delete`);
+      dislikesSnapshot.docs.forEach(dislikeDoc => {
+        batch.delete(dislikeDoc.ref);
+      });
+      
+      // Delete the post
+      batch.delete(postRef);
+      
+      // Commit all operations in a single batch
+      await batch.commit();
+      
+      console.log('✅ Post and all associated data deleted successfully');
+    } catch (error: any) {
+      console.error('❌ Error deleting discussion post:', error);
+      console.error('❌ Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  static async deleteReply(replyId: string, userId: string, postId: string): Promise<void> {
+    try {
+      console.log(`🔍 Attempting to delete reply ${replyId} by user ${userId} from post ${postId}`);
+      
+      const replyRef = doc(db, 'comment_replies', replyId);
+      const replySnapshot = await getDoc(replyRef);
+      
+      if (!replySnapshot.exists()) {
+        throw new Error('Reply not found');
+      }
+      
+      const replyData = replySnapshot.data();
+      console.log(`🔍 Reply data:`, replyData);
+      
+      // Get post data to check if user is post owner
+      const postRef = doc(db, 'discussion_posts', postId);
+      const postDoc = await getDoc(postRef);
+      const postData = postDoc.data();
+      
+      if (!postData) {
+        throw new Error('Post not found');
+      }
+      
+      console.log(`🔍 Post data:`, postData);
+      console.log(`🔍 Checking permissions: reply owner: ${replyData.userId}, post owner: ${postData.userId}, current user: ${userId}`);
+      
+      // Check if user is the reply owner or post owner
+      if (replyData.userId !== userId && postData.userId !== userId) {
+        throw new Error('Only reply owner or post owner can delete this reply');
+      }
+      
+      console.log(`✅ Permission check passed, proceeding with deletion`);
+      
+      // Delete the reply
+      await deleteDoc(replyRef);
+      
+      console.log('✅ Reply deleted successfully');
+    } catch (error: any) {
+      console.error('❌ Error deleting reply:', error);
+      console.error('❌ Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  // Delete a comment (only by comment owner or post owner)
+  static async deleteComment(commentId: string, userId: string, postId: string): Promise<void> {
+    try {
+      console.log(`🔍 Attempting to delete comment ${commentId} by user ${userId} from post ${postId}`);
+      
+      const commentRef = doc(db, 'comments', commentId);
+      const commentSnapshot = await getDoc(commentRef);
+      
+      if (!commentSnapshot.exists()) {
+        throw new Error('Comment not found');
+      }
+      
+      const commentData = commentSnapshot.data();
+      console.log(`🔍 Comment data:`, commentData);
+      
+      // Get post data to check if user is post owner
+      const postRef = doc(db, 'discussion_posts', postId);
+      const postDoc = await getDoc(postRef);
+      const postData = postDoc.data();
+      
+      if (!postData) {
+        throw new Error('Post not found');
+      }
+      
+      console.log(`🔍 Post data:`, postData);
+      console.log(`🔍 Checking permissions: comment owner: ${commentData.userId}, post owner: ${postData.userId}, current user: ${userId}`);
+      
+      // Check if user is the comment owner or post owner
+      if (commentData.userId !== userId && postData.userId !== userId) {
+        throw new Error('Only comment owner or post owner can delete this comment');
+      }
+      
+      console.log(`✅ Permission check passed, proceeding with deletion`);
+      
+      // Use a batch to ensure atomic operations
+      const batch = writeBatch(db);
+      
+      // Delete the comment
+      batch.delete(commentRef);
+      
+      // Update post comment count
+      batch.update(postRef, {
+        commentsCount: increment(-1),
+        updatedAt: serverTimestamp()
+      });
+      
+      // Commit the batch
+      await batch.commit();
+      
+      console.log('✅ Comment deleted successfully');
+    } catch (error: any) {
+      console.error('❌ Error deleting comment:', error);
+      console.error('❌ Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
+      throw error;
     }
   }
 
@@ -1885,14 +2333,14 @@ export class FirebaseService {
             const userProfile = await this.getUserProfile(post.userId);
             return {
               ...post,
-              userName: userProfile?.display_name || 'Anonymous',
+              userName: userProfile?.display_name || 'User',
               interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
             };
           } catch (error) {
             console.error('Error enriching post:', error);
             return {
               ...post,
-              userName: 'Anonymous',
+              userName: 'User',
               interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
             };
           }
@@ -1958,7 +2406,7 @@ export class FirebaseService {
             const constituencyName = await this.getConstituencyName(post.constituency);
             return {
               ...post,
-              userName: userProfile?.display_name || 'Anonymous',
+              userName: userProfile?.display_name || 'User',
               constituencyName: constituencyName || `Constituency ${post.constituency}`,
               interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
             };
@@ -1966,7 +2414,7 @@ export class FirebaseService {
             console.error('Error enriching post:', error);
             return {
               ...post,
-              userName: 'Anonymous',
+              userName: 'User',
               constituencyName: `Constituency ${post.constituency}`,
               interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
             };

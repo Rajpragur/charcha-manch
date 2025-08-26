@@ -14,7 +14,8 @@ import {
   List, 
   ListOrdered,
   Trash2,
-  Plus
+  Plus,
+  Check
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import FirebaseService from '../services/firebaseService';
@@ -46,12 +47,15 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
   const [postContent, setPostContent] = useState('');
   const [selectedConstituency, setSelectedConstituency] = useState<number | null>(null);
   const [constituencies, setConstituencies] = useState<Constituency[]>([]);
+  const [constituencySearchQuery, setConstituencySearchQuery] = useState('');
+  const [showConstituencyDropdown, setShowConstituencyDropdown] = useState(false);
+  const [filteredConstituencies, setFilteredConstituencies] = useState<Constituency[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const constituencyInputRef = useRef<HTMLInputElement>(null);
 
   const content = {
     title: isEnglish ? 'Share Your Voice' : 'अपनी आवाज़ साझा करें',
@@ -81,18 +85,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
     guidelinesText: isEnglish ? 'Keep discussions respectful, constructive, and focused on local community issues.' : 'चर्चाओं को सम्मानजनक, रचनात्मक और स्थानीय समुदाय के मुद्दों पर केंद्रित रखें।'
   };
 
-  const fallbackConstituencies = [
-    { id: 1, name: 'Bhabua' },
-    { id: 2, name: 'Chainpur' },
-    { id: 3, name: 'Buxar' },
-    { id: 4, name: 'Dumraon' },
-    { id: 5, name: 'Rajpur' },
-    { id: 6, name: 'Ara' },
-    { id: 7, name: 'Jagdishpur' },
-    { id: 8, name: 'Shahpur' },
-    { id: 9, name: 'Barhara' },
-    { id: 10, name: 'Brahmpur' }
-  ];
+
 
   // Fetch constituencies on component mount
   useEffect(() => {
@@ -111,64 +104,89 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
           const userConstituency = constituencies.find(c => c.id === profile.constituency_id);
           if (userConstituency) {
             setSelectedConstituency(userConstituency.id);
+            setConstituencySearchQuery(userConstituency.name);
           }
         }
       });
     }
   }, [currentUser?.uid, constituencies]);
 
+
+
+  // Filter constituencies based on search query
+  useEffect(() => {
+    if (constituencySearchQuery.trim() === '') {
+      setFilteredConstituencies(constituencies);
+    } else {
+      const filtered = constituencies.filter(constituency =>
+        constituency.name.toLowerCase().includes(constituencySearchQuery.toLowerCase()) ||
+        (constituency.area_name && constituency.area_name.toLowerCase().includes(constituencySearchQuery.toLowerCase())) ||
+        (constituency.district && constituency.district.toLowerCase().includes(constituencySearchQuery.toLowerCase()))
+      );
+      setFilteredConstituencies(filtered);
+    }
+  }, [constituencySearchQuery, constituencies]);
+
+  // Handle constituency selection
+  const handleConstituencySelect = (constituency: Constituency) => {
+    setSelectedConstituency(constituency.id);
+    setConstituencySearchQuery(constituency.name);
+    setShowConstituencyDropdown(false);
+  };
+
+  // Handle constituency search input
+  const handleConstituencySearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setConstituencySearchQuery(query);
+    setShowConstituencyDropdown(true);
+    
+    if (query.trim() === '') {
+      setSelectedConstituency(null);
+    }
+  };
+
+  // Handle click outside dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (constituencyInputRef.current && !constituencyInputRef.current.contains(event.target as Node)) {
+        setShowConstituencyDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Handle keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      setShowConstituencyDropdown(false);
+      constituencyInputRef.current?.blur();
+    } else if (e.key === 'Enter' && filteredConstituencies.length === 1) {
+      // Auto-select if only one result
+      handleConstituencySelect(filteredConstituencies[0]);
+    }
+  };
+
+
+
   const fetchConstituencies = async () => {
     try {
-      setIsLoading(true);
+      // Use the new service method that loads from merged_candidates.json
+      const constituencies = await FirebaseService.getAllConstituencies();
       
-      // Try to fetch from database first
-      const dbConstituencies = await FirebaseService.getAllConstituencies();
-      
-      if (dbConstituencies.length > 0) {
-        setConstituencies(dbConstituencies);
-        console.log(`✅ Loaded ${dbConstituencies.length} constituencies from database`);
+      if (constituencies.length > 0) {
+        setConstituencies(constituencies);
+        console.log(`✅ Loaded ${constituencies.length} constituencies from merged_candidates.json`);
       } else {
-        // Fallback to candidates.json if database is empty
-        try {
-          const response = await fetch('/data/candidates_en.json');
-          if (response.ok) {
-            const candidatesData = await response.json();
-            
-            // Extract unique constituency names and create constituency objects
-            const constituencyMap = new Map();
-            candidatesData.forEach((candidate: any, index: number) => {
-              if (candidate.area_name && !constituencyMap.has(candidate.area_name)) {
-                constituencyMap.set(candidate.area_name, {
-                  id: index + 1,
-                  name: candidate.area_name,
-                  area_name: candidate.area_name,
-                  area_name_hi: candidate.area_name
-                });
-              }
-            });
-            
-            const constituenciesFromFile = Array.from(constituencyMap.values())
-              .sort((a, b) => a.name.localeCompare(b.name));
-            
-            if (constituenciesFromFile.length > 0) {
-              setConstituencies(constituenciesFromFile);
-              console.log(`✅ Loaded ${constituenciesFromFile.length} constituencies from candidates_en.json`);
-            } else {
-              setConstituencies(fallbackConstituencies);
-            }
-          } else {
-            setConstituencies(fallbackConstituencies);
-          }
-        } catch (error) {
-          console.error('Error fetching from candidates.json:', error);
-          setConstituencies(fallbackConstituencies);
-        }
+        console.warn('No constituencies found');
+        setConstituencies([]);
       }
     } catch (error) {
       console.error('Error fetching constituencies:', error);
-      setConstituencies(fallbackConstituencies);
-    } finally {
-      setIsLoading(false);
+      setConstituencies([]);
     }
   };
 
@@ -289,6 +307,9 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
       // Get constituency name
       const constituency = constituencies.find(c => c.id === selectedConstituency);
       const constituencyName = constituency?.name || constituency?.area_name || `Constituency ${selectedConstituency}`;
+      
+      // Get user's display name
+      const userName = currentUser.displayName || 'User';
 
       // Create the post first to get the ID
       const postData = {
@@ -297,6 +318,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
         constituency: selectedConstituency,
         constituencyName,
         userId: currentUser.uid,
+        userName,
         status: moderatedContent.status,
         createdAt: new Date(),
         likesCount: 0,
@@ -325,6 +347,8 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
       setTitle('');
       setPostContent('');
       setSelectedConstituency(null);
+      setConstituencySearchQuery('');
+      setShowConstituencyDropdown(false);
       setTags([]);
       setMediaFiles([]);
       
@@ -407,26 +431,88 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
               {content.constituency}
             </label>
             <div className="relative">
-              <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-              <select
+              {selectedConstituency ? (
+                <Check className="absolute left-4 top-1/2 transform -translate-y-1/2 text-green-500 h-5 w-5" />
+              ) : (
+                <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              )}
+              <input
+                ref={constituencyInputRef}
+                type="text"
                 id="constituency"
-                value={selectedConstituency || ''}
-                onChange={(e) => setSelectedConstituency(Number(e.target.value))}
-                className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 text-lg transition-all duration-200 appearance-none bg-white"
+                value={constituencySearchQuery}
+                onChange={handleConstituencySearch}
+                onFocus={() => setShowConstituencyDropdown(true)}
+                onKeyDown={handleKeyDown}
+                placeholder={content.selectConstituency}
+                className={`w-full pl-12 pr-4 py-4 border-2 rounded-xl focus:outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 text-lg transition-all duration-200 ${
+                  selectedConstituency 
+                    ? 'border-green-500 bg-green-50 text-green-900' 
+                    : 'border-gray-200 bg-white text-gray-900'
+                }`}
                 required
-              >
-                <option value="">{content.selectConstituency}</option>
-                {isLoading ? (
-                  <option disabled>{content.loading}</option>
-                ) : (
-                  constituencies.map(constituency => (
-                    <option key={constituency.id} value={constituency.id}>
-                      {constituency.name}
-                    </option>
-                  ))
-                )}
-              </select>
+              />
+              
+              {/* Clear button */}
+              {constituencySearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConstituencySearchQuery('');
+                    setSelectedConstituency(null);
+                    setShowConstituencyDropdown(false);
+                  }}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              )}
             </div>
+            
+            {/* Scrollable Constituency Dropdown */}
+            {showConstituencyDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-64 overflow-y-auto z-50">
+                <div className="p-2">
+                  {filteredConstituencies.length > 0 ? (
+                    filteredConstituencies.map(constituency => (
+                      <button
+                        key={constituency.id}
+                        type="button"
+                        onClick={() => handleConstituencySelect(constituency)}
+                        className="w-full text-left px-4 py-3 hover:bg-sky-50 rounded-lg transition-colors mb-1 last:mb-0"
+                      >
+                        <div className="font-medium text-gray-900">{constituency.name}</div>
+                        {constituency.district && (
+                          <div className="text-sm text-gray-500">{constituency.district}</div>
+                        )}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-3 text-gray-500 text-center">
+                      {isEnglish ? 'No constituencies found' : 'कोई निर्वाचन क्षेत्र नहीं मिला'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Help text */}
+            <div className="mt-2 text-sm text-gray-600">
+              {isEnglish 
+                ? 'Type to search for your constituency by name, area, or district' 
+                : 'अपने निर्वाचन क्षेत्र को नाम, क्षेत्र या जिले से खोजने के लिए टाइप करें'
+              }
+            </div>
+            
+            {/* Selected constituency confirmation */}
+            {selectedConstituency && (
+              <div className="mt-2 text-sm text-green-600 font-medium">
+                {isEnglish 
+                  ? '✓ Constituency selected successfully' 
+                  : '✓ निर्वाचन क्षेत्र सफलतापूर्वक चुना गया'
+                }
+              </div>
+            )}
           </div>
 
           {/* Tags */}

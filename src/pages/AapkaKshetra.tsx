@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import FirebaseService from '../services/firebaseService';
+import { House ,MapPin, MessageCircle } from 'lucide-react';
 
 interface CandidateData {
   area_name: string;
@@ -63,9 +64,13 @@ const AapkaKshetra: React.FC = () => {
   const [currentSatisfactionNo, setCurrentSatisfactionNo] = useState<number>(0);
 
   const translations = {
-    title: {
-      en: "Your Constituency",
-      hi: "आपका क्षेत्र"
+    titlefirst: {
+      en: "Your",
+      hi: "आपका"
+    },
+    titlesecond: {
+      en: "Constituency",
+      hi: "क्षेत्र"
     },
     selectConstituency: {
       en: "Select Your Constituency",
@@ -318,18 +323,15 @@ const AapkaKshetra: React.FC = () => {
         ...prev,
         [deptName]: rating
       }));
-      // Here you would typically send this to your backend
     }
   };
 
-  // Check if user already submitted questionnaire and load constituency scores
   useEffect(() => {
     const checkSubmission = async () => {
       if (!currentUser || !constituencyId) return;
       const submitted = await FirebaseService.hasSubmittedQuestionnaire(currentUser.uid, constituencyId);
       setHasSubmittedQuestionnaire(submitted);
       
-      // Fetch current constituency scores
       try {
         const constituencyScores = await FirebaseService.getConstituencyScores(constituencyId);
         if (constituencyScores) {
@@ -479,7 +481,7 @@ const AapkaKshetra: React.FC = () => {
   if (showCharchaManch) {
     return (
     currentUser && (
-      <div className="min-h-screen bg-slate-50 py-8">
+      <div className="min-h-screen bg-slate-50 py-8 pb-24 lg:pb-8">
         <div className="max-w-4xl mx-auto px-4">
           <div className="bg-white rounded-xl shadow-lg p-6 text-center border border-slate-200">
             <h1 className="text-2xl font-semibold text-slate-800 mb-2">{translations.charchaManch[isEnglish ? 'en' : 'hi']}</h1>
@@ -511,12 +513,12 @@ const AapkaKshetra: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8">
+    <div className="min-h-screen bg-slate-50 py-8 pb-24 lg:pb-8">
       <div className="max-w-7xl mx-auto px-4">
         {/* Header Section */}
         <div className="bg-white rounded-xl shadow-md border border-slate-200 p-8 mb-8">
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-slate-800 mb-3">{translations.title[isEnglish ? 'en' : 'hi']}</h1>
+            <h1 className="text-3xl font-bold text-[#004e5c] mb-3">{translations.titlefirst[isEnglish ? 'en' : 'hi']} <span className="text-[#dc3b21]">{translations.titlesecond[isEnglish ? 'en' : 'hi']}</span></h1>
             {!selectedConstituency && (
             <p className="text-lg text-slate-600 max-w-2xl mx-auto">
                 {isEnglish ? 'Select your constituency to view detailed information about your representative and their performance' : 'अपने प्रतिनिधि और उनके प्रदर्शन के बारे में विस्तृत जानकारी देखने के लिए अपना क्षेत्र चुनें'}
@@ -822,6 +824,33 @@ const AapkaKshetra: React.FC = () => {
             </div>
           </>
         )}
+      </div>
+
+      {/* Bottom Navigation - Mobile */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20 shadow-lg">
+        <div className="flex items-center justify-around py-3 px-2">
+          <button
+            onClick={() => window.location.href = '/'}
+            className="flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-gray-500 hover:text-[#014e5c]"
+          >
+            <House className="w-5 h-5 rounded" />
+            <span className="text-xs font-medium">{isEnglish ? 'Home' : 'होम'}</span>
+          </button>
+          <button
+            onClick={() => window.location.href = '/discussion'}
+            className="flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-gray-500 hover:text-[#014e5c]"
+          >
+            <MessageCircle className="w-5 h-5 rounded" />
+            <span className="text-xs font-medium">{isEnglish ? 'Discussion' : 'चर्चा'}</span>
+          </button>
+          <button
+            onClick={() => window.location.href = '/aapka-kshetra'}
+            className="flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-[#014e5c] bg-[#014e5c]/10"
+          >
+            <MapPin className="w-5 h-5 rounded" />
+            <span className="text-xs font-medium">{isEnglish ? 'Area' : 'क्षेत्र'}</span>
+          </button>
+        </div>
       </div>
     </div>
   );

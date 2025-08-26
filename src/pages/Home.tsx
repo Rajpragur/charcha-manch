@@ -1,19 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import FirebaseService from '../services/firebaseService';
 import CharchitVidhanSabha from '../components/CharchitVidhanSabha';
 import { 
   Search, 
-  MapPin, 
-  User, 
+  MapPin,
+  House,
   TrendingUp, 
   Users, 
   Calendar,
   MessageCircle,
   Star,
-  Database,
+  Database
 } from 'lucide-react';
 
 interface CandidateData {
@@ -954,9 +954,9 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 pb-24 lg:pb-0">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 text-white py-12 sm:py-16 px-4 w-full">
+      <div className="bg-[#273f4f] text-white py-12 sm:py-16 px-4 w-full">
         <div className="w-full max-w-none mx-auto">
           <div className="text-center">
             <div className="grid grid-cols-2 gap-6 md:gap-20 items-center mb-6 sm:mb-8">
@@ -1105,32 +1105,6 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
         </div>
       </div>
 
-      {/* Welcome Section for Authenticated Users */}
-      {currentUser && userProfile && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white">
-            <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-                <User className="h-8 w-8" />
-              </div>
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold mb-2">
-                  {isEnglish ? 'Welcome back!' : 'वापसी पर स्वागत है!'}
-                </h2>
-                <p className="text-blue-100">
-                  {isEnglish ? 'Continue your journey in democracy' : 'लोकतंत्र में अपनी यात्रा जारी रखें'}
-                </p>
-              </div>
-              <Link
-                to="/dashboard"
-                className="bg-white text-blue-600 px-3 sm:px-6 py-3 sm:py-2 max-[340px]:text-xs max-[330px]:text-[8px] rounded-lg font-medium hover:bg-blue-50 transition-colors"
-              >
-                {isEnglish ? 'Go to Dashboard' : 'डैशबोर्ड पर जाएं'}
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Nagrik Yogdan Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -1258,6 +1232,33 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
           refreshConstituencyData={refreshConstituencyData}
         />
       )}
+
+      {/* Bottom Navigation - Mobile */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20 shadow-lg">
+        <div className="flex items-center justify-around py-3 px-2">
+          <button
+            onClick={() => navigate('/')}
+            className="flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-[#014e5c] bg-[#014e5c]/10"
+          >
+            <House className="w-5 h-5" />
+            <span className="text-xs font-medium">{isEnglish ? 'Home' : 'होम'}</span>
+          </button>
+          <button
+            onClick={() => navigate('/discussion')}
+            className="flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-gray-500 hover:text-[#014e5c]"
+          >
+            <MessageCircle className="w-5 h-5" />
+            <span className="text-xs font-medium">{isEnglish ? 'Charcha Manch' : 'चर्चा मंच'}</span>
+          </button>
+          <button
+            onClick={() => navigate('/aapka-kshetra')}
+            className="flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-gray-500 hover:text-[#014e5c]"
+          >
+            <MapPin className="w-5 h-5" />
+            <span className="text-xs font-medium">{isEnglish ? 'Aapka Kshetra' : 'आपका क्षेत्र'}</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,17 +1,15 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
 
-// Firebase configuration - you'll need to replace this with your actual config
 const firebaseConfig = {
-  apiKey: "AIzaSyBvQvQvQvQvQvQvQvQvQvQvQvQvQvQvQvQ",
-  authDomain: "charchagramadmin.firebaseapp.com",
-  projectId: "charchagramadmin",
-  storageBucket: "charchagramadmin.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:abcdefghijklmnop"
+  apiKey: meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 

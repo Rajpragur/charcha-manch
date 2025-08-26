@@ -12,11 +12,6 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
     
-    // Allow authenticated users to read and write satisfaction surveys (alternative collection name)
-    match /satisfaction_surveys/{surveyId} {
-      allow read, write: if request.auth != null;
-    }
-    
     // Allow authenticated users to read and write constituency interactions
     match /constituency_interactions/{interactionId} {
       allow read, write: if request.auth != null;
@@ -26,11 +21,6 @@ service cloud.firestore {
     match /global_stats/{docId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null; // Temporarily allow write for setup
-    }
-    
-    // Allow authenticated users to read and write discussion posts
-    match /discussion_posts/{postId} {
-      allow read, write: if request.auth != null;
     }
     
     // Allow authenticated users to read and write referrals
@@ -72,17 +62,10 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
     
-
-    
     // Constituencies collection - allow public read access, authenticated write
     match /constituencies/{constituencyId} {
       allow read: if true; // Allow public read access
       allow write: if request.auth != null; // Only authenticated users can write
-    }
-    
-    // Constituency scores collection - allow all authenticated users to read, write for now
-    match /constituency_scores/{scoreId} {
-      allow read, write: if request.auth != null;
     }
     
     // Constituency news collection - allow all authenticated users to read, write for now
@@ -104,12 +87,11 @@ service cloud.firestore {
     match /discussion_posts/{postId} {
       allow read: if true; // Allow public read access
       allow create: if request.auth != null; // Only authenticated users can create
-      allow update: if request.auth != null && (
-        resource.data.userId == request.auth.uid || // Users can edit their own posts
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' // Admins can edit any post
+      allow update: if request.auth != null; // Allow all authenticated users to update (for like/dislike counts)
+      allow delete: if request.auth != null && (
+        resource.data.userId == request.auth.uid || // Users can delete their own posts
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' // Admins can delete any post
       );
-      allow delete: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; // Only admins can delete
     }
     
     // Comments collection - allow authenticated users to read and write comments
@@ -120,8 +102,10 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid || // Users can edit their own comments
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' // Admins can edit any comment
       );
-      allow delete: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; // Only admins can delete
+      allow delete: if request.auth != null && (
+        resource.data.userId == request.auth.uid || // Users can delete their own comments
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' // Admins can delete any comment
+      );
     }
     
     // Post likes collection - allow authenticated users to manage their likes
@@ -133,6 +117,15 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid; // Users can only manage their own likes
     }
     
+    // Post dislikes collection - allow authenticated users to manage their dislikes
+    match /post_dislikes/{dislikeId} {
+      allow read: if true; // Allow public read access
+      allow create: if request.auth != null && 
+        request.resource.data.userId == request.auth.uid; // Users can only create dislikes for themselves
+      allow update, delete: if request.auth != null && 
+        resource.data.userId == request.auth.uid; // Users can only manage their own dislikes
+    }
+    
     // Comment replies collection - allow authenticated users to read and write replies
     match /comment_replies/{replyId} {
       allow read: if true; // Allow public read access
@@ -141,8 +134,10 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid || // Users can edit their own replies
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' // Admins can edit any reply
       );
-      allow delete: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; // Only admins can delete
+      allow delete: if request.auth != null && (
+        resource.data.userId == request.auth.uid || // Users can delete their own replies
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' // Admins can delete any reply
+      );
     }
     
     // Allow public read access to published blogs for better SEO and sharing
@@ -153,12 +148,6 @@ service cloud.firestore {
     
     // Allow public read access to constituency data for better user experience
     match /constituency_scores/{scoreId} {
-      allow read: if true; // Allow public read access
-      allow write: if request.auth != null; // Only authenticated users can write
-    }
-    
-    // Allow public read access to global stats
-    match /global_stats/{docId} {
       allow read: if true; // Allow public read access
       allow write: if request.auth != null; // Only authenticated users can write
     }

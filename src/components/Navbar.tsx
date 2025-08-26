@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, User, ToggleRight, ToggleLeft, LogOut, Settings, LogIn, UserPlus, Shield } from "lucide-react";
+import { Menu, X, User, ToggleRight, ToggleLeft, LogOut, Settings, LogIn, UserPlus, Shield, CircleUserRound } from "lucide-react";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
 import { useAdmin } from "../contexts/AdminContext";
@@ -96,13 +96,7 @@ const Navbar: React.FC = () => {
                 onClick={() => setShowProfile((prev) => !prev)}
                 className="p-1.5 sm:p-2 rounded-full hover:text-blue-600 transition-colors"
               >
-                {currentUser ? (
-                  <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-sky-500 to-blue-600 flex items-center justify-center text-white text-xs font-semibold">
-                    {currentUser.email?.charAt(0).toUpperCase() || 'U'}
-                  </div>
-                ) : (
-                  <User className="h-4 w-4 max-[340px]:h-3 sm:h-6 sm:w-6 text-gray-700" />
-                )}
+              <CircleUserRound className="h-6 w-6 max-[340px]:h-3 sm:h-6 sm:w-6 text-gray-700" />
               </button>
               {showProfile && (
                 <div className="absolute right-0 mt-3 w-56 bg-white border border-gray-200 rounded-xl shadow-xl py-3 z-50 backdrop-blur-sm bg-white/95">

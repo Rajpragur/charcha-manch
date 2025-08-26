@@ -13,14 +13,17 @@ import {
   Share2,
   MessageSquare,
   Calendar,
-  Hash
+  Hash,
+  ThumbsDown,
+  Home
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import FirebaseService from '../services/firebaseService';
 
 interface DiscussionPost {
   id: string;
-  title: string;
+  titlefirst: string;
+  titlesecond: string;
   content: string;
   constituency: number;
   constituencyName: string;
@@ -71,7 +74,7 @@ const PostDetail: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
-  const [userReaction, setUserReaction] = useState<{ liked: boolean }>({ liked: false });
+  const [userReaction, setUserReaction] = useState<{ liked: boolean; disliked: boolean }>({ liked: false, disliked: false });
   const [replies, setReplies] = useState<{ [commentId: string]: Reply[] }>({});
   const [replyText, setReplyText] = useState<{ [commentId: string]: string }>({});
   const [isSubmittingReply, setIsSubmittingReply] = useState<{ [commentId: string]: boolean }>({});
@@ -91,7 +94,11 @@ const PostDetail: React.FC = () => {
     comments: isEnglish ? 'Comments' : 'टिप्पणियां',
     signInToComment: isEnglish ? 'Please sign in to comment' : 'टिप्पणी करने के लिए साइन इन करें',
     signInToLike: isEnglish ? 'Please sign in to like posts' : 'पोस्ट को लाइक करने के लिए साइन इन करें',
-    signInToDislike: isEnglish ? 'Please sign in to dislike posts' : 'पोस्ट को डिसलाइक करने के लिए साइन इन करें'
+    signInToDislike: isEnglish ? 'Please sign in to dislike posts' : 'पोस्ट को डिसलाइक करने के लिए साइन इन करें',
+    delete: isEnglish ? 'Delete' : 'हटाएं',
+    deleteCommentConfirm: isEnglish ? 'Are you sure you want to delete this comment? This action cannot be undone.' : 'क्या आप वाकई इस टिप्पणी को हटाना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।',
+    commentDeleted: isEnglish ? 'Comment deleted successfully' : 'टिप्पणी सफलतापूर्वक हटा दी गई',
+    deleteCommentFailed: isEnglish ? 'Failed to delete comment' : 'टिप्पणी हटाने में विफल'
   };
 
   useEffect(() => {
@@ -122,7 +129,8 @@ const PostDetail: React.FC = () => {
       // Check user reaction if logged in
       if (currentUser?.uid) {
         const hasLiked = await FirebaseService.hasUserLikedPost(postId!, currentUser.uid);
-        setUserReaction({ liked: hasLiked });
+        const hasDisliked = await FirebaseService.hasUserDislikedPost(postId!, currentUser.uid);
+        setUserReaction({ liked: hasLiked, disliked: hasDisliked });
       }
       
       // Fetch replies for all comments
@@ -158,7 +166,7 @@ const PostDetail: React.FC = () => {
       
       await FirebaseService.addComment(postId!, {
         userId: currentUser.uid,
-        userName: currentUser.displayName || 'Anonymous',
+        userName: currentUser.displayName || 'User',
         content: commentContent,
         constituencyName: post?.constituencyName || 'Unknown'
       });
@@ -195,7 +203,7 @@ const PostDetail: React.FC = () => {
       await FirebaseService.likePost(postId!, currentUser.uid);
       
       // Update local state
-      setUserReaction(prev => ({ ...prev, liked: !prev.liked }));
+      setUserReaction(prev => ({ ...prev, liked: !prev.liked, disliked: false }));
       setPost(prev => prev ? {
         ...prev,
         likesCount: prev.likesCount + (prev.likesCount ? -1 : 1)
@@ -205,6 +213,29 @@ const PostDetail: React.FC = () => {
     } catch (error) {
       console.error('Error updating like:', error);
       toast.error('Failed to update like');
+    }
+  };
+
+  const handleDislike = async () => {
+    if (!currentUser?.uid) {
+      toast.error(content.signInToLike);
+      return;
+    }
+
+    try {
+      await FirebaseService.dislikePost(postId!, currentUser.uid);
+      
+      // Update local state
+      setUserReaction(prev => ({ ...prev, disliked: !prev.disliked, liked: false }));
+      setPost(prev => prev ? {
+        ...prev,
+        dislikesCount: prev.dislikesCount + (prev.dislikesCount ? -1 : 1)
+      } : null);
+      
+      toast.success(userReaction.disliked ? 'Post undisliked' : 'Post disliked!');
+    } catch (error) {
+      console.error('Error updating dislike:', error);
+      toast.error('Failed to update dislike');
     }
   };
 
@@ -239,7 +270,7 @@ const PostDetail: React.FC = () => {
       
       await FirebaseService.addReply(commentId, {
         userId: currentUser.uid,
-        userName: currentUser.displayName || 'Anonymous',
+        userName: currentUser.displayName || 'User',
         content: replyContent,
         constituencyName: post?.constituencyName || 'Unknown',
         parentCommentId: commentId
@@ -263,6 +294,59 @@ const PostDetail: React.FC = () => {
 
   const toggleReplyInput = (commentId: string) => {
     setShowReplyInput(prev => ({ ...prev, [commentId]: !prev[commentId] }));
+  };
+
+  // Handle comment deletion
+  const handleDeleteComment = async (commentId: string) => {
+    if (!currentUser?.uid) {
+      toast.error('Please sign in to delete comments');
+      return;
+    }
+
+    if (window.confirm(content.deleteCommentConfirm)) {
+      try {
+        await FirebaseService.deleteComment(commentId, currentUser.uid, postId!);
+        toast.success(content.commentDeleted);
+        
+        // Refresh comments
+        const fetchedComments = await FirebaseService.getComments(postId!);
+        setComments(fetchedComments);
+        
+        // Refresh post to update comment count
+        const posts = await FirebaseService.getDiscussionPosts();
+        const updatedPost = posts.find(p => p.id === postId);
+        if (updatedPost) {
+          setPost(updatedPost);
+        }
+        
+
+      } catch (error: any) {
+        console.error('Error deleting comment:', error);
+        toast.error(error.message || content.deleteCommentFailed);
+      }
+    }
+  };
+
+  // Handle reply deletion
+  const handleDeleteReply = async (replyId: string) => {
+    if (!currentUser?.uid) {
+      toast.error('Please sign in to delete replies');
+      return;
+    }
+
+    if (window.confirm('Are you sure you want to delete this reply? This action cannot be undone.')) {
+      try {
+        await FirebaseService.deleteReply(replyId, currentUser.uid, postId!);
+        toast.success('Reply deleted successfully');
+        
+        // Refresh replies for this comment
+        const commentReplies = await FirebaseService.getReplies(replyId.split('_')[0]); // Get parent comment ID
+        setReplies(prev => ({ ...prev, [replyId.split('_')[0]]: commentReplies }));
+      } catch (error: any) {
+        console.error('Error deleting reply:', error);
+        toast.error(error.message || 'Failed to delete reply');
+      }
+    }
   };
 
   if (isLoading) {
@@ -295,10 +379,27 @@ const PostDetail: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-20">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center space-x-4">
+      {/* Desktop Header */}
+      <div className="hidden lg:block bg-white border-b border-gray-200 sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => navigate('/discussion')}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <h1 className="text-lg font-semibold text-gray-900">{content.backToForum}</h1>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Header */}
+      <div className="lg:hidden bg-white border-b border-gray-200 sticky top-0 z-20">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between">
             <button
               onClick={() => navigate('/discussion')}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -306,11 +407,15 @@ const PostDetail: React.FC = () => {
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </button>
             <h1 className="text-lg font-semibold text-gray-900">{content.backToForum}</h1>
+            <div className="w-10"></div> {/* Spacer for centering */}
           </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      {/* Gap for mobile */}
+      <div className="lg:hidden h-4 bg-[#c1cad1]"></div>
+
+      <div className="max-w-7xl mx-auto px-6 py-6 pb-24 lg:pb-6">
         {/* Post Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -331,7 +436,7 @@ const PostDetail: React.FC = () => {
                     <User className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-lg">{post.userName || 'Anonymous'}</h3>
+                    <h3 className="font-semibold text-gray-900 text-lg">{post.userName || 'User'}</h3>
                     <div className="flex items-center space-x-2 text-sm text-gray-500">
                       <MapPin className="h-4 w-4" />
                       <span>{post.constituencyName || `Constituency ${post.constituency}`}</span>
@@ -353,9 +458,20 @@ const PostDetail: React.FC = () => {
 
               {/* Post Content */}
               <div className="mb-6">
-                <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">
-                  {post.title}
+                {/* Poster Name - Above Title */}
+                <div className="mb-3">
+                  <span className="text-sm text-gray-600">
+                    {isEnglish ? 'Posted by ' : 'द्वारा पोस्ट किया गया '}
+                    <span className="font-semibold text-[#014e5c]">{post.userName || 'User'}</span>
+                  </span>
+                </div>
+                
+                {/* Post Title - More Prominent */}
+                <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4 leading-tight">
+                  {post.titlefirst} {post.titlesecond}
                 </h1>
+                
+                {/* Post Content */}
                 <p className="text-gray-700 leading-relaxed text-lg mb-4">{post.content}</p>
                 
                 {/* Tags */}
@@ -379,14 +495,32 @@ const PostDetail: React.FC = () => {
                 <div className="flex items-center space-x-6">
                   <button 
                     onClick={handleLike}
+                    disabled={userReaction.disliked}
                     className={`flex items-center space-x-2 p-2 rounded-lg transition-colors ${
                       userReaction.liked 
                         ? 'text-red-500 bg-red-50' 
+                        : userReaction.disliked
+                        ? 'text-gray-300 cursor-not-allowed'
                         : 'text-gray-500 hover:text-red-500 hover:bg-red-50'
                     }`}
                   >
                     <Heart className={`h-5 w-5 ${userReaction.liked ? 'fill-current' : ''}`} />
                     <span className="text-sm font-medium">{post.likesCount || 0}</span>
+                  </button>
+
+                  <button 
+                    onClick={handleDislike}
+                    disabled={userReaction.liked}
+                    className={`flex items-center space-x-2 p-2 rounded-lg transition-colors ${
+                      userReaction.disliked 
+                        ? 'text-blue-500 bg-blue-50' 
+                        : userReaction.liked
+                        ? 'text-gray-300 cursor-not-allowed'
+                        : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50'
+                    }`}
+                  >
+                    <ThumbsDown className={`h-5 w-5 ${userReaction.disliked ? 'fill-current' : ''}`} />
+                    <span className="text-sm font-medium">{post.dislikesCount || 0}</span>
                   </button>
 
                   <button className="flex items-center space-x-2 text-gray-500 hover:text-green-500 hover:bg-green-50 p-2 rounded-lg transition-colors">
@@ -471,13 +605,25 @@ const PostDetail: React.FC = () => {
                           </div>
                           <p className="text-gray-700 mb-3">{comment.content}</p>
                           
-                          {/* Reply Button */}
-                          <button
-                            onClick={() => toggleReplyInput(comment.id)}
-                            className="text-sm text-green-600 hover:text-green-700 font-medium"
-                          >
-                            {content.reply}
-                          </button>
+                          <div className="flex items-center space-x-3">
+                            {/* Reply Button */}
+                            <button
+                              onClick={() => toggleReplyInput(comment.id)}
+                              className="text-sm text-green-600 hover:text-green-700 font-medium"
+                            >
+                              {content.reply}
+                            </button>
+                            
+                            {/* Delete Button (only show for comment owner or post owner) */}
+                            {(currentUser?.uid === comment.userId || currentUser?.uid === post?.userId) && (
+                              <button
+                                onClick={() => handleDeleteComment(comment.id)}
+                                className="text-sm text-red-600 hover:text-red-700 font-medium"
+                              >
+                                {content.delete}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -524,7 +670,17 @@ const PostDetail: React.FC = () => {
                                   <span>•</span>
                                   <span>{reply.constituencyName}</span>
                                 </div>
-                                <p className="text-gray-700 text-sm">{reply.content}</p>
+                                <p className="text-gray-700 text-sm mb-2">{reply.content}</p>
+                                
+                                {/* Delete Button for replies (only show for reply owner or post owner) */}
+                                {(currentUser?.uid === reply.userId || currentUser?.uid === post?.userId) && (
+                                  <button
+                                    onClick={() => handleDeleteReply(reply.id)}
+                                    className="text-sm text-red-600 hover:text-red-700 font-medium"
+                                  >
+                                    {content.delete}
+                                  </button>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -536,6 +692,33 @@ const PostDetail: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Bottom Navigation - Mobile */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20 shadow-lg">
+        <div className="flex items-center justify-around py-3 px-2">
+          <button
+            onClick={() => navigate('/')}
+            className="flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-gray-500 hover:text-[#014e5c]"
+          >
+            <Home className="w-5 h-5" />
+            <span className="text-xs font-medium">{isEnglish ? 'Home' : 'होम'}</span>
+          </button>
+          <button
+            onClick={() => navigate('/discussion')}
+            className="flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-[#014e5c] bg-[#014e5c]/10"
+          >
+            <MessageSquare className="w-5 h-5" />
+            <span className="text-xs font-medium">{isEnglish ? 'Discussion' : 'चर्चा'}</span>
+          </button>
+          <button
+            onClick={() => navigate('/aapka-kshetra')}
+            className="flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-gray-500 hover:text-[#014e5c]"
+          >
+            <MapPin className="w-5 h-5" />
+            <span className="text-xs font-medium">{isEnglish ? 'Area' : 'क्षेत्र'}</span>
+          </button>
         </div>
       </div>
     </div>
