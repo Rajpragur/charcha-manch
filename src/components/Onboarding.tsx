@@ -195,80 +195,78 @@ const Onboarding: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-8">
+    <div className="min-h-screen bg-[#9ca8b4] flex items-center justify-center p-2 lg:p-4">
+      <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-4 lg:p-8">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <User className="h-8 w-8 text-white" />
+        <div className="text-center mb-4 lg:mb-8">
+          <div className="w-8 h-8 lg:w-16 lg:h-16 bg-[#014e5c] rounded-full flex items-center justify-center mx-auto mb-4">
+            <User className="h-4 w-4 lg:h-8 lg:w-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-lg lg:text-3xl font-bold text-gray-900 mb-2">
             {isEnglish ? 'Welcome to Charcha Manch!' : 'चर्चा मंच में आपका स्वागत है!'}
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 text-xs lg:text-sm">
             {isEnglish ? 'Let\'s get to know you better' : 'आइए आपको बेहतर तरीके से जानें'}
           </p>
-          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-700">
+          <div className="mt-3 p-2 lg:p-3 bg-[#d3dae0] border border-blue-200 rounded-lg">
+            <p className="text-xs lg:text-base text-black">
               {isEnglish ? 'Setting your constituency is required to access the portal' : 'पोर्टल का उपयोग करने के लिए अपना क्षेत्र सेट करना आवश्यक है'}
             </p>
           </div>
         </div>
 
         {/* Progress Bar */}
-        <div className="mb-8">
+        <div className="mb-4 lg:mb-8">
           <div className="flex items-center justify-between mb-2">
             {[1, 2, 3].map((stepNumber) => (
               <div
                 key={stepNumber}
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                className={`w-6 h-6 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-xs lg:text-sm font-medium ${
                   step >= stepNumber
-                    ? 'bg-green-500 text-white'
+                    ? 'bg-[#014e5c] text-white'
                     : 'bg-gray-200 text-gray-600'
                 }`}
               >
-                {step > stepNumber ? <CheckCircle className="h-5 w-5" /> : stepNumber}
+                {step > stepNumber ? <CheckCircle className="h-4 w-4 lg:h-5 lg:w-5" /> : stepNumber}
               </div>
             ))}
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div
-              className="bg-green-500 h-2 rounded-full transition-all duration-300"
+              className="bg-[#014e5c] h-2 rounded-full transition-all duration-300"
               style={{ width: `${(step / 3) * 100}%` }}
             />
           </div>
         </div>
-
         {/* Step Content */}
-        <div className="mb-8">
+        <div className="mb-4 lg:mb-8">
           {step === 1 && (
             <div className="space-y-6">
               <div className="text-center">
-                <MapPin className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                <MapPin className="h-7 w-7 lg:h-12 lg:w-12 text-[#014e5c] mx-auto mb-4" />
+                <h2 className="text-sm lg:text-2xl font-semibold text-gray-900 mb-2">
                   {isEnglish ? 'Select Your Constituency' : 'अपना निर्वाचन क्षेत्र चुनें'}
                 </h2>
-                <p className="text-gray-600">
+                <p className="text-gray-600 text-xs lg:text-base">
                   {isEnglish ? 'Choose the constituency where you vote' : 'वह निर्वाचन क्षेत्र चुनें जहां आप वोट करते हैं'}
                 </p>
               </div>
-
-              <div className="max-h-96 overflow-y-auto">
-                <div className="grid grid-cols-1 gap-3">
+              <div className="max-h-60 lg:max-h-150 overflow-y-auto">
+                <div className="grid grid-cols-1 gap-2 lg:gap-3">
                   {constituencies.map((constituency) => (
                     <button
                       key={constituency.id}
                       onClick={() => handleConstituencySelect(constituency.id)}
-                      className={`p-4 text-left rounded-lg border-2 transition-all duration-200 ${
+                      className={`p-2 lg:p-4 text-left rounded-lg border-2 transition-all duration-200 ${
                         selectedConstituency === constituency.id
-                          ? 'border-green-500 bg-green-50'
+                          ? 'border-[#014e5c]/50 bg-[#014e5c]/90'
                           : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
                       }`}
                     >
-                      <div className="font-medium text-gray-900">
+                      <div className={`font-medium text-xs lg:text-base ${selectedConstituency === constituency.id ?'text-white' : 'text-black'}`}>
                         {constituency.area_name}
                       </div>
-                      <div className="text-sm text-gray-600">
+                      <div className={`text-xs lg:text-sm ${selectedConstituency === constituency.id ?'text-white' : 'text-black'}`}>
                         {constituency.district} • Bihar
                       </div>
                     </button>
@@ -277,24 +275,22 @@ const Onboarding: React.FC = () => {
               </div>
             </div>
           )}
-
           {step === 2 && (
             <div className="space-y-6">
               <div className="text-center">
-                <Calendar className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                <Calendar className="h-7 w-7 lg:h-12 lg:w-12 text-[#014e5c] mx-auto mb-4" />
+                <h2 className="text-sm lg:text-2xl font-semibold text-gray-900 mb-2">
                   {isEnglish ? 'When Did You First Vote?' : 'आपने पहली बार कब वोट किया?'}
                 </h2>
-                <p className="text-gray-600">
+                <p className="text-gray-600 text-xs lg:text-base">
                   {isEnglish ? 'This helps us understand your voting experience' : 'यह हमें आपके मतदान अनुभव को समझने में मदद करता है'}
                 </p>
               </div>
-
               <div className="max-w-md mx-auto">
                 <select
                   value={firstVoteYear || ''}
                   onChange={(e) => handleFirstVoteYearChange(e.target.value)}
-                  className="w-full p-4 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none text-lg"
+                  className="w-full p-2 lg:p-4 border-2 border-gray-200 rounded-lg focus:outline-none text-sm lg:text-base"
                 >
                   <option value="">
                     {isEnglish ? 'Select year...' : 'वर्ष चुनें...'}
@@ -308,8 +304,8 @@ const Onboarding: React.FC = () => {
               </div>
 
               {firstVoteYear && (
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <p className="text-green-800 font-medium">
+                <div className="text-center p-2 lg:p-4 bg-[#014e5c] rounded-lg">
+                  <p className="text-white font-medium text-xs lg:text-base">
                     {isEnglish 
                       ? `You first voted in ${firstVoteYear}`
                       : `आपने पहली बार ${firstVoteYear} में वोट किया`
@@ -323,18 +319,18 @@ const Onboarding: React.FC = () => {
           {step === 3 && (
             <div className="space-y-6">
               <div className="text-center">
-                <User className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                <User className="h-7 w-7 lg:h-12 lg:w-12 text-[#014e5c] mx-auto mb-4" />
+                <h2 className="text-sm lg:text-2xl font-semibold text-gray-900 mb-2">
                   {isEnglish ? 'Tell Us About Yourself' : 'हमें अपने बारे में बताएं'}
                 </h2>
-                <p className="text-gray-600">
+                <p className="text-gray-600 text-xs lg:text-base">
                   {isEnglish ? 'This information is optional but helps personalize your experience' : 'यह जानकारी वैकल्पिक है लेकिन आपके अनुभव को व्यक्तिगत बनाने में मदद करती है'}
                 </p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1 lg:mb-2">
                     {isEnglish ? 'Display Name' : 'प्रदर्शन नाम'}
                   </label>
                   <input
@@ -342,12 +338,12 @@ const Onboarding: React.FC = () => {
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder={isEnglish ? 'Enter your display name' : 'अपना प्रदर्शन नाम दर्ज करें'}
-                    className="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none"
+                    className="w-full p-2 lg:p-3 border-2 border-gray-200 rounded-3xl focus:border-[#014e5c] focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1 lg:mb-2">
                     {isEnglish ? 'Bio' : 'जीवनी'}
                   </label>
                   <textarea
@@ -355,7 +351,7 @@ const Onboarding: React.FC = () => {
                     onChange={(e) => setBio(e.target.value)}
                     placeholder={isEnglish ? 'Tell us about yourself...' : 'हमें अपने बारे में बताएं...'}
                     rows={3}
-                    className="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none resize-none"
+                    className="w-full p-2 lg:p-3 border-2 border-gray-200 rounded-3xl focus:border-[#014e5c] focus:outline-none resize-none"
                   />
                 </div>
               </div>
@@ -374,7 +370,7 @@ const Onboarding: React.FC = () => {
         {message && (
           <div className={`mb-6 p-4 rounded-lg border ${
             messageType === 'success' 
-              ? 'bg-green-50 text-green-800 border-green-200' 
+              ? 'bg-[#014e5c] text-white border-[#014e5c]' 
               : 'bg-blue-50 text-blue-800 border-blue-200'
           }`}>
             <p className="text-sm">{message}</p>
@@ -386,7 +382,7 @@ const Onboarding: React.FC = () => {
           <button
             onClick={handlePrevious}
             disabled={step === 1}
-            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+            className={`px-6 py-3 rounded-lg font-medium transition-colors text-xs lg:text-base ${
               step === 1
                 ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -400,7 +396,7 @@ const Onboarding: React.FC = () => {
               <button
                 onClick={handleSkipProfile}
                 disabled={isLoading}
-                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors"
+                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors text-xs lg:text-base"
               >
                 {isEnglish ? 'Skip' : 'छोड़ें'}
               </button>
@@ -409,7 +405,7 @@ const Onboarding: React.FC = () => {
             <button
               onClick={handleNext}
               disabled={!canProceedToNext() || isLoading}
-              className="px-6 py-3 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              className="px-6 py-3 bg-[#014e5c] text-white rounded-lg font-medium hover:bg-[#014e5c]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
               {isLoading ? (
                 <>
@@ -418,7 +414,7 @@ const Onboarding: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <span>
+                  <span className="text-xs lg:text-base">
                     {step === 3 
                       ? (isEnglish ? 'Complete' : 'पूरा करें')
                       : (isEnglish ? 'Next' : 'अगला')

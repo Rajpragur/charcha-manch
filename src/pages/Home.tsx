@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -65,6 +65,18 @@ interface CandidateData {
   }>;
 }
 
+interface UserProfile {
+  id: string;
+  display_name: string;
+  bio: string;
+  first_vote_year?: number | null;
+  referral_code: string;
+  level: string;
+  participation_score: number;
+  tier_level: number; // 0, 1, 2, 3, 4
+  constituency_id?: number;
+}
+
 interface ConstituencyData {
   id: string;
   profileImage: string | undefined;
@@ -105,13 +117,13 @@ const Home: React.FC = () => {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedParty, setSelectedParty] = useState<string>('all');
+  const [selectedParty, ] = useState<string>('all');
   const [constituencies, setConstituencies] = useState<ConstituencyData[]>([]);
-  const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
+  const [, setGlobalStats] = useState<GlobalStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitializing, setIsInitializing] = useState(false);
 
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userAchievements, setUserAchievements] = useState<any>(null);
   const [, setEnglishData] = useState<CandidateData[]>([]);
   const [, setHindiData] = useState<CandidateData[]>([]);
@@ -120,7 +132,23 @@ const Home: React.FC = () => {
 
   const [visibleCount, setVisibleCount] = useState(3); // Show 3 initially, then load 12 more each time
 
-  // Popup state
+  // Ref for dropdown to handle click outside
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Handle click outside dropdown to close it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   const [popup, setPopup] = useState<{
     isOpen: boolean;
     title: string;
@@ -547,25 +575,55 @@ const Home: React.FC = () => {
       
       const profile = await FirebaseService.getUserProfile(currentUser.uid);
       if (profile) {
+        // Calculate current engagement score based on achievements
+        const { surveys } = await FirebaseService.loadUserInteractions(currentUser.uid);
+        const posts = await FirebaseService.getUserPosts(currentUser.uid);
+        const referrals = await FirebaseService.getUserReferrals(currentUser.uid);
+        
+        // Calculate engagement score: surveys (5 points each) + posts (10 points each) + referrals (15 points each)
+        const engagementScore = (surveys.length * 5) + (posts.length * 10) + (referrals.length * 15);
+        
+        // Update user tier in database if score has changed
+        if (profile.engagement_score !== engagementScore) {
+          await FirebaseService.updateUserTier(currentUser.uid, engagementScore);
+        }
+        
+        // Get updated profile with new tier
+        const updatedProfile = await FirebaseService.getUserProfile(currentUser.uid);
+        const currentTier = updatedProfile?.tier_level || 1;
+        
         setUserProfile({
           id: profile.id,
           display_name: profile.display_name || currentUser?.displayName || 'User',
           bio: profile.bio || 'Active member of Charcha Manch',
           first_vote_year: profile.first_vote_year,
           referral_code: profile.referral_code || 'CHM' + Math.random().toString(36).substr(2, 6).toUpperCase(),
-          level: 'Tier 1', // Everyone starts at Tier 1
-          participation_score: profile.engagement_score || 0
+          level: `Tier ${currentTier}`,
+          participation_score: engagementScore,
+          tier_level: currentTier
         });
       } else {
         // No profile data, create basic info
+        const engagementScore = 0;
+        const tierLevel = 0; // Start at tier 0
+        
+        // Create user profile in database
+        await FirebaseService.createUserProfile(currentUser.uid, {
+          display_name: currentUser?.displayName || 'User',
+          bio: 'Active member of Charcha Manch',
+          tier_level: tierLevel,
+          engagement_score: engagementScore
+        });
+        
         setUserProfile({
           id: currentUser?.uid || 'mock-user',
           display_name: currentUser?.displayName || 'User',
           bio: 'Active member of Charcha Manch',
           first_vote_year: null,
           referral_code: 'CHM' + Math.random().toString(36).substr(2, 6).toUpperCase(),
-          level: 'Tier 1', // Everyone starts at Tier 1
-          participation_score: 0
+          level: `Tier ${tierLevel}`,
+          participation_score: engagementScore,
+          tier_level: tierLevel
         });
       }
     } catch (err) {
@@ -577,8 +635,9 @@ const Home: React.FC = () => {
         bio: 'Active member of Charcha Manch',
         first_vote_year: null,
         referral_code: 'CHM' + Math.random().toString(36).substr(2, 6).toUpperCase(),
-        level: 'Tier 1', // Everyone starts at Tier 1
-        participation_score: 0
+        level: 'Tier 0',
+        participation_score: 0,
+        tier_level: 0
       });
     }
   };
@@ -664,7 +723,6 @@ const Home: React.FC = () => {
     const query = e.target.value;
     setSearchQuery(query);
     setShowDropdown(true);
-    
   };
 
   // Handle constituency selection from dropdown
@@ -954,9 +1012,9 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 pb-24 lg:pb-0">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 pb-20 lg:pb-0">
       {/* Hero Section */}
-      <div className="bg-[#273f4f] text-white py-12 sm:py-16 px-4 w-full">
+      <div className="bg-[#273f4f] text-white py-5 sm:py-16 px-4 w-full">
         <div className="w-full max-w-none mx-auto">
           <div className="text-center">
             <div className="grid grid-cols-2 gap-6 md:gap-20 items-center mb-6 sm:mb-8">
@@ -968,12 +1026,12 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
                 />
               </div>
               <div className="text-center">
-                <h1 className="text-3xl max-[340px]:text-2xl sm:text-4xl md:text-6xl font-bold leading-tight text-left">{isEnglish ? 'Your Electoral' : 'जनता का'}</h1>
-                <h1 className="text-3xl max-[340px]:text-2xl sm:text-4xl md:text-6xl font-bold leading-tight text-left">{isEnglish ? '' : 'चुनावी'} <span className="text-red-400">{isEnglish ? 'Companion' : 'साथी'}</span></h1>
+                <h1 className="text-3xl max-[340px]:text-2xl sm:text-4xl md:text-6xl font-light leading-tight text-left">{isEnglish ? 'Your Electoral' : 'जनता का'}</h1>
+                <h1 className="text-3xl max-[340px]:text-2xl sm:text-4xl md:text-6xl font-light leading-tight text-left">{isEnglish ? '' : 'चुनावी'} <span className="text-red-400">{isEnglish ? 'Companion' : 'साथी'}</span></h1>
               </div>
               <div className="text-center">
-                <p className="text-base max-[400px]:text-xs max-[330px]:text-[8px] sm:text-lg md:text-xl font-medium text-right">{isEnglish ? 'Who has done what work' : 'किसने किया है कैसा काम'}</p>
-                <p className="text-base max-[400px]:text-xs max-[330px]:text-[8px] sm:text-lg md:text-xl font-medium text-right">{isEnglish ? 'Let\'s discuss' : 'आओ करें चर्चाग्राम'}</p>
+                <p className="text-base max-[400px]:text-sm max-[330px]:text-[8px] sm:text-lg md:text-xl font-bold text-right">{isEnglish ? 'Who has done what work' : 'किसने किया है कैसा काम'}</p>
+                <p className="text-base max-[400px]:text-sm max-[330px]:text-[8px] sm:text-lg md:text-xl font-bold text-right">{isEnglish ? 'Let\'s discuss' : 'आओ करें चर्चाग्राम'}</p>
               </div>
               <div className="flex justify-left">
                 <img 
@@ -986,7 +1044,7 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
             
             
             {/* Enhanced Search Dropdown */}
-            <div className="relative max-w-lg sm:max-w-lg mx-auto">
+            <div className="relative max-w-lg sm:max-w-lg mx-auto" ref={dropdownRef}>
               <div className="flex">
                 <div className="relative flex-1">
                   <input
@@ -996,12 +1054,12 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
                     onChange={handleSearchChange}
                     onFocus={() => setShowDropdown(true)}
                     onClick={() => setShowDropdown(true)}
-                    className="w-full px-3 sm:px-4 py-2 sm:py-3 rounded-l-lg text-slate-900 bg-white border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm sm:text-base placeholder-slate-500 cursor-pointer"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 rounded-l-lg text-slate-900 bg-white border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#273f4f] text-sm sm:text-base placeholder-slate-500 cursor-pointer"
                   />
                   <MapPin className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                 </div>
                 <button 
-                  className="bg-green-600 hover:bg-green-700 px-4 sm:px-6 py-2 sm:py-3 rounded-r-lg transition-colors border border-green-600 hover:border-green-700"
+                  className="bg-[#014e5c] hover:bg-[#014e5c]/80 px-4 sm:px-6 py-2 sm:py-3 rounded-r-lg transition-colors border border-[#014e5c] hover:border-[#014e5c]/80"
                   onClick={() => setShowDropdown(!showDropdown)}
                 >
                   <Search className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
@@ -1049,30 +1107,14 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
                   )}
                 </div>
               )}
-              
-              {/* Party Filter */}
-              <div className="mt-4 max-w-lg sm:max-w-lg mx-auto">
-                <select
-                  value={selectedParty}
-                  onChange={(e) => setSelectedParty(e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm bg-white text-slate-900"
-                >
-                  <option value="all">{isEnglish ? 'All Parties' : 'सभी पार्टियां'}</option>
-                  {Array.from(new Set(
-                    constituencies.map(c => c.partyName.nameHi).filter(Boolean)
-                  )).sort().map(party => (
-                    <option key={party} value={party}>{party}</option>
-                  ))}
-                </select>
-              </div>
             </div>
             
             <div className="text-center space-y-3 mt-6 max-w-4xl px-4">
               <p className="flex justify-center items-center gap-2">
-                <span className="text-xl sm:text-2xl font-bold text-slate-50">
+                <span className="text-md lg:text-xl sm:text-2xl font-bold text-slate-50">
                   {!isEnglish ? "जाने" : "Know"}
                 </span>
-                <span className="text-sm sm:text-base text-slate-200">
+                <span className="text-xs lg:text-sm sm:text-base text-slate-200">
                   {!isEnglish
                     ? "- उम्मीदवारों की सम्पत्ति, आपराधिक मामले और संसद में भागीदारी"
                     : "- The candidates' assets, criminal cases and participation in Parliament"}
@@ -1080,10 +1122,10 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
               </p>
 
               <p className="flex justify-center items-center gap-2">
-                <span className="text-xl sm:text-2xl font-bold text-slate-50">
+                <span className="text-md lg:text-xl sm:text-2xl font-bold text-slate-50">
                   {!isEnglish ? "रखें" : "Share"}
                 </span>
-                <span className="text-sm sm:text-base text-slate-200">
+                <span className="text-xs lg:text-sm sm:text-base text-slate-200">
                   {!isEnglish
                     ? "- वर्तमान और पूर्व उम्मीदवारों पर अपनी राय"
                     : "- Your views on current and past candidates"}
@@ -1091,10 +1133,10 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
               </p>
 
               <p className="flex justify-center items-center gap-2">
-                <span className="text-xl sm:text-2xl font-bold text-slate-50">
+                <span className="text-md lg:text-xl sm:text-2xl font-bold text-slate-50">
                   {!isEnglish ? "करें" : "Do"}
                 </span>
-                <span className="text-sm sm:text-base text-slate-200">
+                <span className="text-xs lg:text-sm sm:text-base text-slate-200">
                   {!isEnglish
                     ? "- जनसंवाद, सवाल-जवाब और जवाबदेही तय"
                     : "- Public dialogue, questions and answers, and fix accountability"}
@@ -1106,37 +1148,82 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
       </div>
 
 
-      {/* Nagrik Yogdan Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            {isEnglish ? 'Nagrik Yogdan' : 'नागरिक योगदान'}
-          </h2>
-          <p className="text-gray-600">
-            {isEnglish ? 'User engagement levels across constituencies' : 'निर्वाचन क्षेत्रों में उपयोगकर्ता जुड़ाव के स्तर'}
-          </p>
-        </div>
+      {/* Nagrik Yogdan Section - Show Current User's Tier */}
+      {currentUser && userProfile && (
+        <div className="max-w-full mx-auto bg-[#9ca8b4] px-4 sm:px-6 lg:px-8 py-3 sm:py-8">
+          <div className="text-center mb-5 sm:mb-8">
+            <h2 className="text-xl sm:text-3xl font-bold text-gray-900 mb-4">
+              {isEnglish ? 'Your Nagrik Yogdan' : 'आपका नागरिक योगदान'}
+            </h2>
+            <p className="text-sm sm:text-base text-gray-600">
+              {isEnglish ? 'Your current engagement level and tier' : 'आपका वर्तमान जुड़ाव स्तर और टियर'}
+            </p>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            { level: 1, name: 'Tier 1', color: 'from-blue-500 to-blue-600', users: globalStats?.level1_users || 0 },
-            { level: 2, name: 'Tier 2', color: 'from-green-500 to-green-600', users: globalStats?.level2_users || 0 },
-            { level: 3, name: 'Tier 3', color: 'from-yellow-500 to-yellow-600', users: globalStats?.level3_users || 0 },
-            { level: 4, name: 'Tier 4', color: 'from-purple-500 to-purple-600', users: globalStats?.level4_users || 0 }
-          ].map((tier) => (
-            <div key={tier.level} className="bg-white rounded-xl shadow-lg p-6 text-center">
-              <div className={`w-16 h-16 bg-gradient-to-r ${tier.color} rounded-full flex items-center justify-center mx-auto mb-4`}>
-                <Star className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">{tier.name}</h3>
-              <div className="text-3xl font-bold text-gray-900 mb-1">{tier.users}</div>
-              <div className="text-sm text-gray-600">
-                {globalStats?.total_users ? Math.round((tier.users / globalStats.total_users) * 100) : 0}% of total users
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+              {[
+                { level: 0, name: '0', color: 'from-gray-400 to-gray-500', description: 'New User' },
+                { level: 1, name: '1', color: 'from-blue-500 to-blue-600', description: 'Beginner' },
+                { level: 2, name: '2', color: 'from-green-500 to-green-600', description: 'Active' },
+                { level: 3, name: '3', color: 'from-yellow-500 to-yellow-600', description: 'Engaged' },
+                { level: 4, name: '4', color: 'from-purple-500 to-purple-600', description: 'Leader' }
+              ]
+                .filter((tier) => tier.level === userProfile.tier_level)
+                .map((tier) => (
+                  <div
+                    key={tier.level}
+                    className="bg-white rounded-xl shadow-lg p-6 text-center"
+                  >
+                    <div
+                      className={`w-16 h-16 bg-gradient-to-r ${tier.color} rounded-full flex items-center justify-center mx-auto mb-4`}
+                    >
+                      <Star className="h-8 w-8 text-white" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{tier.name}</h3>
+                    <div className="text-sm text-gray-600 mb-1">{tier.description}</div>
+                    <div className="text-lg font-bold text-green-600">
+                      {isEnglish ? 'Current Tier' : 'वर्तमान टियर'}
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+          
+          {/* User's Current Stats */}
+          <div className="mt-8 bg-white rounded-xl shadow-lg p-6">
+            <div className="text-center">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                {isEnglish ? 'Your Progress' : 'आपकी प्रगति'}
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-600 mb-2">{userProfile.participation_score}</div>
+                  <div className="text-sm text-gray-600">{isEnglish ? 'Engagement Score' : 'जुड़ाव स्कोर'}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-green-600 mb-2">{userProfile.tier_level}</div>
+                  <div className="text-sm text-gray-600">{isEnglish ? 'Current Tier' : 'वर्तमान टियर'}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-purple-600 mb-2">
+                    {userProfile.tier_level < 4 ? 
+                      (userProfile.tier_level === 0 ? 1 : 
+                       userProfile.tier_level === 1 ? 20 : 
+                       userProfile.tier_level === 2 ? 50 : 100) - userProfile.participation_score
+                      : 0}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {isEnglish ? 
+                      (userProfile.tier_level < 4 ? 'Points to Next Tier' : 'Max Tier Reached') :
+                      (userProfile.tier_level < 4 ? 'अगले टियर तक अंक' : 'अधिकतम टियर पहुंचा')
+                    }
+                  </div>
+                </div>
               </div>
             </div>
-          ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Achievement Section for Authenticated Users */}
       {currentUser && userAchievements && (

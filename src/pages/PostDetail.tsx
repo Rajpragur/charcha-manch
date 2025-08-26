@@ -554,24 +554,24 @@ const PostDetail: React.FC = () => {
                 </div>
 
                 {/* Post Content */}
-                <div className="mb-6">
+                <div className="mb-4">
                   {/* Post Title - More Prominent */}
-                  <h1 className="text-2xl lg:text-3xl font-bold text-[#014e5c] mb-4 leading-tight">
+                  <h1 className="text-xl lg:text-2xl font-bold text-[#014e5c] mb-3 leading-tight">
                     {post.titlefirst} {post.titlesecond}
                   </h1>
                   
                   {/* Post Content */}
-                  <p className="text-gray-700 leading-relaxed text-lg mb-6">{post.content}</p>
+                  <p className="text-gray-700 leading-relaxed text-base mb-4">{post.content}</p>
                   
                   {/* Tags */}
                   {post.tags && post.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-4">
+                    <div className="flex flex-wrap gap-1 mb-3">
                       {post.tags.map((tag, tagIndex) => (
                         <span
                           key={tagIndex}
-                          className="px-3 py-1 bg-[#014e5c]/10 text-[#014e5c] hover:bg-[#014e5c]/20 text-sm rounded-full flex items-center border border-[#014e5c]/20"
+                          className="px-2 py-1 bg-[#014e5c]/10 text-[#014e5c] hover:bg-[#014e5c]/20 text-xs rounded-full flex items-center border border-[#014e5c]/20"
                         >
-                          <Hash className="h-3 w-3 mr-1" />
+                          <Hash className="h-2 w-2 mr-1" />
                           {tag}
                         </span>
                       ))}
@@ -579,15 +579,15 @@ const PostDetail: React.FC = () => {
                   )}
                 </div>
 
-                <div className="border-t border-gray-100 my-4"></div>
+                <div className="border-t border-gray-100 my-3"></div>
 
                 {/* Engagement Section */}
                 <div className="flex items-center justify-between pt-2">
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-3">
                     <button 
                       onClick={handleLike}
                       disabled={userReaction.disliked}
-                      className={`flex items-center space-x-2 p-2 rounded-lg transition-colors ${
+                      className={`flex items-center space-x-2 p-1.5 rounded-md transition-colors ${
                         userReaction.liked 
                           ? 'text-red-500 bg-red-50 hover:bg-red-100 hover:text-red-600' 
                           : userReaction.disliked
@@ -595,14 +595,14 @@ const PostDetail: React.FC = () => {
                           : 'text-gray-500 hover:text-red-500 hover:bg-red-50'
                       }`}
                     >
-                      <Heart className={`h-5 w-5 ${userReaction.liked ? 'fill-current' : ''}`} />
-                      <span className="font-medium">{post.likesCount || 0}</span>
+                      <Heart className={`h-4 w-4 ${userReaction.liked ? 'fill-current' : ''}`} />
+                      <span className="text-sm font-medium">{post.likesCount || 0}</span>
                     </button>
 
                     <button 
                       onClick={handleDislike}
                       disabled={userReaction.liked}
-                      className={`flex items-center space-x-2 p-2 rounded-lg transition-colors ${
+                      className={`flex items-center space-x-2 p-1.5 rounded-md transition-colors ${
                         userReaction.disliked 
                           ? 'text-blue-500 bg-blue-50 hover:bg-blue-100 hover:text-blue-600' 
                           : userReaction.liked
@@ -610,20 +610,20 @@ const PostDetail: React.FC = () => {
                           : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50'
                       }`}
                     >
-                      <ThumbsDown className={`h-5 w-5 ${userReaction.disliked ? 'fill-current' : ''}`} />
-                      <span className="font-medium">{post.dislikesCount || 0}</span>
+                      <ThumbsDown className={`h-4 w-4 ${userReaction.disliked ? 'fill-current' : ''}`} />
+                      <span className="text-sm font-medium">{post.dislikesCount || 0}</span>
                     </button>
 
                     <button 
                       onClick={handleShare}
-                      className="text-gray-500 hover:text-[#014e5c] hover:bg-[#014e5c]/10 p-2 rounded-lg transition-colors flex items-center space-x-2"
+                      className="text-gray-500 hover:text-[#014e5c] hover:bg-[#014e5c]/10 p-1.5 rounded-md transition-colors flex items-center space-x-2"
                     >
                       {copiedPostId === post.id ? (
-                        <Check className="h-5 w-5 text-green-600" />
+                        <Check className="h-4 w-4 text-green-600" />
                       ) : (
-                        <Share2 className="h-5 w-5" />
+                        <Share2 className="h-4 w-4" />
                       )}
-                      <span className="font-medium">
+                      <span className="text-sm font-medium">
                         {copiedPostId === post.id ? (isEnglish ? 'Copied!' : 'कॉपी किया!') : content.share}
                       </span>
                     </button>
@@ -640,49 +640,49 @@ const PostDetail: React.FC = () => {
         </motion.div>
 
         {/* Comments Section */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 bg-white">
-            <h2 className="text-xl font-semibold text-[#014e5c] mb-4">{content.comments}</h2>
+        <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+          <div className="p-4 border-b border-gray-100 bg-white">
+            <h2 className="text-lg font-semibold text-[#014e5c] mb-3">{content.comments}</h2>
             
             {/* Comment Input */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               {currentUser ? (
-                <div className="flex flex-col space-y-3">
+                <div className="flex flex-col space-y-2">
                   <textarea
                     placeholder={content.writeComment}
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#014e5c] focus:border-[#014e5c] resize-none"
-                    rows={3}
+                    className="w-full px-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#014e5c] focus:border-[#014e5c] resize-none"
+                    rows={2}
                   />
                   <div className="flex justify-end">
                     <button
                       onClick={handleCommentSubmit}
                       disabled={isSubmittingComment}
-                      className="bg-[#014e5c] hover:bg-[#014e5c]/90 text-white px-6 py-2 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-[#014e5c] hover:bg-[#014e5c]/90 text-white px-4 py-1.5 rounded-md transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSubmittingComment ? content.posting : content.comment}
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-                  <MessageSquare className="h-8 w-8 mx-auto mb-2 text-[#014e5c]/40" />
-                  <p className="text-gray-500">{content.signInToComment}</p>
+                <div className="text-center py-3 bg-white rounded-md border border-gray-200 shadow-sm">
+                  <MessageSquare className="h-6 w-6 mx-auto mb-2 text-[#014e5c]/40" />
+                  <p className="text-sm text-gray-500">{content.signInToComment}</p>
                 </div>
               )}
             </div>
           </div>
 
           {/* Comments List */}
-          <div className="p-6">
+          <div className="p-4">
             {comments.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p>{content.noComments}</p>
+              <div className="text-center text-gray-500 py-6">
+                <MessageSquare className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                <p className="text-sm">{content.noComments}</p>
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <AnimatePresence>
                   {comments.map((comment, index) => (
                     <motion.div
@@ -693,28 +693,28 @@ const PostDetail: React.FC = () => {
                       className="space-y-3"
                     >
                       {/* Main Comment */}
-                      <div className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-                        <div className="p-4 bg-white">
-                          <div className="flex space-x-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-[#014e5c] to-[#01798e] rounded-full flex-shrink-0 flex items-center justify-center">
-                              <User className="h-5 w-5 text-white" />
+                      <div className="border border-gray-200 rounded-md shadow-sm overflow-hidden">
+                        <div className="p-3 bg-white">
+                          <div className="flex space-x-2">
+                            <div className="w-8 h-8 bg-gradient-to-br from-[#014e5c] to-[#01798e] rounded-full flex-shrink-0 flex items-center justify-center">
+                              <User className="h-4 w-4 text-white" />
                             </div>
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2 text-sm mb-1">
-                                <span className="font-semibold text-[#014e5c]">{comment.userName}</span>
-                                <span className="text-gray-400">•</span>
-                                <span className="text-gray-500">{formatRelativeTime(comment.createdAt)}</span>
-                                <span className="text-gray-400">•</span>
-                                <span className="text-gray-500">{comment.constituencyName}</span>
-                              </div>
-                              <p className="text-gray-700 mb-3">{comment.content}</p>
+                                                          <div className="flex-1">
+                                <div className="flex items-center space-x-2 text-xs mb-1">
+                                  <span className="font-semibold text-[#014e5c]">{comment.userName}</span>
+                                  <span className="text-gray-400">•</span>
+                                  <span className="text-gray-500">{formatRelativeTime(comment.createdAt)}</span>
+                                  <span className="text-gray-400">•</span>
+                                  <span className="text-gray-500">{comment.constituencyName}</span>
+                                </div>
+                                <p className="text-gray-700 text-sm mb-2">{comment.content}</p>
                               
                               <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-4">
+                                <div className="flex items-center space-x-3">
                                   {/* Reply Button */}
                                   <button
                                     onClick={() => toggleReplyInput(comment.id)}
-                                    className="text-[#014e5c] hover:bg-[#014e5c]/10 px-2 py-1 rounded text-sm font-medium transition-colors"
+                                    className="text-[#014e5c] hover:bg-[#014e5c]/10 px-1.5 py-0.5 rounded text-xs font-medium transition-colors"
                                   >
                                     {content.reply}
                                   </button>
@@ -723,7 +723,7 @@ const PostDetail: React.FC = () => {
                                   {(currentUser?.uid === comment.userId || currentUser?.uid === post?.userId) && (
                                     <button
                                       onClick={() => handleDeleteComment(comment.id)}
-                                      className="text-red-500 hover:bg-red-50 hover:text-red-600 px-2 py-1 rounded text-sm font-medium transition-colors"
+                                      className="text-red-500 hover:bg-red-50 hover:text-red-600 px-1.5 py-0.5 rounded text-xs font-medium transition-colors"
                                     >
                                       {content.delete}
                                     </button>
@@ -753,8 +753,8 @@ const PostDetail: React.FC = () => {
 
                         {/* Reply Input */}
                         {showReplyInput[comment.id] && (
-                          <div className="p-4 bg-gray-50 border-t border-gray-100">
-                            <div className="flex flex-col space-y-3">
+                          <div className="p-3 bg-gray-50 border-t border-gray-100">
+                            <div className="flex flex-col space-y-2">
                               <textarea
                                 placeholder={content.writeReply}
                                 value={replyText[comment.id] || ''}
@@ -762,14 +762,14 @@ const PostDetail: React.FC = () => {
                                   ...prev,
                                   [comment.id]: e.target.value
                                 }))}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#014e5c] focus:border-[#014e5c] resize-none"
-                                rows={2}
+                                className="w-full px-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#014e5c] focus:border-[#014e5c] resize-none"
+                                rows={1}
                               />
                               <div className="flex justify-end">
                                 <button
                                   onClick={() => handleReplySubmit(comment.id)}
                                   disabled={isSubmittingReply[comment.id]}
-                                  className="bg-[#014e5c] hover:bg-[#014e5c]/90 text-white px-4 py-2 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="bg-[#014e5c] hover:bg-[#014e5c]/90 text-white px-3 py-1.5 rounded-md transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {isSubmittingReply[comment.id] ? content.posting : content.reply}
                                 </button>

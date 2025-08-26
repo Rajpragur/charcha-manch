@@ -142,6 +142,29 @@ export interface FirebaseConstituency {
 // Firebase Service Class
 export class FirebaseService {
 
+  // Calculate user tier based on engagement score
+  static calculateUserTier(engagementScore: number): number {
+    if (engagementScore >= 100) return 4;
+    if (engagementScore >= 50) return 3;
+    if (engagementScore >= 20) return 2;
+    if (engagementScore >= 1) return 1;
+    return 0; // Start at tier 0
+  }
+
+  // Update user tier based on current engagement score
+  static async updateUserTier(userId: string, engagementScore: number): Promise<void> {
+    try {
+      const newTier = this.calculateUserTier(engagementScore);
+      await this.updateUserProfile(userId, {
+        tier_level: newTier,
+        engagement_score: engagementScore
+      });
+    } catch (error) {
+      console.error('Error updating user tier:', error);
+      throw error;
+    }
+  }
+
   // User Profile Operations
   static async getUserProfile(userId: string): Promise<FirebaseUserProfile | null> {
     try {

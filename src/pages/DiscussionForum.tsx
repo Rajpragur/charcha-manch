@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
@@ -72,6 +72,7 @@ const DiscussionForum: React.FC = () => {
   const { currentUser } = useAuth();
   const { isAdmin } = useAdmin();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [posts, setPosts] = useState<DiscussionPost[]>([]);
   const [constituencies, setConstituencies] = useState<Constituency[]>([]);
   const [selectedConstituencies, setSelectedConstituencies] = useState<number[]>([]);
@@ -191,6 +192,22 @@ const DiscussionForum: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [currentUser?.uid]);
+
+  // Handle URL parameters for constituency selection
+  useEffect(() => {
+    const constituencyParam = searchParams.get('constituency');
+    
+    if (constituencyParam && !isNaN(Number(constituencyParam))) {
+      const constituencyId = Number(constituencyParam);
+      setSelectedConstituencies([constituencyId]);
+      setSelectedConstituency(constituencyId);
+      setShowAllConstituencies(false);
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('constituency');
+      newSearchParams.delete('name');
+      navigate(`/discussion?${newSearchParams.toString()}`, { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   // Handle constituency selection
   const handleConstituencyChange = (constituencyId: number | null) => {
@@ -999,9 +1016,10 @@ const DiscussionForum: React.FC = () => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowCreatePost(true)}
-          className="w-14 h-14 bg-[#014e5c] text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center"
+          className="w-25 h-14 bg-[#014e5c] text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center"
         >
-          <Plus className="w-6 h-6" />
+          <Plus className="w-6 h-6 mr-1" />
+          <span className="text-xs font-medium">{isEnglish ? 'Create Post' : 'नई चर्चा'}</span>
         </motion.button>
       </div>
 

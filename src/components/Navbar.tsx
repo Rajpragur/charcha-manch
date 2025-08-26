@@ -61,7 +61,7 @@ const Navbar: React.FC = () => {
   return (
     <nav className="bg-white shadow-md sticky top-0 z-50 w-full overflow-x-clip">
       <div className="w-full px-2 sm:px-4 lg:px-6">
-        <div className="flex justify-between items-center h-16 relative">
+        <div className="flex justify-between items-center h-12 lg:h-16 relative">
           {/* Language Toggle */}
           <div className="flex items-center gap- lg:gap-4 justify-start">
             <button
@@ -79,14 +79,14 @@ const Navbar: React.FC = () => {
             </button>
             <img
               src="/images/logo.png"
-              className="h-7 w-7 max-[360px]:h-4 max-[360px]:w-4 sm:h-9 sm:w-9 md:h-9 md:w-9 lg:h-11 lg:w-11 object-contain"
+              className="h-5 w-5 lg:h-9 lg:w-9 object-contain"
               alt="Logo"
             />
           </div>
 
           {/* Logo fixed left */}
           <Link to="/" className="absolute left-1/2 -translate-x-1/2 flex items-center min-w-0">
-            <img src='/images/charchagram.png' className='w-40 h-auto max-[340px]:w-30 sm:h-auto sm:w-50 shrink-0 mx-1' />
+            <img src='/images/charchagram.png' className='w-30 h-auto lg:w-40 lg:h-auto lg:shrink-0 mx-1' />
           </Link>
           
           {/* Right section (profile + menu) */}
