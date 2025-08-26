@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useAdmin } from '../contexts/AdminContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -14,6 +15,7 @@ import {
   Shield, 
   Filter,
   Plus,
+  X,
   ChevronDown,
   Flame,
   Share2,
@@ -68,16 +70,21 @@ interface Constituency {
 const DiscussionForum: React.FC = () => {
   const { isEnglish } = useLanguage();
   const { currentUser } = useAuth();
+  const { isAdmin } = useAdmin();
   const navigate = useNavigate();
   const [posts, setPosts] = useState<DiscussionPost[]>([]);
   const [constituencies, setConstituencies] = useState<Constituency[]>([]);
+  const [selectedConstituencies, setSelectedConstituencies] = useState<number[]>([]);
   const [selectedConstituency, setSelectedConstituency] = useState<number | null>(null);
+  const [showAllConstituencies, setShowAllConstituencies] = useState(false);
+  const [constituencyThreshold] = useState(5); // Minimum posts threshold
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'recent' | 'trending' | 'interactions' | 'top'>('recent');
   const [isLoading, setIsLoading] = useState(false);
 
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [showConstituencyFilter, setShowConstituencyFilter] = useState(false);
+
 
   const [activeTab, setActiveTab] = useState<'home' | 'discussion' | 'area'>('discussion');
 
@@ -92,7 +99,7 @@ const DiscussionForum: React.FC = () => {
     subtitle: isEnglish ? 'Platform for Dialogue and Community Cooperation' : 'संवाद और सामुदायिक सहयोग का मंच',
     createPost: isEnglish ? 'New Discussion' : 'नई चर्चा',
     searchPlaceholder: isEnglish ? 'Search discussions, issues, candidates...' : 'चर्चा, मुद्दे, उम्मीदवार खोजें...',
-    allConstituencies: isEnglish ? 'All Constituencies' : 'सभी निर्वाचन क्षेत्र',
+    allConstituencies: isEnglish ? 'All Constituencies' : 'All Constituencies',
     selectConstituency: isEnglish ? 'Select Constituency' : 'निर्वाचन क्षेत्र चुनें',
     noPosts: isEnglish ? 'No discussions found' : 'कोई चर्चा नहीं मिली',
     noPostsDescription: isEnglish ? 'Be the first to start a discussion in your constituency!' : 'अपने निर्वाचन क्षेत्र में चर्चा शुरू करने वाले पहले व्यक्ति बनें!',
@@ -125,18 +132,18 @@ const DiscussionForum: React.FC = () => {
   // Filtered and sorted posts
   const filteredPosts = useMemo(() => {
     let filtered = posts;
-
+  
     // Filter by constituency
-    if (selectedConstituency) {
-      filtered = filtered.filter(post => post.constituency === selectedConstituency);
+    if (!showAllConstituencies && selectedConstituencies.length > 0) {
+      filtered = filtered.filter(post => selectedConstituencies.includes(post.constituency));
     }
-
+  
     // Filter by search term
     if (searchTerm.trim()) {
       const searchResults = fuse.search(searchTerm);
       filtered = searchResults.map(result => result.item);
     }
-
+  
     // Sort posts
     switch (sortBy) {
       case 'recent':
@@ -160,9 +167,25 @@ const DiscussionForum: React.FC = () => {
         });
         break;
     }
-
+  
     return filtered;
-  }, [posts, selectedConstituency, searchTerm, sortBy, fuse]);
+  }, [posts, selectedConstituencies, showAllConstituencies, searchTerm, sortBy, fuse]);
+  const shouldShowAllConstituenciesOption = useMemo(() => {
+    if (selectedConstituencies.length === 0) return false;
+    
+    const selectedConstituencyPosts = posts.filter(post => 
+      selectedConstituencies.includes(post.constituency)
+    );
+    
+    return selectedConstituencyPosts.length < constituencyThreshold;
+  }, [posts, selectedConstituencies, constituencyThreshold]);
+  
+  const shouldShowAllResultsOption = useMemo(() => {
+    if (!searchTerm.trim()) return false;
+    
+    const searchResults = fuse.search(searchTerm);
+    return searchResults.length < 10; // Show option if less than 10 search results
+  }, [searchTerm, fuse]);
 
   // Fetch posts and constituencies
   useEffect(() => {
@@ -171,7 +194,44 @@ const DiscussionForum: React.FC = () => {
 
   // Handle constituency selection
   const handleConstituencyChange = (constituencyId: number | null) => {
-    setSelectedConstituency(constituencyId);
+    if (constituencyId === null) {
+      setSelectedConstituencies([]);
+      setSelectedConstituency(null);
+      setShowAllConstituencies(false);
+    } else {
+      setSelectedConstituencies([constituencyId]);
+      setSelectedConstituency(constituencyId);
+      setShowAllConstituencies(false);
+    }
+  };
+  
+  // Handle multi-constituency selection
+  const handleMultiConstituencyChange = (constituencyId: number) => {
+    setSelectedConstituencies(prev => {
+      if (prev.includes(constituencyId)) {
+        const newSelection = prev.filter(id => id !== constituencyId);
+        // Update selectedConstituency if it was the one removed
+        if (selectedConstituency === constituencyId) {
+          setSelectedConstituency(newSelection.length > 0 ? newSelection[0] : null);
+        }
+        return newSelection;
+      } else {
+        const newSelection = [...prev, constituencyId];
+        // Update selectedConstituency to the first selected
+        if (newSelection.length === 1) {
+          setSelectedConstituency(constituencyId);
+        }
+        return newSelection;
+      }
+    });
+    setShowAllConstituencies(false);
+  };
+  
+  // Show all constituencies
+  const handleShowAllConstituencies = () => {
+    setShowAllConstituencies(true);
+    setSelectedConstituencies([]);
+    setSelectedConstituency(null);
   };
 
   // Handle post creation
@@ -179,7 +239,7 @@ const DiscussionForum: React.FC = () => {
     fetchData();
   };
 
-  // Handle post deletion
+  // Handle post deletion (user can only delete their own posts)
   const handleDeletePost = async (postId: string) => {
     if (!currentUser?.uid) {
       toast.error('Please sign in to delete posts');
@@ -194,6 +254,25 @@ const DiscussionForum: React.FC = () => {
       } catch (error: any) {
         console.error('Error deleting post:', error);
         toast.error(error.message || content.deleteFailed);
+      }
+    }
+  };
+
+  // Handle admin post removal
+  const handleAdminRemovePost = async (postId: string) => {
+    if (!isAdmin) {
+      toast.error('Only admins can remove posts');
+      return;
+    }
+
+    if (window.confirm('Are you sure you want to remove this post? This action cannot be undone.')) {
+      try {
+        await FirebaseService.removeDiscussionPost(postId);
+        toast.success('Post removed successfully');
+        fetchData(); // Refresh the posts
+      } catch (error: any) {
+        console.error('Error removing post:', error);
+        toast.error('Failed to remove post');
       }
     }
   };
@@ -236,6 +315,40 @@ const DiscussionForum: React.FC = () => {
       const fetchedConstituencies = await FirebaseService.getAllConstituencies();
       setConstituencies(fetchedConstituencies);
       
+      // Auto-select constituencies based on threshold and user login status
+      if (currentUser?.uid) {
+        // If logged in, check if user's constituency has enough posts
+        const userConstituencyPosts = fetchedPosts.filter(post => 
+          post.userId === currentUser.uid
+        );
+        
+        if (userConstituencyPosts.length > 0) {
+          const userConstituency = userConstituencyPosts[0].constituency;
+          const constituencyPostCount = fetchedPosts.filter(post => 
+            post.constituency === userConstituency
+          ).length;
+          
+          if (constituencyPostCount >= constituencyThreshold) {
+            setSelectedConstituencies([userConstituency]);
+            setSelectedConstituency(userConstituency);
+            setShowAllConstituencies(false);
+          } else {
+            setSelectedConstituencies([]);
+            setSelectedConstituency(null);
+            setShowAllConstituencies(true);
+          }
+        } else {
+          setSelectedConstituencies([]);
+          setSelectedConstituency(null);
+          setShowAllConstituencies(true);
+        }
+      } else {
+        // If not logged in, show all constituencies by default
+        setSelectedConstituencies([]);
+        setSelectedConstituency(null);
+        setShowAllConstituencies(true);
+      }
+      
       // Fetch user reactions for all posts if logged in
       if (currentUser?.uid) {
         const reactions: { [postId: string]: { liked: boolean; disliked: boolean } } = {};
@@ -246,8 +359,8 @@ const DiscussionForum: React.FC = () => {
         }
         setUserReactions(reactions);
       }
-      
-    } catch (error) {
+        
+      } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load discussions');
     } finally {
@@ -434,114 +547,115 @@ const DiscussionForum: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 lg:px-6 py-4 lg:py-6 pb-24 lg:pb-6">
-        {/* Constituency Filter - Desktop */}
-        <div className="hidden lg:block mb-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
-              <Filter className="w-5 h-5 text-gray-600" />
-              <span>{content.selectConstituency}</span>
-            </h3>
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => handleConstituencyChange(null)}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  selectedConstituency === null
-                    ? 'bg-green-100 text-green-700 border border-green-200'
-                    : 'text-gray-700 hover:bg-gray-50 border border-gray-200'
-                }`}
-              >
-                {content.allConstituencies}
-              </button>
-              {constituencies.map((constituency) => (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Left Sidebar - Desktop Only */}
+          <div className="hidden lg:block lg:col-span-1 space-y-6">
+            {/* Constituency Filter */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+                <Filter className="w-5 h-5 text-gray-600" />
+                <span>{content.selectConstituency}</span>
+              </h3>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
                 <button
-                  key={constituency.id}
-                  onClick={() => handleConstituencyChange(constituency.id)}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
-                    selectedConstituency === constituency.id
-                      ? 'bg-[#014e5c] text-white'
-                      : 'text-gray-700 hover:bg-gray-50 border border-gray-200'
+                  onClick={() => handleConstituencyChange(null)}
+                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                    showAllConstituencies
+                      ? 'bg-[#014e5c] text-white border border-green-200'
+                      : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  {constituency.name}
+                  {content.allConstituencies}
                 </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Sort Options - Desktop */}
-        <div className="hidden lg:block mb-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Sort by</h3>
-            <div className="flex flex-wrap gap-3">
-              {[
-                { key: 'recent', label: 'Latest', icon: Clock },
-                { key: 'trending', label: 'Trending', icon: Flame },
-                { key: 'interactions', label: 'Most Active', icon: TrendingUp },
-                { key: 'top', label: 'Top', icon: Award }
-              ].map((option) => (
-                <button
-                  key={option.key}
-                  onClick={() => setSortBy(option.key as any)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
-                    sortBy === option.key
-                      ? 'bg-green-100 text-green-700 border border-green-200'
-                      : 'text-gray-700 hover:bg-gray-50 border border-gray-200'
-                  }`}
-                >
-                  <option.icon className={`w-4 h-4 ${sortBy === option.key ? 'text-green-600' : 'text-gray-500'}`} />
-                  <span className="font-medium">{option.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="space-y-4 lg:space-y-6 mb-4">
-            {/* Constituency Filter - Mobile */}
-            <div className="lg:hidden bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              <button
-                onClick={() => setShowConstituencyFilter(!showConstituencyFilter)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <MapPin className="w-5 h-5 text-gray-600" />
-                  <span className="text-gray-700">
-                    {selectedConstituency 
-                      ? constituencies.find(c => c.id === selectedConstituency)?.name 
-                      : content.allConstituencies
-                    }
-                  </span>
-                </div>
-                <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${showConstituencyFilter ? 'rotate-180' : ''}`} />
-              </button>
-              
-              {showConstituencyFilter && (
-                <div className="mt-3 space-y-2">
+                {constituencies.map((constituency) => (
                   <button
-                    onClick={() => handleConstituencyChange(null)}
+                    key={constituency.id}
+                    onClick={() => handleConstituencyChange(constituency.id)}
                     className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                      selectedConstituency === null
-                        ? 'bg-green-100 text-green-700 border border-green-200'
+                      selectedConstituency === constituency.id
+                        ? 'bg-[#014e5c] text-white'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    {content.allConstituencies}
+                    {constituency.name}
                   </button>
-                  {constituencies.map((constituency) => (
-                    <button
-                      key={constituency.id}
-                      onClick={() => handleConstituencyChange(constituency.id)}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                        selectedConstituency === constituency.id
-                          ? 'bg-green-100 text-green-700 border border-green-200'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {constituency.name}
-                    </button>
-                  ))}
+                ))}
+              </div>
+            </div>
+
+            {/* Sort Options */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Sort by</h3>
+              <div className="space-y-2">
+                {[
+                  { key: 'recent', label: 'Latest', icon: Clock },
+                  { key: 'trending', label: 'Trending', icon: Flame },
+                  { key: 'interactions', label: 'Most Active', icon: TrendingUp },
+                  { key: 'top', label: 'Top', icon: Award }
+                ].map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => setSortBy(option.key as any)}
+                    className={`w-full flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 ${
+                      sortBy === option.key
+                        ? 'bg-[#014e5c] text-white border border-green-200'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <option.icon className={`w-4 h-4 ${sortBy === option.key ? 'text-white' : 'text-gray-500'}`} />
+                    <span className="font-medium">{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div className="lg:col-span-3 space-y-4 lg:space-y-6 mb-4">
+            {/* Constituency Filter - Mobile */}
+            <div className="lg:hidden bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-4">
+                <button
+                onClick={() => setShowConstituencyFilter(!showConstituencyFilter)}
+                className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                  <Filter className="w-5 h-5 text-gray-600" />
+                  <span>{content.selectConstituency}</span>
+                  {showConstituencyFilter ? (
+                    <X className="w-5 h-5 text-gray-600" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-gray-600" />
+                  )}
+                </h3>
+                  
+                </button>
+              </div>
+              
+              {showConstituencyFilter && (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                                  <button
+                  onClick={() => handleConstituencyChange(null)}
+                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                    selectedConstituencies.length === 0
+                      ? 'bg-green-100 text-green-700 border border-green-200'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {content.allConstituencies}
+                </button>
+                {constituencies.map((constituency) => (
+                  <button
+                    key={constituency.id}
+                    onClick={() => handleMultiConstituencyChange(constituency.id)}
+                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                      selectedConstituencies.includes(constituency.id)
+                        ? 'bg-[#014e5c] text-white'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {constituency.name}
+                  </button>
+                ))}
                 </div>
               )}
             </div>
@@ -624,8 +738,8 @@ const DiscussionForum: React.FC = () => {
                                 </span>
                               )}
                               
-                              {/* Post Menu (only show for post owner) */}
-                              {currentUser?.uid === post.userId && (
+                              {/* Post Menu (show for post owner or admin) */}
+                              {(currentUser?.uid === post.userId || isAdmin) && (
                                 <div className="relative post-menu">
                                   <button
                                     onClick={(e) => {
@@ -639,17 +753,35 @@ const DiscussionForum: React.FC = () => {
                                   
                                   {showPostMenu[post.id] && (
                                     <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[120px]">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeletePost(post.id);
-                                          setShowPostMenu(prev => ({ ...prev, [post.id]: false }));
-                                        }}
-                                        className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center space-x-2"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                        <span>{content.delete}</span>
-                                      </button>
+                                      {/* User can delete their own posts */}
+                                      {currentUser?.uid === post.userId && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeletePost(post.id);
+                                            setShowPostMenu(prev => ({ ...prev, [post.id]: false }));
+                                          }}
+                                          className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                          <span>{content.delete}</span>
+                                        </button>
+                                      )}
+                                      
+                                      {/* Admin can remove any post */}
+                                      {isAdmin && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleAdminRemovePost(post.id);
+                                            setShowPostMenu(prev => ({ ...prev, [post.id]: false }));
+                                          }}
+                                          className="w-full px-4 py-2 text-left text-orange-600 hover:bg-orange-50 flex items-center space-x-2"
+                                        >
+                                          <Shield className="h-4 w-4" />
+                                          <span>Remove Post</span>
+                                        </button>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -776,7 +908,61 @@ const DiscussionForum: React.FC = () => {
                   ))}
                 </AnimatePresence>
               )}
-                        </div>
+            </div>
+
+            {/* Show All Options */}
+            {shouldShowAllConstituenciesOption && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200"
+              >
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                    {isEnglish ? 'Limited Posts in Selected Constituency' : 'चयनित निर्वाचन क्षेत्र में सीमित पोस्ट'}
+                  </h3>
+                  <p className="text-blue-700 mb-4">
+                    {isEnglish 
+                      ? `Only ${filteredPosts.length} posts found in the selected constituency. View posts from all constituencies for more discussions.`
+                      : `चयनित निर्वाचन क्षेत्र में केवल ${filteredPosts.length} पोस्ट मिले। अधिक चर्चाओं के लिए सभी निर्वाचन क्षेत्रों के पोस्ट देखें।`
+                    }
+                  </p>
+                  <button
+                    onClick={handleShowAllConstituencies}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    {isEnglish ? 'Show All Constituencies' : 'सभी निर्वाचन क्षेत्र दिखाएं'}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+            
+            {shouldShowAllResultsOption && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-6 p-6 bg-white rounded-xl border border-green-200"
+              >
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-green-900 mb-2">
+                    {isEnglish ? 'Limited Search Results' : 'सीमित खोज परिणाम'}
+                  </h3>
+                  <p className="text-black mb-4">
+                    {isEnglish 
+                      ? `Only ${filteredPosts.length} results found for "${searchTerm}". View all posts for more discussions.`
+                      : `"${searchTerm}" के लिए केवल ${filteredPosts.length} परिणाम मिले। अधिक चर्चाओं के लिए सभी पोस्ट देखें।`
+                    }
+                  </p>
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="px-6 py-3 bg-[#014e5c] text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                  >
+                    {isEnglish ? 'Show All Posts' : 'सभी पोस्ट दिखाएं'}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </div>
         </div>
       </div>
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar, User, ThumbsUp, Eye, Clock, ArrowLeft, Loader } from 'lucide-react';
+import { Calendar, User, Eye, ArrowLeft, Loader, Heart, Share2, BookOpen, Tag, Award } from 'lucide-react';
 import FirebaseService from '../services/firebaseService';
 import SignInPopup from '../components/SignInPopup';
 
@@ -49,7 +49,11 @@ const BlogDetail: React.FC = () => {
     error: isEnglish ? 'Error loading blog' : 'ब्लॉग लोड करने में त्रुटि',
     notFound: isEnglish ? 'Blog not found' : 'ब्लॉग नहीं मिला',
     like: isEnglish ? 'Like' : 'लाइक',
-    share: isEnglish ? 'Share' : 'शेयर करें'
+    share: isEnglish ? 'Share' : 'शेयर करें',
+    publishedOn: isEnglish ? 'Published on' : 'प्रकाशित किया गया',
+    readingTime: isEnglish ? 'Reading time' : 'पढ़ने का समय',
+    category: isEnglish ? 'Category' : 'श्रेणी',
+    author: isEnglish ? 'Author' : 'लेखक'
   };
 
   // Fetch blog data
@@ -102,11 +106,23 @@ const BlogDetail: React.FC = () => {
     
     try {
       if (date.toDate) {
-        return date.toDate().toLocaleDateString();
+        return date.toDate().toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
       } else if (date instanceof Date) {
-        return date.toLocaleDateString();
+        return date.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
       } else {
-        return new Date(date).toLocaleDateString();
+        return new Date(date).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
       }
     } catch {
       return 'Unknown date';
@@ -170,10 +186,10 @@ const BlogDetail: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader className="animate-spin h-12 w-12 text-sky-600 mx-auto mb-4" />
-          <p className="text-gray-600 text-lg">{content.loading}</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#014e5c] mx-auto mb-6"></div>
+          <p className="text-gray-600 text-xl font-medium">{content.loading}</p>
         </div>
       </div>
     );
@@ -181,14 +197,14 @@ const BlogDetail: React.FC = () => {
 
   if (error || !blog) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">{content.error}</h1>
-          <p className="text-gray-600">{error || content.notFound}</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <div className="text-red-500 text-8xl mb-6">⚠️</div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">{content.error}</h1>
+          <p className="text-gray-600 mb-8 text-lg">{error || content.notFound}</p>
           <button
             onClick={() => navigate('/blog')}
-            className="mt-4 bg-sky-600 text-white px-6 py-2 rounded-lg hover:bg-sky-700 transition-colors"
+            className="bg-[#014e5c] text-white px-8 py-3 rounded-xl hover:bg-[#013a47] transition-all duration-200 font-medium shadow-lg hover:shadow-xl"
           >
             {content.backToBlogs}
           </button>
@@ -198,13 +214,13 @@ const BlogDetail: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <button
             onClick={() => navigate('/blog')}
-            className="flex items-center text-slate-600 hover:text-slate-800 transition-colors"
+            className="flex items-center text-[#014e5c] hover:text-[#013a47] transition-colors font-medium"
           >
             <ArrowLeft className="h-5 w-5 mr-2" />
             {content.backToBlogs}
@@ -213,60 +229,68 @@ const BlogDetail: React.FC = () => {
       </div>
 
       {/* Blog Content */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <article className="bg-white rounded-lg shadow-md overflow-hidden">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <article className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
           {/* Blog Header */}
-          <div className="p-6 sm:p-8 border-b border-slate-100">
-            <div className="flex items-center space-x-2 mb-4">
+          <div className="p-6 sm:p-8 lg:p-10 border-b border-gray-100">
+            <div className="flex flex-wrap items-center gap-3 mb-6">
               {blog.featured && (
-                <span className="px-3 py-1 bg-amber-100 text-amber-800 text-sm font-medium rounded-full">
+                <span className="px-4 py-2 bg-amber-100 text-amber-800 text-sm font-semibold rounded-full flex items-center">
+                  <Award className="h-4 w-4 mr-2" />
                   {content.featured}
                 </span>
               )}
-              <span className="px-3 py-1 bg-sky-100 text-sky-800 text-sm font-medium rounded-full">
-                {blog.category || 'General'}
-              </span>
+              {blog.category && (
+                <span className="px-4 py-2 bg-[#014e5c]/10 text-[#014e5c] text-sm font-semibold rounded-full flex items-center">
+                  <Tag className="h-4 w-4 mr-2" />
+                  {blog.category}
+                </span>
+              )}
             </div>
             
-            <h1 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-4">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-6 leading-tight">
               {blog.title}
             </h1>
             
-            <p className="text-lg text-slate-600 mb-6 leading-relaxed">
+            <p className="text-lg sm:text-xl text-gray-600 mb-8 leading-relaxed max-w-4xl">
               {blog.excerpt}
             </p>
             
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-6 text-sm text-slate-500">
-                <span className="flex items-center">
-                  <User className="h-4 w-4 mr-2" />
-                  {blog.author}
-                </span>
-                <span className="flex items-center">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  {formatDate(blog.createdAt)}
-                </span>
-                <span className="flex items-center">
-                  <Clock className="h-4 w-4 mr-2" />
-                  {calculateReadingTime(blog.content)} {content.readTime}
-                </span>
+            {/* Author and Meta Info */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-[#014e5c] rounded-full flex items-center justify-center">
+                  <User className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">{blog.author}</p>
+                  <div className="flex items-center space-x-4 text-sm text-gray-500">
+                    <span className="flex items-center">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      {formatDate(blog.createdAt)}
+                    </span>
+                    <span className="flex items-center">
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      {calculateReadingTime(blog.content)} {content.readTime}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-
           {/* Blog Image */}
           {blog.imageUrl && (
             <div className="w-full">
               <img 
                 src={blog.imageUrl} 
                 alt={blog.title}
-                className="w-full h-64 sm:h-80 object-cover"
+                className="w-full h-64 sm:h-80 lg:h-96 object-cover"
               />
             </div>
           )}
 
           {/* Blog Content */}
-          <div className="p-6 sm:p-8">
+          <div className="p-6 sm:p-8 lg:p-10">
             <div className="prose prose-lg max-w-none">
               <div className="text-gray-800 leading-relaxed text-lg whitespace-pre-wrap font-normal">
                 {blog.content}
@@ -275,45 +299,42 @@ const BlogDetail: React.FC = () => {
           </div>
 
           {/* Blog Footer */}
-          <div className="px-6 sm:px-8 py-6 border-t border-slate-100 bg-slate-50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-6 text-sm text-slate-500">
+          <div className="px-6 sm:px-8 lg:px-10 py-8 border-t border-gray-100 bg-gray-50">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+              <div className="flex items-center space-x-6 text-sm text-gray-600">
                 <span className="flex items-center">
                   <Eye className="h-4 w-4 mr-2" />
                   {blog.views || 0} {content.views}
                 </span>
                 <span className="flex items-center">
-                  <ThumbsUp className="h-4 w-4 mr-2" />
+                  <Heart className="h-4 w-4 mr-2" />
                   {blog.likes || 0} {content.likes}
                 </span>
-
               </div>
               
               <div className="flex space-x-3">
                 <button 
                   onClick={handleLike}
                   disabled={likeLoading}
-                  className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium flex items-center ${
+                  className={`px-6 py-3 rounded-xl transition-all duration-200 text-sm font-semibold flex items-center shadow-md hover:shadow-lg ${
                     isLiked
-                      ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
+                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 hover:border-[#014e5c] hover:text-[#014e5c]'
                   } ${likeLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {likeLoading ? (
                     <Loader className="h-4 w-4 inline mr-2 animate-spin" />
                   ) : (
-                    <ThumbsUp className={`h-4 w-4 inline mr-2 ${isLiked ? 'fill-current' : ''}`} />
+                    <Heart className={`h-4 w-4 inline mr-2 ${isLiked ? 'fill-current' : ''}`} />
                   )}
                   {content.like}
                 </button>
 
                 <button 
                   onClick={handleShare}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium"
+                  className="px-6 py-3 bg-white text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 text-sm font-semibold border border-gray-200 hover:border-[#014e5c] hover:text-[#014e5c] shadow-md hover:shadow-lg flex items-center"
                 >
-                  <svg className="h-4 w-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-                  </svg>
+                  <Share2 className="h-4 w-4 inline mr-2" />
                   {content.share}
                 </button>
               </div>

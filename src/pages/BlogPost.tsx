@@ -340,7 +340,7 @@ const BlogPost: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 text-white py-12 sm:py-16 px-4 w-full">
+      <div className="bg-[#014e5c] text-white py-12 sm:py-16 px-4 w-full">
         <div className="w-full max-w-none mx-auto">
           <div className="text-center">
             <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6">

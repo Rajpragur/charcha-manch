@@ -12,10 +12,12 @@ import {
   Heart,
   Share2,
   MessageSquare,
-  Calendar,
   Hash,
   ThumbsDown,
-  Home
+  Home,
+  Clock,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import FirebaseService from '../services/firebaseService';
@@ -79,6 +81,7 @@ const PostDetail: React.FC = () => {
   const [replyText, setReplyText] = useState<{ [commentId: string]: string }>({});
   const [isSubmittingReply, setIsSubmittingReply] = useState<{ [commentId: string]: boolean }>({});
   const [showReplyInput, setShowReplyInput] = useState<{ [commentId: string]: boolean }>({});
+  const [expandedComments, setExpandedComments] = useState<{ [commentId: string]: boolean }>({});
 
   const content = {
     backToForum: isEnglish ? 'Back to Forum' : 'फोरम पर वापस जाएं',
@@ -98,7 +101,14 @@ const PostDetail: React.FC = () => {
     delete: isEnglish ? 'Delete' : 'हटाएं',
     deleteCommentConfirm: isEnglish ? 'Are you sure you want to delete this comment? This action cannot be undone.' : 'क्या आप वाकई इस टिप्पणी को हटाना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।',
     commentDeleted: isEnglish ? 'Comment deleted successfully' : 'टिप्पणी सफलतापूर्वक हटा दी गई',
-    deleteCommentFailed: isEnglish ? 'Failed to delete comment' : 'टिप्पणी हटाने में विफल'
+    deleteCommentFailed: isEnglish ? 'Failed to delete comment' : 'टिप्पणी हटाने में विफल',
+    showReplies: isEnglish ? 'Show Replies' : 'जवाब दिखाएं',
+    hideReplies: isEnglish ? 'Hide Replies' : 'जवाब छिपाएं',
+    writeReply: isEnglish ? 'Write your reply...' : 'अपना जवाब लिखें...',
+    posting: isEnglish ? 'Posting...' : 'पोस्ट कर रहा है...',
+    home: isEnglish ? 'Home' : 'होम',
+    discussion: isEnglish ? 'Discussion' : 'चर्चा',
+    area: isEnglish ? 'Area' : 'क्षेत्र'
   };
 
   useEffect(() => {
@@ -206,7 +216,8 @@ const PostDetail: React.FC = () => {
       setUserReaction(prev => ({ ...prev, liked: !prev.liked, disliked: false }));
       setPost(prev => prev ? {
         ...prev,
-        likesCount: prev.likesCount + (prev.likesCount ? -1 : 1)
+        likesCount: prev.likesCount + (userReaction.liked ? -1 : 1),
+        dislikesCount: userReaction.disliked ? prev.dislikesCount - 1 : prev.dislikesCount
       } : null);
       
       toast.success(userReaction.liked ? 'Post unliked' : 'Post liked!');
@@ -218,7 +229,7 @@ const PostDetail: React.FC = () => {
 
   const handleDislike = async () => {
     if (!currentUser?.uid) {
-      toast.error(content.signInToLike);
+      toast.error(content.signInToDislike);
       return;
     }
 
@@ -229,7 +240,8 @@ const PostDetail: React.FC = () => {
       setUserReaction(prev => ({ ...prev, disliked: !prev.disliked, liked: false }));
       setPost(prev => prev ? {
         ...prev,
-        dislikesCount: prev.dislikesCount + (prev.dislikesCount ? -1 : 1)
+        dislikesCount: prev.dislikesCount + (userReaction.disliked ? -1 : 1),
+        likesCount: userReaction.liked ? prev.likesCount - 1 : prev.likesCount
       } : null);
       
       toast.success(userReaction.disliked ? 'Post undisliked' : 'Post disliked!');
@@ -238,8 +250,6 @@ const PostDetail: React.FC = () => {
       toast.error('Failed to update dislike');
     }
   };
-
-
 
   const formatRelativeTime = (date: any) => {
     const now = new Date();
@@ -296,6 +306,10 @@ const PostDetail: React.FC = () => {
     setShowReplyInput(prev => ({ ...prev, [commentId]: !prev[commentId] }));
   };
 
+  const toggleReplies = (commentId: string) => {
+    setExpandedComments(prev => ({ ...prev, [commentId]: !prev[commentId] }));
+  };
+
   // Handle comment deletion
   const handleDeleteComment = async (commentId: string) => {
     if (!currentUser?.uid) {
@@ -319,7 +333,6 @@ const PostDetail: React.FC = () => {
           setPost(updatedPost);
         }
         
-
       } catch (error: any) {
         console.error('Error deleting comment:', error);
         toast.error(error.message || content.deleteCommentFailed);
@@ -353,7 +366,7 @@ const PostDetail: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#014e5c] mx-auto mb-4"></div>
           <p className="text-gray-600">{content.loading}</p>
         </div>
       </div>
@@ -368,7 +381,7 @@ const PostDetail: React.FC = () => {
           <h2 className="text-xl font-semibold text-gray-900 mb-2">{content.postNotFound}</h2>
           <button
             onClick={() => navigate('/discussion')}
-            className="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600 transition-colors"
+            className="bg-[#014e5c] text-white px-6 py-2 rounded-lg hover:bg-[#014e5c]/90 transition-colors"
           >
             {content.backToForum}
           </button>
@@ -380,193 +393,189 @@ const PostDetail: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Desktop Header */}
-      <div className="hidden lg:block bg-white border-b border-gray-200 sticky top-0 z-20">
+      <div className="hidden lg:block bg-[#014e5c] text-white sticky top-0 z-20 shadow-md">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => navigate('/discussion')}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-white/10 text-white rounded-full transition-colors"
               >
-                <ArrowLeft className="w-5 h-5 text-gray-600" />
+                <ArrowLeft className="w-5 h-5" />
               </button>
-              <h1 className="text-lg font-semibold text-gray-900">{content.backToForum}</h1>
+              <h1 className="text-lg font-semibold">{content.backToForum}</h1>
             </div>
           </div>
         </div>
       </div>
 
       {/* Mobile Header */}
-      <div className="lg:hidden bg-white border-b border-gray-200 sticky top-0 z-20">
+      <div className="lg:hidden bg-[#014e5c] text-white sticky top-0 z-20 shadow-md">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between">
             <button
               onClick={() => navigate('/discussion')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-white/10 text-white rounded-full transition-colors"
             >
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
+              <ArrowLeft className="w-5 h-5" />
             </button>
-            <h1 className="text-lg font-semibold text-gray-900">{content.backToForum}</h1>
+            <h1 className="text-lg font-semibold">{content.backToForum}</h1>
             <div className="w-10"></div> {/* Spacer for centering */}
           </div>
         </div>
       </div>
 
-      {/* Gap for mobile */}
-      <div className="lg:hidden h-4 bg-[#c1cad1]"></div>
-
-      <div className="max-w-7xl mx-auto px-6 py-6 pb-24 lg:pb-6">
+      <div className="max-w-4xl mx-auto px-4 py-6 pb-24 lg:pb-6">
         {/* Post Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6"
+          className="mb-6"
         >
-          {post.status === 'removed' ? (
-            <div className="p-8 text-center">
-              <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-              <p className="text-gray-600 text-lg">{content.postRemoved}</p>
-            </div>
-          ) : (
-            <div className="p-6">
-              {/* Post Header */}
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-red-500 rounded-full flex items-center justify-center">
-                    <User className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 text-lg">{post.userName || 'User'}</h3>
-                    <div className="flex items-center space-x-2 text-sm text-gray-500">
-                      <MapPin className="h-4 w-4" />
-                      <span>{post.constituencyName || `Constituency ${post.constituency}`}</span>
-                      <span>•</span>
-                      <Calendar className="h-4 w-4" />
-                      <span>{formatRelativeTime(post.createdAt)}</span>
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+            {post.status === 'removed' ? (
+              <div className="p-8 text-center">
+                <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+                <p className="text-gray-600 text-lg">{content.postRemoved}</p>
+              </div>
+            ) : (
+              <div className="p-6">
+                {/* Post Header */}
+                <div className="flex items-start justify-between mb-5">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-[#014e5c] to-[#01798e] rounded-full flex items-center justify-center">
+                      <User className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900 text-lg">{post.userName || 'User'}</h3>
+                      <div className="flex items-center space-x-2 text-sm text-gray-500">
+                        <MapPin className="h-4 w-4" />
+                        <span>{post.constituencyName || `Constituency ${post.constituency}`}</span>
+                        <span>•</span>
+                        <Clock className="h-4 w-4" />
+                        <span>{formatRelativeTime(post.createdAt)}</span>
+                      </div>
                     </div>
                   </div>
+                  
+                  {/* Status Badge */}
+                  {post.status === 'under_review' && (
+                    <span className="px-3 py-1 bg-yellow-50 text-yellow-700 border border-yellow-200 text-xs font-medium rounded-full flex items-center gap-1">
+                      <Shield className="h-3 w-3" />
+                      {content.underReview}
+                    </span>
+                  )}
                 </div>
-                
-                {/* Status Badge */}
-                {post.status === 'under_review' && (
-                  <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full flex items-center">
-                    <Shield className="h-3 w-3 mr-1" />
-                    {content.underReview}
-                  </span>
-                )}
-              </div>
 
-              {/* Post Content */}
-              <div className="mb-6">
-                {/* Poster Name - Above Title */}
-                <div className="mb-3">
-                  <span className="text-sm text-gray-600">
-                    {isEnglish ? 'Posted by ' : 'द्वारा पोस्ट किया गया '}
-                    <span className="font-semibold text-[#014e5c]">{post.userName || 'User'}</span>
-                  </span>
-                </div>
-                
-                {/* Post Title - More Prominent */}
-                <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4 leading-tight">
-                  {post.titlefirst} {post.titlesecond}
-                </h1>
-                
                 {/* Post Content */}
-                <p className="text-gray-700 leading-relaxed text-lg mb-4">{post.content}</p>
-                
-                {/* Tags */}
-                {post.tags && post.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {post.tags.map((tag, tagIndex) => (
-                      <span
-                        key={tagIndex}
-                        className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full flex items-center"
-                      >
-                        <Hash className="h-3 w-3 mr-1" />
-                        {tag}
-                      </span>
-                    ))}
+                <div className="mb-6">
+                  {/* Post Title - More Prominent */}
+                  <h1 className="text-2xl lg:text-3xl font-bold text-[#014e5c] mb-4 leading-tight">
+                    {post.titlefirst} {post.titlesecond}
+                  </h1>
+                  
+                  {/* Post Content */}
+                  <p className="text-gray-700 leading-relaxed text-lg mb-6">{post.content}</p>
+                  
+                  {/* Tags */}
+                  {post.tags && post.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {post.tags.map((tag, tagIndex) => (
+                        <span
+                          key={tagIndex}
+                          className="px-3 py-1 bg-[#014e5c]/10 text-[#014e5c] hover:bg-[#014e5c]/20 text-sm rounded-full flex items-center border border-[#014e5c]/20"
+                        >
+                          <Hash className="h-3 w-3 mr-1" />
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t border-gray-100 my-4"></div>
+
+                {/* Engagement Section */}
+                <div className="flex items-center justify-between pt-2">
+                  <div className="flex items-center space-x-4">
+                    <button 
+                      onClick={handleLike}
+                      disabled={userReaction.disliked}
+                      className={`flex items-center space-x-2 p-2 rounded-lg transition-colors ${
+                        userReaction.liked 
+                          ? 'text-red-500 bg-red-50 hover:bg-red-100 hover:text-red-600' 
+                          : userReaction.disliked
+                          ? 'text-gray-300 cursor-not-allowed'
+                          : 'text-gray-500 hover:text-red-500 hover:bg-red-50'
+                      }`}
+                    >
+                      <Heart className={`h-5 w-5 ${userReaction.liked ? 'fill-current' : ''}`} />
+                      <span className="font-medium">{post.likesCount || 0}</span>
+                    </button>
+
+                    <button 
+                      onClick={handleDislike}
+                      disabled={userReaction.liked}
+                      className={`flex items-center space-x-2 p-2 rounded-lg transition-colors ${
+                        userReaction.disliked 
+                          ? 'text-blue-500 bg-blue-50 hover:bg-blue-100 hover:text-blue-600' 
+                          : userReaction.liked
+                          ? 'text-gray-300 cursor-not-allowed'
+                          : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50'
+                      }`}
+                    >
+                      <ThumbsDown className={`h-5 w-5 ${userReaction.disliked ? 'fill-current' : ''}`} />
+                      <span className="font-medium">{post.dislikesCount || 0}</span>
+                    </button>
+
+                    <button 
+                      className="text-gray-500 hover:text-[#014e5c] hover:bg-[#014e5c]/10 p-2 rounded-lg transition-colors flex items-center space-x-2"
+                    >
+                      <Share2 className="h-5 w-5" />
+                      <span className="font-medium">{content.share}</span>
+                    </button>
                   </div>
-                )}
-              </div>
-
-              {/* Engagement Section */}
-              <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                <div className="flex items-center space-x-6">
-                  <button 
-                    onClick={handleLike}
-                    disabled={userReaction.disliked}
-                    className={`flex items-center space-x-2 p-2 rounded-lg transition-colors ${
-                      userReaction.liked 
-                        ? 'text-red-500 bg-red-50' 
-                        : userReaction.disliked
-                        ? 'text-gray-300 cursor-not-allowed'
-                        : 'text-gray-500 hover:text-red-500 hover:bg-red-50'
-                    }`}
-                  >
-                    <Heart className={`h-5 w-5 ${userReaction.liked ? 'fill-current' : ''}`} />
-                    <span className="text-sm font-medium">{post.likesCount || 0}</span>
-                  </button>
-
-                  <button 
-                    onClick={handleDislike}
-                    disabled={userReaction.liked}
-                    className={`flex items-center space-x-2 p-2 rounded-lg transition-colors ${
-                      userReaction.disliked 
-                        ? 'text-blue-500 bg-blue-50' 
-                        : userReaction.liked
-                        ? 'text-gray-300 cursor-not-allowed'
-                        : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50'
-                    }`}
-                  >
-                    <ThumbsDown className={`h-5 w-5 ${userReaction.disliked ? 'fill-current' : ''}`} />
-                    <span className="text-sm font-medium">{post.dislikesCount || 0}</span>
-                  </button>
-
-                  <button className="flex items-center space-x-2 text-gray-500 hover:text-green-500 hover:bg-green-50 p-2 rounded-lg transition-colors">
-                    <Share2 className="h-5 w-5" />
-                    <span className="text-sm font-medium">{content.share}</span>
-                  </button>
-                </div>
-                
-                <div className="flex items-center space-x-2 text-sm text-gray-500">
-                  <MessageSquare className="h-4 w-4" />
-                  <span>{post.commentsCount || 0} {content.comments}</span>
+                  
+                  <div className="flex items-center space-x-2 text-sm text-gray-500">
+                    <MessageSquare className="h-4 w-4" />
+                    <span>{post.commentsCount || 0} {content.comments}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </motion.div>
 
         {/* Comments Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">{content.comments}</h2>
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-100 bg-[#014e5c]/5">
+            <h2 className="text-xl font-semibold text-[#014e5c] mb-4">{content.comments}</h2>
             
             {/* Comment Input */}
             <div className="space-y-4">
               {currentUser ? (
-                <div className="flex space-x-3">
-                  <div className="flex-1">
-                    <textarea
-                      placeholder={content.writeComment}
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
-                      rows={3}
-                    />
+                <div className="flex flex-col space-y-3">
+                  <textarea
+                    placeholder={content.writeComment}
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#014e5c] focus:border-[#014e5c] resize-none"
+                    rows={3}
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleCommentSubmit}
+                      disabled={isSubmittingComment}
+                      className="bg-[#014e5c] hover:bg-[#014e5c]/90 text-white px-6 py-2 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSubmittingComment ? content.posting : content.comment}
+                    </button>
                   </div>
-                  <button
-                    onClick={handleCommentSubmit}
-                    disabled={isSubmittingComment}
-                    className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSubmittingComment ? 'Posting...' : content.comment}
-                  </button>
                 </div>
               ) : (
-                <div className="text-center py-4 text-gray-500">
-                  {content.signInToComment}
+                <div className="text-center py-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+                  <MessageSquare className="h-8 w-8 mx-auto mb-2 text-[#014e5c]/40" />
+                  <p className="text-gray-500">{content.signInToComment}</p>
                 </div>
               )}
             </div>
@@ -580,112 +589,135 @@ const PostDetail: React.FC = () => {
                 <p>{content.noComments}</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <AnimatePresence>
                   {comments.map((comment, index) => (
                     <motion.div
                       key={comment.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
+                      transition={{ delay: index * 0.05 }}
                       className="space-y-3"
                     >
                       {/* Main Comment */}
-                      <div className="flex space-x-3 p-4 bg-gray-50 rounded-lg">
-                        <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-red-500 rounded-full flex-shrink-0 flex items-center justify-center">
-                          <User className="h-4 w-4 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 text-sm text-gray-500 mb-2">
-                            <span className="font-medium text-gray-900">{comment.userName}</span>
-                            <span>•</span>
-                            <span>{formatRelativeTime(comment.createdAt)}</span>
-                            <span>•</span>
-                            <span>{comment.constituencyName}</span>
-                          </div>
-                          <p className="text-gray-700 mb-3">{comment.content}</p>
-                          
-                          <div className="flex items-center space-x-3">
-                            {/* Reply Button */}
-                            <button
-                              onClick={() => toggleReplyInput(comment.id)}
-                              className="text-sm text-green-600 hover:text-green-700 font-medium"
-                            >
-                              {content.reply}
-                            </button>
-                            
-                            {/* Delete Button (only show for comment owner or post owner) */}
-                            {(currentUser?.uid === comment.userId || currentUser?.uid === post?.userId) && (
-                              <button
-                                onClick={() => handleDeleteComment(comment.id)}
-                                className="text-sm text-red-600 hover:text-red-700 font-medium"
-                              >
-                                {content.delete}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Reply Input */}
-                      {showReplyInput[comment.id] && (
-                        <div className="ml-11 p-4 bg-white border border-gray-200 rounded-lg">
+                      <div className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                        <div className="p-4 bg-white">
                           <div className="flex space-x-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-[#014e5c] to-[#01798e] rounded-full flex-shrink-0 flex items-center justify-center">
+                              <User className="h-5 w-5 text-white" />
+                            </div>
                             <div className="flex-1">
+                              <div className="flex items-center space-x-2 text-sm mb-1">
+                                <span className="font-semibold text-[#014e5c]">{comment.userName}</span>
+                                <span className="text-gray-400">•</span>
+                                <span className="text-gray-500">{formatRelativeTime(comment.createdAt)}</span>
+                                <span className="text-gray-400">•</span>
+                                <span className="text-gray-500">{comment.constituencyName}</span>
+                              </div>
+                              <p className="text-gray-700 mb-3">{comment.content}</p>
+                              
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-4">
+                                  {/* Reply Button */}
+                                  <button
+                                    onClick={() => toggleReplyInput(comment.id)}
+                                    className="text-[#014e5c] hover:bg-[#014e5c]/10 px-2 py-1 rounded text-sm font-medium transition-colors"
+                                  >
+                                    {content.reply}
+                                  </button>
+                                  
+                                  {/* Delete Button (only show for comment owner or post owner) */}
+                                  {(currentUser?.uid === comment.userId || currentUser?.uid === post?.userId) && (
+                                    <button
+                                      onClick={() => handleDeleteComment(comment.id)}
+                                      className="text-red-500 hover:bg-red-50 hover:text-red-600 px-2 py-1 rounded text-sm font-medium transition-colors"
+                                    >
+                                      {content.delete}
+                                    </button>
+                                  )}
+                                </div>
+                                
+                                {/* Show/Hide Replies Button */}
+                                {replies[comment.id] && replies[comment.id].length > 0 && (
+                                  <button
+                                    onClick={() => toggleReplies(comment.id)}
+                                    className="text-gray-500 hover:text-[#014e5c] flex items-center space-x-1 px-2 py-1 rounded text-sm font-medium transition-colors"
+                                  >
+                                    <span className="text-xs">
+                                      {expandedComments[comment.id] ? content.hideReplies : content.showReplies} ({replies[comment.id].length})
+                                    </span>
+                                    {expandedComments[comment.id] ? (
+                                      <ChevronUp className="h-4 w-4" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Reply Input */}
+                        {showReplyInput[comment.id] && (
+                          <div className="p-4 bg-gray-50 border-t border-gray-100">
+                            <div className="flex flex-col space-y-3">
                               <textarea
-                                placeholder="Write your reply..."
+                                placeholder={content.writeReply}
                                 value={replyText[comment.id] || ''}
                                 onChange={(e) => setReplyText(prev => ({
                                   ...prev,
                                   [comment.id]: e.target.value
                                 }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#014e5c] focus:border-[#014e5c] resize-none"
                                 rows={2}
                               />
+                              <div className="flex justify-end">
+                                <button
+                                  onClick={() => handleReplySubmit(comment.id)}
+                                  disabled={isSubmittingReply[comment.id]}
+                                  className="bg-[#014e5c] hover:bg-[#014e5c]/90 text-white px-4 py-2 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {isSubmittingReply[comment.id] ? content.posting : content.reply}
+                                </button>
+                              </div>
                             </div>
-                            <button
-                              onClick={() => handleReplySubmit(comment.id)}
-                              disabled={isSubmittingReply[comment.id]}
-                              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {isSubmittingReply[comment.id] ? 'Posting...' : 'Reply'}
-                            </button>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Replies */}
-                      {replies[comment.id] && replies[comment.id].length > 0 && (
-                        <div className="ml-11 space-y-3">
-                          {replies[comment.id].map((reply) => (
-                            <div key={reply.id} className="flex space-x-3 p-3 bg-white border border-gray-200 rounded-lg">
-                              <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-red-500 rounded-full flex-shrink-0 flex items-center justify-center">
-                                <User className="h-3 w-3 text-white" />
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 text-sm text-gray-500 mb-1">
-                                  <span className="font-medium text-gray-900">{reply.userName}</span>
-                                  <span>•</span>
-                                  <span>{formatRelativeTime(reply.createdAt)}</span>
-                                  <span>•</span>
-                                  <span>{reply.constituencyName}</span>
+                        {/* Replies */}
+                        {replies[comment.id] && replies[comment.id].length > 0 && expandedComments[comment.id] && (
+                          <div className="bg-gray-50 border-t border-gray-100">
+                            <div className="pl-12 pr-4 py-3 space-y-3">
+                              {replies[comment.id].map((reply) => (
+                                <div key={reply.id} className="flex space-x-3 p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                                  <div className="w-8 h-8 bg-gradient-to-br from-[#014e5c]/80 to-[#01798e]/80 rounded-full flex-shrink-0 flex items-center justify-center">
+                                    <User className="h-4 w-4 text-white" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex items-center space-x-2 text-xs mb-1">
+                                      <span className="font-semibold text-[#014e5c]">{reply.userName}</span>
+                                      <span className="text-gray-400">•</span>
+                                      <span className="text-gray-500">{formatRelativeTime(reply.createdAt)}</span>
+                                    </div>
+                                    <p className="text-gray-700 text-sm mb-2">{reply.content}</p>
+                                    
+                                    {/* Delete Button for replies (only show for reply owner or post owner) */}
+                                    {(currentUser?.uid === reply.userId || currentUser?.uid === post?.userId) && (
+                                      <button
+                                        onClick={() => handleDeleteReply(reply.id)}
+                                        className="text-red-500 hover:bg-red-50 hover:text-red-600 px-2 py-1 rounded text-xs font-medium transition-colors"
+                                      >
+                                        {content.delete}
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
-                                <p className="text-gray-700 text-sm mb-2">{reply.content}</p>
-                                
-                                {/* Delete Button for replies (only show for reply owner or post owner) */}
-                                {(currentUser?.uid === reply.userId || currentUser?.uid === post?.userId) && (
-                                  <button
-                                    onClick={() => handleDeleteReply(reply.id)}
-                                    className="text-sm text-red-600 hover:text-red-700 font-medium"
-                                  >
-                                    {content.delete}
-                                  </button>
-                                )}
-                              </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      )}
+                          </div>
+                        )}
+                      </div>
                     </motion.div>
                   ))}
                 </AnimatePresence>
@@ -700,24 +732,24 @@ const PostDetail: React.FC = () => {
         <div className="flex items-center justify-around py-3 px-2">
           <button
             onClick={() => navigate('/')}
-            className="flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-gray-500 hover:text-[#014e5c]"
+            className="flex flex-col items-center space-y-1 h-auto py-2 text-gray-500 hover:text-[#014e5c] hover:bg-transparent transition-colors"
           >
             <Home className="w-5 h-5" />
-            <span className="text-xs font-medium">{isEnglish ? 'Home' : 'होम'}</span>
+            <span className="text-xs font-medium">{content.home}</span>
           </button>
           <button
             onClick={() => navigate('/discussion')}
-            className="flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-[#014e5c] bg-[#014e5c]/10"
+            className="flex flex-col items-center space-y-1 h-auto py-2 text-[#014e5c] bg-[#014e5c]/10 hover:bg-[#014e5c]/20 transition-colors rounded-lg"
           >
             <MessageSquare className="w-5 h-5" />
-            <span className="text-xs font-medium">{isEnglish ? 'Discussion' : 'चर्चा'}</span>
+            <span className="text-xs font-medium">{content.discussion}</span>
           </button>
           <button
             onClick={() => navigate('/aapka-kshetra')}
-            className="flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-gray-500 hover:text-[#014e5c]"
+            className="flex flex-col items-center space-y-1 h-auto py-2 text-gray-500 hover:text-[#014e5c] hover:bg-transparent transition-colors"
           >
             <MapPin className="w-5 h-5" />
-            <span className="text-xs font-medium">{isEnglish ? 'Area' : 'क्षेत्र'}</span>
+            <span className="text-xs font-medium">{content.area}</span>
           </button>
         </div>
       </div>
