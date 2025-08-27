@@ -594,6 +594,34 @@ export class FirebaseService {
     }
   }
 
+  static async getSubmittedQuestionnaire(userId: string, constituencyId: number): Promise<FirebaseQuestionnaireSubmission | null> {
+    try {
+      const submissionsRef = collection(db, 'questionnaire_submissions');
+      const q = query(
+        submissionsRef,
+        where('user_id', '==', userId),
+        where('constituency_id', '==', constituencyId)
+      );
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) {
+        return null;
+      }
+      
+      const doc = snapshot.docs[0];
+      return {
+        id: doc.id,
+        ...doc.data()
+      } as FirebaseQuestionnaireSubmission;
+    } catch (error: any) {
+      if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
+        console.warn('Permission denied getting submitted questionnaire, assuming not submitted');
+        return null;
+      }
+      console.error('Error getting submitted questionnaire:', error);
+      return null;
+    }
+  }
+
   // Manifesto score aggregation
   static async recalcAndUpdateManifestoAverageScore(constituencyId: number): Promise<FirebaseManifestoAverageScore | null> {
     try {

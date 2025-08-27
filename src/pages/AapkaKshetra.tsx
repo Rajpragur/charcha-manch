@@ -1052,11 +1052,11 @@ const AapkaKshetra: React.FC = () => {
                     <div className="flex items-start space-x-3">
                       <div className="relative">
                         <img 
-                          src={candidate.candidate_image_url} 
+                          src={candidate.candidate_party.toUpperCase() == 'NOTA' || candidate.candidate_party == 'नोटा' ? '/images/party_logo/nota.png' : candidate.candidate_image_url} 
                           alt={candidate.candidate_name}
                           className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
                           onError={(e) => {
-                            e.currentTarget.src = '/images/logo.png';
+                            e.currentTarget.src = '/images/party_logo/nota.png';
                           }}
                         />
                       </div>

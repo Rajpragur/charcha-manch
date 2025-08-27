@@ -376,6 +376,27 @@ const DiscussionForum: React.FC = () => {
       .replace(/^\d+\.\s/gm, (match) => match);
   };
 
+  // Function to sort constituencies with selected ones at the top
+  const getSortedConstituencies = () => {
+    if (!constituencies.length) return [];
+    
+    // Separate selected and unselected constituencies
+    const selected = constituencies.filter(c => 
+      selectedConstituencies.includes(c.id) || selectedConstituency === c.id
+    );
+    const unselected = constituencies.filter(c => 
+      !selectedConstituencies.includes(c.id) && selectedConstituency !== c.id
+    );
+    
+    // Return selected first, then unselected
+    return [...selected, ...unselected];
+  };
+
+  // Function to check if a constituency is selected
+  const isConstituencySelected = (constituencyId: number) => {
+    return selectedConstituencies.includes(constituencyId) || selectedConstituency === constituencyId;
+  };
+
   // Handle post deletion (user can only delete their own posts)
   const handleDeletePost = async (postId: string) => {
     if (!currentUser?.uid) {
@@ -738,15 +759,31 @@ const DiscussionForum: React.FC = () => {
                 >
                   {content.allConstituencies}
                 </button>
-                {constituencies.map((constituency) => (
+                
+                {/* Selected Constituencies */}
+                {getSortedConstituencies().filter(c => isConstituencySelected(c.id)).length > 0 && (
+                  <>
+                    {getSortedConstituencies().filter(c => isConstituencySelected(c.id)).map((constituency) => (
+                      <button
+                        key={constituency.id}
+                        onClick={() => handleConstituencyChange(constituency.id)}
+                        className="w-full text-left px-2 py-1.5 rounded-md transition-colors text-sm bg-[#014e5c] text-white"
+                      >
+                        {constituency.name}
+                      </button>
+                    ))}
+                    
+                    {/* Separator */}
+                    <div className="border-t border-gray-200 my-2"></div>
+                  </>
+                )}
+                
+                {/* Unselected Constituencies */}
+                {getSortedConstituencies().filter(c => !isConstituencySelected(c.id)).map((constituency) => (
                   <button
                     key={constituency.id}
                     onClick={() => handleConstituencyChange(constituency.id)}
-                    className={`w-full text-left px-2 py-1.5 rounded-md transition-colors text-sm ${
-                      selectedConstituency === constituency.id
-                        ? 'bg-[#014e5c] text-white'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
+                    className="w-full text-left px-2 py-1.5 rounded-md transition-colors text-sm text-gray-700 hover:bg-gray-50"
                   >
                     {constituency.name}
                   </button>
@@ -804,29 +841,45 @@ const DiscussionForum: React.FC = () => {
               
               {showConstituencyFilter && (
                 <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                                  <button
-                  onClick={() => handleConstituencyChange(null)}
-                  className={`w-full text-left px-2 py-1.5 rounded-md transition-colors text-sm ${
-                    selectedConstituencies.length === 0
-                      ? 'bg-green-100 text-green-700 border border-green-200'
-                      : 'text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  {content.allConstituencies}
-                </button>
-                {constituencies.map((constituency) => (
                   <button
-                    key={constituency.id}
-                    onClick={() => handleMultiConstituencyChange(constituency.id)}
+                    onClick={() => handleConstituencyChange(null)}
                     className={`w-full text-left px-2 py-1.5 rounded-md transition-colors text-sm ${
-                      selectedConstituencies.includes(constituency.id)
-                        ? 'bg-[#014e5c] text-white'
+                      selectedConstituencies.length === 0
+                        ? 'bg-[#014e5c] text-white border border-green-200'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    {constituency.name}
+                    {content.allConstituencies}
                   </button>
-                ))}
+                  
+                  {/* Selected Constituencies */}
+                  {getSortedConstituencies().filter(c => isConstituencySelected(c.id)).length > 0 && (
+                    <>
+                      {getSortedConstituencies().filter(c => isConstituencySelected(c.id)).map((constituency) => (
+                        <button
+                          key={constituency.id}
+                          onClick={() => handleMultiConstituencyChange(constituency.id)}
+                          className="w-full text-left px-2 py-1.5 rounded-md transition-colors text-sm bg-[#014e5c] text-white"
+                        >
+                          {constituency.name}
+                        </button>
+                      ))}
+                      
+                      {/* Separator */}
+                      <div className="border-t border-gray-200 my-2"></div>
+                    </>
+                  )}
+                  
+                  {/* Unselected Constituencies */}
+                  {getSortedConstituencies().filter(c => !isConstituencySelected(c.id)).map((constituency) => (
+                    <button
+                      key={constituency.id}
+                      onClick={() => handleMultiConstituencyChange(constituency.id)}
+                      className="w-full text-left px-2 py-1.5 rounded-md transition-colors text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      {constituency.name}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
