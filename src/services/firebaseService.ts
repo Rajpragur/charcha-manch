@@ -1375,6 +1375,169 @@ export class FirebaseService {
     }
   }
 
+  // Get user's liked discussion posts
+  static async getUserLikedDiscussionPosts(userId: string): Promise<string[]> {
+    try {
+      if (!userId) {
+        console.log('No user ID provided, returning empty array');
+        return [];
+      }
+      
+      const likesRef = collection(db, 'post_likes');
+      const q = query(likesRef, where('userId', '==', userId));
+      const querySnapshot = await getDocs(q);
+      
+      console.log(`🔍 Found ${querySnapshot.size} discussion post likes for user ${userId}`);
+      
+      const likedPostIds = querySnapshot.docs.map(doc => doc.data().postId);
+      console.log('🔍 Liked discussion post IDs:', likedPostIds);
+      return likedPostIds;
+    } catch (error: any) {
+      console.error('Error getting user liked discussion posts:', error);
+      return [];
+    }
+  }
+
+  // Get user's viewed discussion posts
+  static async getUserViewedDiscussionPosts(userId: string): Promise<string[]> {
+    try {
+      if (!userId) {
+        console.log('No user ID provided, returning empty array');
+        return [];
+      }
+      
+      // Since there's no dedicated post_views collection, we'll use the constituency_interactions
+      // where interaction_type is 'view' and it's related to discussion posts
+      const interactionsRef = collection(db, 'discussion_posts');
+      const q = query(
+        interactionsRef, 
+        where('userId', '==', userId)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      console.log(`🔍 Found ${querySnapshot.size} discussion posts created by user ${userId}`);
+      
+      // Return the count of posts created by user
+      return Array(querySnapshot.size).fill('created');
+    } catch (error: any) {
+      console.error('Error getting user discussion posts:', error);
+      return [];
+    }
+  }
+
+  // Get user's comment count from discussion posts
+  static async getUserCommentCount(userId: string): Promise<number> {
+    try {
+      if (!userId) {
+        console.log('No user ID provided, returning 0');
+        return 0;
+      }
+      
+      // Get comments from constituency_interactions where interaction_type is 'comment'
+      const interactionsRef = collection(db, 'constituency_interactions');
+      const q = query(
+        interactionsRef, 
+        where('user_id', '==', userId),
+        where('interaction_type', '==', 'comment')
+      );
+      const querySnapshot = await getDocs(q);
+      
+      console.log(`🔍 Found ${querySnapshot.size} comments by user ${userId}`);
+      
+      return querySnapshot.size;
+    } catch (error: any) {
+      console.error('Error getting user comment count:', error);
+      return 0;
+    }
+  }
+
+  // Get user's share count from discussion posts
+  static async getUserShareCount(userId: string): Promise<number> {
+    try {
+      if (!userId) {
+        console.log('No user ID provided, returning 0');
+        return 0;
+      }
+      
+      // Get shares from constituency_interactions where interaction_type is 'share'
+      const interactionsRef = collection(db, 'constituency_interactions');
+      const q = query(
+        interactionsRef, 
+        where('user_id', '==', userId),
+        where('interaction_type', '==', 'share')
+      );
+      const querySnapshot = await getDocs(q);
+      
+      console.log(`🔍 Found ${querySnapshot.size} shares by user ${userId}`);
+      
+      return querySnapshot.size;
+    } catch (error: any) {
+      console.error('Error getting user share count:', error);
+      return 0;
+    }
+  }
+
+  // Get user's satisfaction survey count
+  static async getUserSatisfactionSurveyCount(userId: string): Promise<number> {
+    try {
+      if (!userId) {
+        console.log('No user ID provided, returning 0');
+        return 0;
+      }
+      
+      // Get satisfaction surveys from satisfaction_surveys collection
+      const surveysRef = collection(db, 'satisfaction_surveys');
+      const q = query(surveysRef, where('user_id', '==', userId));
+      const querySnapshot = await getDocs(q);
+      
+      console.log(`🔍 Found ${querySnapshot.size} satisfaction surveys by user ${userId}`);
+      
+      return querySnapshot.size;
+    } catch (error: any) {
+      console.error('Error getting user satisfaction survey count:', error);
+      return 0;
+    }
+  }
+
+  // Get user's total interaction count
+  static async getUserTotalInteractionCount(userId: string): Promise<number> {
+    try {
+      if (!userId) {
+        console.log('No user ID provided, returning 0');
+        return 0;
+      }
+      
+      // Get all interactions from constituency_interactions
+      const interactionsRef = collection(db, 'constituency_interactions');
+      const q = query(interactionsRef, where('user_id', '==', userId));
+      const interactionsSnapshot = await getDocs(q);
+      
+      // Get satisfaction surveys
+      const surveysRef = collection(db, 'satisfaction_surveys');
+      const surveysQuery = query(surveysRef, where('user_id', '==', userId));
+      const surveysSnapshot = await getDocs(surveysQuery);
+      
+      // Get discussion posts
+      const postsRef = collection(db, 'discussion_posts');
+      const postsQuery = query(postsRef, where('userId', '==', userId));
+      const postsSnapshot = await getDocs(postsQuery);
+      
+      // Get likes given
+      const likesRef = collection(db, 'post_likes');
+      const likesQuery = query(likesRef, where('userId', '==', userId));
+      const likesSnapshot = await getDocs(likesQuery);
+      
+      const totalInteractions = interactionsSnapshot.size + surveysSnapshot.size + postsSnapshot.size + likesSnapshot.size;
+      
+      console.log(`🔍 Total interactions for user ${userId}: ${totalInteractions}`);
+      
+      return totalInteractions;
+    } catch (error: any) {
+      console.error('Error getting user total interaction count:', error);
+      return 0;
+    }
+  }
+
   // Get blog like count
   static async getBlogLikeCount(blogId: string): Promise<number> {
     try {
