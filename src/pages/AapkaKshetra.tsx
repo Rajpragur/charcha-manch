@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import FirebaseService from '../services/firebaseService';
-import { Calendar, GraduationCap, House, MapPin, MessageCircle,Scale, CircleQuestionMark, IndianRupee,BanknoteArrowUp,Hospital, School, Tractor, BriefcaseBusiness } from 'lucide-react';
+import { Calendar, GraduationCap, House, MapPin, MessageCircle,Scale, CircleQuestionMark, IndianRupee,BanknoteArrowUp,Hospital } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../configs/firebase';
@@ -66,7 +66,6 @@ const AapkaKshetra: React.FC = () => {
   const [departmentRatings, setDepartmentRatings] = useState<Record<string, number>>({});
   const [hasSubmittedQuestionnaire, setHasSubmittedQuestionnaire] = useState(false);
   const [otherCandidates, setOtherCandidates] = useState<CandidateData[]>([]);
-  const [userSurveys, setUserSurveys] = useState<Set<string>>(new Set());
   const checkedConstituencies = useRef<Set<string>>(new Set());
   const [initialLoadComplete, setInitialLoadComplete] = useState<boolean>(false);
 
