@@ -146,7 +146,7 @@ export default function CharchitVidhanSabha({
 
   return (
     <div className="min-h-screen bg-[#c5ced4]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-8">
         {/* Header Section */}
         <div className="text-center mb-2 lg:mb-5">
           <h1 className="text-2xl md:text-5xl font-bold mb-4 bg-black bg-clip-text text-transparent">
@@ -177,18 +177,18 @@ export default function CharchitVidhanSabha({
         ) : (
           <>
             {/* Constituency Grid Section */}
-            <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-2 lg:py-8">
+            <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-3 lg:py-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {filteredAndSortedConstituencies
                   .slice(0, 2)
                   .map((constituency) => (
                     <div
                       key={constituency.id}
-                      className="bg-white rounded-xl shadow-lg p-6 border border-gray-100"
+                      className="bg-white rounded-xl shadow-lg p-3 border border-gray-100"
                     >
                       {/* Candidate Profile Header */}
                       <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center space-x-3">
+                        <div className="flex max-[450px]:w-60 items-center space-x-1 lg:space-x-3">
                           <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
                             {constituency.profileImage ? (
                               <img
@@ -210,19 +210,19 @@ export default function CharchitVidhanSabha({
                             )}
                           </div>
                           <div>
-                            <div className="text-lg font-bold text-gray-900">
+                            <div className="text-lg max-[450px]:w-40 font-bold text-gray-900">
                               {isEnglish
                                 ? constituency.constituencyName.en
                                 : constituency.constituencyName.hi}
                             </div>
-                            <div className="text-sm font-medium text-gray-700">
+                            <div className="text-sm max-[450px]:w-40 font-medium text-gray-700">
                               {isEnglish
                                 ? constituency.candidateName.en
                                 : constituency.candidateName.hi}
                             </div>
                             <div className="flex items-center space-x-2 mt-1">
                               <span
-                                className={`px-2 py-1 rounded-full text-xs font-medium text-white ${getPartyColor(constituency.partyName.name)}`}
+                                className={`max-[450px]:w-35 px-3 py-1 text-center rounded-full text-xs font-medium text-white ${getPartyColor(constituency.partyName.name)}`}
                               >
                                 {isEnglish
                                   ? constituency.partyName.name

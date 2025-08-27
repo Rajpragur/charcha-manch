@@ -1001,7 +1001,7 @@ const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean)
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 pb-20 md:pb-0">
+    <div className="min-h-screen bg-[#c5ced4] mb-0">
       {/* Hero Section */}
       <div className="bg-[#273f4f] text-white py-5 sm:py-10 px-4 w-full">
         <div className="w-full max-w-none mx-auto">

@@ -44,6 +44,12 @@ interface CandidateData {
     }>;
     average_score: number;
   }>;
+  other_candidates?: Array<{
+    candidate_name: string;
+    candidate_image_url: string;
+    candidate_party: string;
+    vote_share: number;
+  }>;
 }
 
 const AapkaKshetra: React.FC = () => {
@@ -65,7 +71,12 @@ const AapkaKshetra: React.FC = () => {
   const [scoresLoaded, setScoresLoaded] = useState<boolean>(false);
   const [departmentRatings, setDepartmentRatings] = useState<Record<string, number>>({});
   const [hasSubmittedQuestionnaire, setHasSubmittedQuestionnaire] = useState(false);
-  const [otherCandidates, setOtherCandidates] = useState<CandidateData[]>([]);
+  const [, setOtherCandidates] = useState<Array<{
+    candidate_name: string;
+    candidate_image_url: string;
+    candidate_party: string;
+    vote_share: number;
+  }>>([]);
   const checkedConstituencies = useRef<Set<string>>(new Set());
   const [initialLoadComplete, setInitialLoadComplete] = useState<boolean>(false);
 
@@ -394,6 +405,7 @@ const AapkaKshetra: React.FC = () => {
       const dataFile = isEnglish ? '/data/candidates_en.json' : '/data/candidates.json';
       const response = await fetch(dataFile);
       const data: CandidateData[] = await response.json();
+      
       const candidate = data.find((item: CandidateData) => item.area_name === constituency);
       if (candidate) {
         setCandidateData(candidate);
@@ -416,11 +428,21 @@ const AapkaKshetra: React.FC = () => {
           }
         }
         
-        // Fetch other candidates from the same constituency
-        const otherCands = data.filter((item: CandidateData) => 
-          item.area_name === constituency && item.vidhayak_info.name !== candidate.vidhayak_info.name
-        );
-        setOtherCandidates(otherCands);
+        // Fetch other candidates from the same constituency using other_candidates
+        if (candidate.other_candidates && Array.isArray(candidate.other_candidates)) {
+          setOtherCandidates(candidate.other_candidates);
+        } else {
+          // Fallback: filter candidates from the same constituency if other_candidates is not available
+          const otherCands = data.filter((item: CandidateData) => 
+            item.area_name === constituency && item.vidhayak_info.name !== candidate.vidhayak_info.name
+          );
+          setOtherCandidates(otherCands.map(cand => ({
+            candidate_name: cand.vidhayak_info.name,
+            candidate_image_url: cand.vidhayak_info.image_url,
+            candidate_party: cand.vidhayak_info.party_name,
+            vote_share: cand.vidhayak_info.last_election_vote_percentage,
+          })));
+        }
         
         // Initialize department ratings
         const initialRatings: Record<string, number> = {};
@@ -614,7 +636,6 @@ const AapkaKshetra: React.FC = () => {
       navigate(`/discussion?constituency=${candidateData.area_name}&name=${encodeURIComponent(candidateData.area_name)}`);
     }
   };
-
   const formatCurrency = (amount: number, isEnglish: boolean): string => {
     if (amount >= 10000000) {
       return isEnglish ? `₹${(amount / 10000000).toFixed(2)} Cr` : `₹${(amount / 10000000).toFixed(2)} करोड़`;
@@ -670,7 +691,7 @@ const AapkaKshetra: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#9ca8b4] pb-20">
+    <div className="min-h-screen bg-[#9ca8b4]">
       <div className="px-4 py-3">
         {/* Constituency Information Card */}
         <div className="bg-white rounded-lg p-1 mb-4 shadow-sm text-center">
@@ -1012,36 +1033,62 @@ const AapkaKshetra: React.FC = () => {
         )}
 
         {/* Other Candidates Section */}
-        {otherCandidates.length > 0 && (
+        {candidateData && candidateData.other_candidates && candidateData.other_candidates.length > 0 && (
           <div className="bg-white rounded-lg p-4 mb-2 shadow-sm">
-            <h3 className="text-lg font-medium text-black mb-4 text-center">
-              {isEnglish ? 'Other Candidates in This Constituency' : 'इस क्षेत्र के अन्य उम्मीदवार'}
-            </h3>
-            
-            <div className="space-y-3">
-              {otherCandidates.map((candidate, index) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-3">
-                  <div className="flex items-center space-x-3">
-                    <img 
-                      src={candidate.vidhayak_info.image_url} 
-                      alt={candidate.vidhayak_info.name}
-                      className="w-12 h-12 rounded-full object-cover border border-gray-200"
-                      onError={(e) => {
-                        e.currentTarget.src = '/images/logo.png';
-                      }}
-                    />
-                    <div className="flex-1">
-                      <h4 className="font-medium text-black">{candidate.vidhayak_info.name}</h4>
-                      <p className="text-sm text-gray-600">{candidate.vidhayak_info.party_name}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-sm text-gray-500">
-                        {candidate.vidhayak_info.last_election_vote_percentage}% votes
-                      </span>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-black">
+                {isEnglish ? 'Other Major Candidates' : 'अन्य प्रमुख उम्मीदवार'}
+              </h3>
+              <span className="text-sm text-gray-500">
+                {isEnglish ? '(Previous Election)' : '(पिछला चुनाव)'}
+              </span>
+            </div>
+            {/* Navigation Arrows and Candidates Container */}
+            <div className="relative">
+              {/* Candidates Row - Show All */}
+              <div className="flex space-x-4 overflow-x-auto px-4 md:px-8 pb-2">
+                {candidateData.other_candidates.map((candidate, index) => (
+                  <div key={index} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm min-w-[220px] flex-shrink-0">
+                    <div className="flex items-start space-x-3">
+                      <div className="relative">
+                        <img 
+                          src={candidate.candidate_image_url} 
+                          alt={candidate.candidate_name}
+                          className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+                          onError={(e) => {
+                            e.currentTarget.src = '/images/logo.png';
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-black text-base mb-2">
+                          {candidate.candidate_name}
+                        </h4>
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className={`px-3 py-1 rounded-full text-white text-xs font-medium ${getPartyColor(candidate.candidate_party)}`}>
+                            {candidate.candidate_party}
+                          </span>
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center border border-gray-200">
+                            <img 
+                              className="w-6 h-6 object-contain" 
+                              src={fetchPartyIcon(candidate.candidate_party)} 
+                              alt={`${candidate.candidate_party} logo`}
+                              onError={(e) => {
+                                e.currentTarget.src = '/images/party_logo/independent.png';
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="bg-gray-100 text-black text-xs px-2 py-1 rounded-full">
+                            {isEnglish ? `Vote Share: ${candidate.vote_share}%` : `वोट शेयर: ${candidate.vote_share}%`}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -1054,7 +1101,6 @@ const AapkaKshetra: React.FC = () => {
                 {isEnglish ? 'Select your constituency (this cannot be changed later)' : 'अपना क्षेत्र चुनें (इसे बाद में नहीं बदला जा सकता)'}
               </h2>
             </div>
-            
             <div className="space-y-4">
               <select
                 value={selectedConstituency}
@@ -1093,21 +1139,22 @@ const AapkaKshetra: React.FC = () => {
             </p>
           </div>
         )}
-
         {/* Charcha Manch Button */}
         {candidateData && constituencyId && (
           <div className="text-center mt-6 mb-4">
             <button 
               className={`px-8 py-4 rounded-xl font-medium transition-all duration-200 shadow-lg text-lg flex items-center justify-center space-x-3 mx-auto ${
                 englishConstituencyName 
-                  ? 'bg-[#014e5c] text-white hover:bg-[#014e5c]/80 hover:shadow-xl transform hover:-translate-y-1' 
+                  ? 'bg-gray-700 text-white hover:bg-[#014e5c]/80 hover:shadow-xl transform hover:-translate-y-1' 
                   : 'bg-gray-400 text-gray-600 cursor-not-allowed'
               }`}
               onClick={handleCharchaManchClick}
               disabled={!englishConstituencyName}
             >
               <MessageCircle className="w-4 h-4 lg:w-6 lg:h-6" />
-              <span className="text-sm lg:text-base">{isEnglish ? 'Charcha Manch' : 'चर्चा मंच'}</span>
+              <span className="text-sm lg:text-base">                  
+                {isEnglish ? 'Go to your area\'s Charcha Manch' : 'आपके क्षेत्र के चर्चा मंच पर जाएं'}
+              </span>
             </button>
             {!englishConstituencyName && (
               <p className="text-xs text-gray-500 mt-2">
