@@ -52,14 +52,6 @@ const Profile: React.FC = () => {
 
   const citizenshipLevels: CitizenshipLevel[] = [
     {
-      id: '0',
-      shortName: '0',
-      fullName: 'शुरुआती',
-      fullNameEn: 'Beginner',
-      description: 'Basic citizen level',
-      requirements: ['Complete profile', 'Verify phone number']
-    },
-    {
       id: '1',
       shortName: '1',
       fullName: 'शुरुआती',

@@ -18,8 +18,6 @@ import {
   Share2,
   Plus
 } from 'lucide-react';
-import AdminDashboardWidget from '../components/AdminDashboardWidget';
-import AdminAccessChecker from '../components/AdminAccessChecker';
 import FirebaseService from '../services/firebaseService';
 import toast from 'react-hot-toast';
 
@@ -94,17 +92,61 @@ const Dashboard: React.FC = () => {
     
     try {
       setIsLoading(true);
-      const [posts, referrals, profile] = await Promise.all([
-        FirebaseService.getUserPosts(currentUser.uid),
-        FirebaseService.getUserReferrals(currentUser.uid),
-        FirebaseService.getUserProfile(currentUser.uid)
-      ]);
+      console.log('🔄 Loading user data for:', currentUser.uid);
       
-      setUserPosts(posts);
-      setUserReferrals(referrals);
-      setUserProfile(profile);
+      // Load posts with better error handling
+      let posts: any[] = [];
+      try {
+        posts = await FirebaseService.getUserPosts(currentUser.uid);
+        console.log('✅ Loaded posts:', posts);
+        
+        // Transform posts to match the expected interface
+        const transformedPosts = posts.map(post => ({
+          id: post.id,
+          title: post.title || post.titlefirst || 'Untitled',
+          content: post.content || '',
+          constituency: post.constituency || 0,
+          constituencyName: post.constituencyName || 'Unknown',
+          status: post.status || 'published',
+          createdAt: post.createdAt,
+          updatedAt: post.updatedAt,
+          likesCount: post.likesCount || 0,
+          dislikesCount: post.dislikesCount || 0,
+          commentsCount: post.commentsCount || 0,
+          interactionsCount: post.interactionsCount || 0
+        }));
+        
+        console.log('🔄 Transformed posts:', transformedPosts);
+        setUserPosts(transformedPosts);
+      } catch (error) {
+        console.error('❌ Error loading posts:', error);
+        setUserPosts([]);
+      }
+
+      // Load referrals
+      let referrals: any[] = [];
+      try {
+        referrals = await FirebaseService.getUserReferrals(currentUser.uid);
+        console.log('✅ Loaded referrals:', referrals);
+        setUserReferrals(referrals);
+      } catch (error) {
+        console.error('❌ Error loading referrals:', error);
+        referrals = [];
+      }
+
+      // Load profile
+      let profile = null;
+      try {
+        profile = await FirebaseService.getUserProfile(currentUser.uid);
+        console.log('✅ Loaded profile:', profile);
+        setUserProfile(profile);
+      } catch (error) {
+        console.error('❌ Error loading profile:', error);
+        profile = null;
+      }
+      
     } catch (error) {
-      console.error('Error loading user data:', error);
+      console.error('❌ Error loading user data:', error);
       toast.error('Failed to load user data');
     } finally {
       setIsLoading(false);
@@ -130,15 +172,15 @@ const Dashboard: React.FC = () => {
   };
 
   const handleEditPost = (postId: string) => {
-    navigate(`/discussion-forum?edit=${postId}`);
+    navigate(`/discussion?edit=${postId}`);
   };
 
   const getReferralStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'text-green-600 bg-green-100';
-      case 'active': return 'text-blue-600 bg-blue-100';
-      case 'pending': return 'text-yellow-600 bg-yellow-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'completed': return 'text-white bg-[#014e5c]';
+      case 'active': return 'text-white bg-[#014e5c]/80';
+      case 'pending': return 'text-white bg-[#014e5c]/60';
+      default: return 'text-white bg-[#014e5c]/40';
     }
   };
 
@@ -163,26 +205,39 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // Function to render formatted text
+  const renderFormattedText = (text: string) => {
+    if (!text) return '';
+    
+    // Simple markdown-like formatting
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/__(.*?)__/g, '<u>$1</u>')
+      .replace(/^•\s/gm, '• ')
+      .replace(/^\d+\.\s/gm, (match) => match);
+  };
+
   if (!currentUser) {
     navigate('/signin');
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="bg-[#014e5c] shadow-sm border-b border-[#014e5c]/20">
+        <div className="max-w-5xl mx-auto px-2 sm:px-3 lg:px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-slate-800">Dashboard</h1>
-              <p className="text-slate-600 mt-1">Welcome back, {currentUser.email}</p>
+              <h1 className="text-xl font-bold text-white">Dashboard</h1>
+              <p className="text-white/80 mt-1 text-xs">Welcome back, {currentUser.email}</p>
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center space-x-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-2 rounded-lg hover:from-green-700 hover:to-emerald-700 transition-colors"
+              className="flex items-center space-x-2 bg-white text-[#014e5c] px-2 py-1.5 rounded-md hover:bg-white/90 transition-colors text-xs"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-3 w-3" />
               <span>Logout</span>
             </button>
           </div>
@@ -190,42 +245,37 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Admin Access Checker - Only show if user is admin */}
-        {isAdmin && <AdminAccessChecker />}
-        
-        {/* Admin Widget - Only show if user is admin */}
-        {isAdmin && <AdminDashboardWidget />}
+      <div className="max-w-5xl mx-auto px-2 sm:px-3 lg:px-4 py-4">
         
         {/* Navigation Tabs */}
-        <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6 mb-8">
-          <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg">
+        <div className="bg-white rounded-md shadow-sm border border-[#014e5c]/20 p-3 mb-4">
+          <div className="flex space-x-1 bg-[#014e5c]/10 p-1 rounded-md">
             <button
               onClick={() => setActiveTab('overview')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-colors ${
                 activeTab === 'overview'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-[#014e5c] shadow-sm'
+                  : 'text-[#014e5c]/70 hover:text-[#014e5c]'
               }`}
             >
               Overview
             </button>
             <button
               onClick={() => setActiveTab('posts')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-colors ${
                 activeTab === 'posts'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-[#014e5c] shadow-sm'
+                  : 'text-[#014e5c]/70 hover:text-[#014e5c]'
               }`}
             >
               My Posts ({userPosts.length})
             </button>
             <button
               onClick={() => setActiveTab('referrals')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-colors ${
                 activeTab === 'referrals'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-[#014e5c] shadow-sm'
+                  : 'text-[#014e5c]/70 hover:text-[#014e5c]'
               }`}
             >
               Referrals ({userReferrals.length})
@@ -237,112 +287,112 @@ const Dashboard: React.FC = () => {
         {activeTab === 'overview' && (
           <>
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+              <div className="bg-white rounded-md shadow-sm border border-[#014e5c]/20 p-3">
                 <div className="flex items-center">
-                  <div className="p-3 bg-blue-100 rounded-lg">
-                    <User className="h-6 w-6 text-blue-600" />
+                  <div className="p-1.5 bg-[#014e5c]/10 rounded-md">
+                    <User className="h-4 w-4 text-[#014e5c]" />
                   </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-slate-600">Profile Status</p>
-                    <p className="text-2xl font-bold text-slate-800">Complete</p>
+                  <div className="ml-2">
+                    <p className="text-xs font-medium text-[#014e5c]/70">Profile Status</p>
+                    <p className="text-sm font-bold text-[#014e5c]">Complete</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6">
+              <div className="bg-white rounded-md shadow-sm border border-[#014e5c]/20 p-3">
                 <div className="flex items-center">
-                  <div className="p-3 bg-green-100 rounded-lg">
-                    <Shield className="h-6 w-6 text-green-600" />
+                  <div className="p-1.5 bg-[#014e5c]/10 rounded-md">
+                    <Shield className="h-4 w-4 text-[#014e5c]" />
                   </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-slate-600">Account Type</p>
-                    <p className="text-2xl font-bold text-slate-800">
+                  <div className="ml-2">
+                    <p className="text-xs font-medium text-[#014e5c]/70">Account Type</p>
+                    <p className="text-sm font-bold text-[#014e5c]">
                       {isAdmin ? adminLevel : 'User'}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6">
+              <div className="bg-white rounded-md shadow-sm border border-[#014e5c]/20 p-3">
                 <div className="flex items-center">
-                  <div className="p-3 bg-purple-100 rounded-lg">
-                    <MessageSquare className="h-6 w-6 text-purple-600" />
+                  <div className="p-1.5 bg-[#014e5c]/10 rounded-md">
+                    <MessageSquare className="h-4 w-4 text-[#014e5c]" />
                   </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-slate-600">Total Posts</p>
-                    <p className="text-2xl font-bold text-slate-800">{userPosts.length}</p>
+                  <div className="ml-2">
+                    <p className="text-xs font-medium text-[#014e5c]/70">Total Posts</p>
+                    <p className="text-sm font-bold text-[#014e5c]">{userPosts.length}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6">
+              <div className="bg-white rounded-md shadow-sm border border-[#014e5c]/20 p-3">
                 <div className="flex items-center">
-                  <div className="p-3 bg-amber-100 rounded-lg">
-                    <Users className="h-6 w-6 text-amber-600" />
+                  <div className="p-1.5 bg-[#014e5c]/10 rounded-md">
+                    <Users className="h-4 w-4 text-[#014e5c]" />
                   </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-slate-600">Referrals</p>
-                    <p className="text-2xl font-bold text-slate-800">{userReferrals.length}</p>
+                  <div className="ml-2">
+                    <p className="text-xs font-medium text-[#014e5c]/70">Referrals</p>
+                    <p className="text-sm font-bold text-[#014e5c]">{userReferrals.length}</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Quick Actions */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6">
-                <h3 className="text-lg font-semibold text-slate-800 mb-4">Quick Actions</h3>
-                <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+              <div className="bg-white rounded-md shadow-sm border border-[#014e5c]/20 p-3">
+                <h3 className="text-sm font-semibold text-[#014e5c] mb-2">Quick Actions</h3>
+                <div className="space-y-1.5">
                   <button
-                    onClick={() => navigate('/discussion-forum')}
-                    className="w-full flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                    onClick={() => navigate('/discussion')}
+                    className="w-full flex items-center justify-between p-1.5 bg-[#014e5c]/5 rounded-md hover:bg-[#014e5c]/10 transition-colors"
                   >
-                    <span className="text-slate-700">Create New Post</span>
-                    <Plus className="h-4 w-4 text-slate-500" />
+                    <span className="text-[#014e5c] text-xs">Create New Post</span>
+                    <Plus className="h-3 w-3 text-[#014e5c]" />
                   </button>
                   <button
                     onClick={() => navigate('/constituency/all-constituencies?showAll=true')}
-                    className="w-full flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                    className="w-full flex items-center justify-between p-1.5 bg-[#014e5c]/5 rounded-md hover:bg-[#014e5c]/10 transition-colors"
                   >
-                    <span className="text-slate-700">Browse Constituencies</span>
-                    <ArrowRight className="h-4 w-4 text-slate-500" />
+                    <span className="text-[#014e5c] text-xs">Browse Constituencies</span>
+                    <ArrowRight className="h-3 w-3 text-[#014e5c]" />
                   </button>
                   <button
                     onClick={() => navigate('/profile')}
-                    className="w-full flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                    className="w-full flex items-center justify-between p-1.5 bg-[#014e5c]/5 rounded-md hover:bg-[#014e5c]/10 transition-colors"
                   >
-                    <span className="text-slate-700">Edit Profile</span>
-                    <ArrowRight className="h-4 w-4 text-slate-500" />
+                    <span className="text-[#014e5c] text-xs">Edit Profile</span>
+                    <ArrowRight className="h-3 w-3 text-[#014e5c]" />
                   </button>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6">
-                <h3 className="text-lg font-semibold text-slate-800 mb-4">Account Information</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Email:</span>
-                    <span className="text-slate-800 font-medium">{currentUser.email}</span>
+              <div className="bg-white rounded-md shadow-sm border border-[#014e5c]/20 p-3">
+                <h3 className="text-sm font-semibold text-[#014e5c] mb-2">Account Information</h3>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-[#014e5c]/70">Email:</span>
+                    <span className="text-[#014e5c] font-medium">{currentUser.email}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Email Verified:</span>
-                    <span className={`font-medium ${currentUser.emailVerified ? 'text-green-600' : 'text-red-600'}`}>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-[#014e5c]/70">Email Verified:</span>
+                    <span className={`font-medium ${currentUser.emailVerified ? 'text-[#014e5c]' : 'text-red-500'}`}>
                       {currentUser.emailVerified ? 'Yes' : 'No'}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Account Created:</span>
-                    <span className="text-slate-800 font-medium">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-[#014e5c]/70">Account Created:</span>
+                    <span className="text-[#014e5c] font-medium">
                       {currentUser.metadata?.creationTime ? 
                         new Date(currentUser.metadata.creationTime).toLocaleDateString() : 
                         'Unknown'
                       }
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Role:</span>
-                    <span className="text-slate-800 font-medium">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-[#014e5c]/70">Role:</span>
+                    <span className="text-[#014e5c] font-medium">
                       {isAdmin ? adminLevel : 'User'}
                     </span>
                   </div>
@@ -353,67 +403,84 @@ const Dashboard: React.FC = () => {
         )}
 
         {activeTab === 'posts' && (
-          <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-slate-800">My Posts</h3>
-              <button
-                onClick={() => navigate('/discussion-forum')}
-                className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Create Post</span>
-              </button>
+          <div className="bg-white rounded-md shadow-sm border border-[#014e5c]/20 p-3">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-[#014e5c]">My Posts</h3>
+              <div className="flex items-center space-x-1.5">
+                <button
+                  onClick={loadUserData}
+                  className="flex items-center space-x-1.5 bg-[#014e5c] text-white px-2 py-1 rounded-md hover:bg-[#014e5c]/90 transition-colors text-xs"
+                >
+                  <span>Refresh</span>
+                </button>
+                <button
+                  onClick={() => navigate('/discussion')}
+                  className="flex items-center space-x-1.5 bg-[#014e5c] text-white px-2 py-1 rounded-md hover:bg-[#014e5c]/90 transition-colors text-xs"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span className="hidden sm:inline">Create Post</span>
+                </button>
+              </div>
             </div>
             
             {isLoading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
-                <p className="text-slate-600 mt-2">Loading posts...</p>
+              <div className="text-center py-3">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#014e5c] mx-auto"></div>
+                <p className="text-[#014e5c]/70 mt-1 text-xs">Loading posts...</p>
               </div>
             ) : userPosts.length === 0 ? (
-              <div className="text-center py-8">
-                <MessageSquare className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                <p className="text-slate-600 mb-4">You haven't created any posts yet.</p>
+              <div className="text-center py-3">
+                <MessageSquare className="h-6 w-6 text-[#014e5c]/40 mx-auto mb-1.5" />
+                <p className="text-[#014e5c]/70 mb-1.5 text-xs">You haven't created any posts yet.</p>
+                <div className="text-xs text-[#014e5c]/50 mb-2">
+                  Debug: User ID: {currentUser?.uid}
+                </div>
                 <button
-                  onClick={() => navigate('/discussion-forum')}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                  onClick={() => navigate('/discussion')}
+                  className="bg-[#014e5c] text-white px-2 py-1 rounded-md hover:bg-[#014e5c]/90 transition-colors text-xs"
                 >
                   Create Your First Post
                 </button>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {userPosts.map((post) => (
-                  <div key={post.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div key={post.id} className="border border-[#014e5c]/20 rounded-md p-2 hover:shadow-sm transition-shadow">
                     <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-slate-800 mb-2">{post.title}</h4>
-                        <p className="text-slate-600 text-sm mb-3 line-clamp-2">{post.content}</p>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-[#014e5c] mb-1 text-xs truncate">{post.title}</h4>
+                        <p 
+                          className="text-[#014e5c]/70 text-xs mb-1.5 line-clamp-2"
+                          dangerouslySetInnerHTML={{ __html: renderFormattedText(post.content) }}
+                        />
                         
-                        <div className="flex items-center space-x-6 text-sm text-slate-500 mb-3">
+                        <div className="flex items-center space-x-3 text-xs text-[#014e5c]/60 mb-1.5">
                           <span className="flex items-center">
-                            <Eye className="h-4 w-4 mr-1" />
+                            <Eye className="h-2.5 w-2.5 mr-1" />
                             {post.interactionsCount || 0}
                           </span>
                           <span className="flex items-center">
-                            <Heart className="h-4 w-4 mr-1" />
-                            {post.likesCount}
+                            <Heart className="h-2.5 w-2.5 mr-1" />
+                            {post.likesCount || 0}
                           </span>
                           <span className="flex items-center">
-                            <MessageCircle className="h-4 w-4 mr-1" />
-                            {post.commentsCount}
+                            <MessageCircle className="h-2.5 w-2.5 mr-1" />
+                            {post.commentsCount || 0}
                           </span>
                           <span className="flex items-center">
-                            <Share2 className="h-4 w-4 mr-1" />
-                            {post.constituencyName}
+                            <Share2 className="h-2.5 w-2.5 mr-1" />
+                            <span className="truncate">{post.constituencyName || 'Unknown'}</span>
                           </span>
                         </div>
                         
-                        <div className="flex items-center text-xs text-slate-400">
-                          <Calendar className="h-3 w-3 mr-1" />
-                          {post.createdAt ? new Date(post.createdAt.toDate()).toLocaleDateString() : 'Unknown date'}
+                        <div className="flex items-center text-xs text-[#014e5c]/50">
+                          <Calendar className="h-2.5 w-2.5 mr-1" />
+                          {post.createdAt ? 
+                            (post.createdAt.toDate ? new Date(post.createdAt.toDate()).toLocaleDateString() : new Date(post.createdAt).toLocaleDateString()) 
+                            : 'Unknown date'
+                          }
                           {post.status !== 'published' && (
-                            <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
+                            <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs ${
                               post.status === 'under_review' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
                             }`}>
                               {post.status === 'under_review' ? 'Under Review' : 'Removed'}
@@ -422,20 +489,20 @@ const Dashboard: React.FC = () => {
                         </div>
                       </div>
                       
-                      <div className="flex items-center space-x-2 ml-4">
+                      <div className="flex items-center space-x-1 ml-2">
                         <button
                           onClick={() => handleEditPost(post.id)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          className="p-1 text-[#014e5c] hover:bg-[#014e5c]/10 rounded-md transition-colors"
                           title="Edit Post"
                         >
-                          <Edit3 className="h-4 w-4" />
+                          <Edit3 className="h-3 w-3" />
                         </button>
                         <button
                           onClick={() => handleDeletePost(post.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-1 text-red-500 hover:bg-red-50 rounded-md transition-colors"
                           title="Delete Post"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3 w-3" />
                         </button>
                       </div>
                     </div>
@@ -447,84 +514,87 @@ const Dashboard: React.FC = () => {
         )}
 
         {activeTab === 'referrals' && (
-          <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-slate-800">My Referrals</h3>
-              <div className="text-sm text-slate-600">
+          <div className="bg-white rounded-md shadow-sm border border-[#014e5c]/20 p-3">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-[#014e5c]">My Referrals</h3>
+              <div className="text-xs text-[#014e5c]/70">
                 Total Referrals: <span className="font-semibold">{userReferrals.length}</span>
               </div>
             </div>
 
             {/* User's Own Referral Code */}
             {userProfile?.referral_code && (
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6 mb-6">
-                <h4 className="text-lg font-semibold text-green-800 mb-3">Your Referral Code</h4>
-                <div className="flex items-center space-x-3">
+              <div className="bg-[#014e5c]/5 border border-[#014e5c]/20 rounded-md p-3 mb-3">
+                <h4 className="text-sm font-semibold text-[#014e5c] mb-1.5">Your Referral Code</h4>
+                <div className="flex items-center space-x-2">
                   <div className="flex-1">
-                    <div className="text-sm text-green-600 mb-2">Share this code with friends and family:</div>
-                    <div className="font-mono text-2xl font-bold text-green-800 bg-white px-4 py-3 rounded-lg border-2 border-green-300">
+                    <div className="text-xs text-[#014e5c]/70 mb-1">Share this code with friends and family:</div>
+                    <div className="font-mono text-sm font-bold text-[#014e5c] bg-white px-2 py-1.5 rounded-md border border-[#014e5c]/30">
                       {userProfile.referral_code}
                     </div>
                   </div>
                   <button
                     onClick={copyReferralCode}
-                    className="bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                    className="bg-[#014e5c] text-white px-2 py-1.5 rounded-md hover:bg-[#014e5c]/90 transition-colors flex items-center space-x-1.5 text-xs"
                   >
-                    <Share2 className="h-4 w-4" />
+                    <Share2 className="h-3 w-3" />
                     <span>Copy</span>
                   </button>
                 </div>
-                <p className="text-sm text-green-600 mt-3">
+                <p className="text-xs text-[#014e5c]/70 mt-1.5">
                   When someone signs up using your referral code, you'll both get benefits!
                 </p>
               </div>
             )}
             
             {isLoading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
-                <p className="text-slate-600 mt-2">Loading referrals...</p>
+              <div className="text-center py-3">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#014e5c] mx-auto"></div>
+                <p className="text-[#014e5c]/70 mt-1 text-xs">Loading referrals...</p>
               </div>
             ) : userReferrals.length === 0 ? (
-              <div className="text-center py-8">
-                <Users className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                <p className="text-slate-600 mb-4">You haven't referred anyone yet.</p>
-                <p className="text-slate-500 text-sm mb-4">Share your referral code with friends and family!</p>
+              <div className="text-center py-3">
+                <Users className="h-6 w-6 text-[#014e5c]/40 mx-auto mb-1.5" />
+                <p className="text-[#014e5c]/70 mb-1.5 text-xs">You haven't referred anyone yet.</p>
+                <p className="text-[#014e5c]/50 text-xs mb-1.5">Share your referral code with friends and family!</p>
                 {userProfile?.referral_code && (
-                  <div className="bg-slate-50 rounded-lg p-4">
-                    <p className="text-sm text-slate-600 mb-2">Your referral code:</p>
-                    <div className="font-mono text-lg bg-white px-3 py-2 rounded border">
+                  <div className="bg-[#014e5c]/5 rounded-md p-2">
+                    <p className="text-xs text-[#014e5c]/70 mb-1">Your referral code:</p>
+                    <div className="font-mono text-xs bg-white px-1.5 py-1 rounded border border-[#014e5c]/30">
                       {userProfile.referral_code}
                     </div>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {userReferrals.map((referral) => (
-                  <div key={referral.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div key={referral.id} className="border border-[#014e5c]/20 rounded-md p-2 hover:shadow-sm transition-shadow">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <h4 className="font-semibold text-slate-800">
+                        <div className="flex items-center space-x-1.5 mb-1">
+                          <h4 className="font-semibold text-[#014e5c] text-xs">
                             {referral.referred_user_name || referral.referred_user_email}
                           </h4>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getReferralStatusColor(referral.status)}`}>
+                          <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${getReferralStatusColor(referral.status)}`}>
                             {getReferralStatusText(referral.status)}
                           </span>
                         </div>
                         
-                        <p className="text-slate-600 text-sm mb-2">{referral.referred_user_email}</p>
+                        <p className="text-[#014e5c]/70 text-xs mb-1">{referral.referred_user_email}</p>
                         
-                        <div className="flex items-center text-xs text-slate-400">
-                          <Calendar className="h-3 w-3 mr-1" />
-                          {referral.created_at ? new Date(referral.created_at.toDate()).toLocaleDateString() : 'Unknown date'}
+                        <div className="flex items-center text-xs text-[#014e5c]/50">
+                          <Calendar className="h-2.5 w-2.5 mr-1" />
+                          {referral.created_at ? 
+                            (referral.created_at.toDate ? new Date(referral.created_at.toDate()).toLocaleDateString() : new Date(referral.created_at).toLocaleDateString()) 
+                            : 'Unknown date'
+                          }
                         </div>
                       </div>
                       
                       <div className="text-right">
-                        <div className="text-xs text-slate-500 mb-1">Referral Code</div>
-                        <div className="font-mono text-sm bg-slate-100 px-2 py-1 rounded border">
+                        <div className="text-xs text-[#014e5c]/50 mb-0.5">Referral Code</div>
+                        <div className="font-mono text-xs bg-[#014e5c]/5 px-1.5 py-0.5 rounded border border-[#014e5c]/20">
                           {referral.referral_code}
                         </div>
                       </div>
@@ -535,50 +605,50 @@ const Dashboard: React.FC = () => {
             )}
             
             {/* Referral Stats */}
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-slate-50 rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-slate-800">
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div className="bg-[#014e5c]/5 rounded-md p-2 text-center">
+                <div className="text-sm font-bold text-[#014e5c]">
                   {userReferrals.filter(r => r.status === 'completed').length}
                 </div>
-                <div className="text-sm text-slate-600">Completed</div>
+                <div className="text-xs text-[#014e5c]/70">Completed</div>
               </div>
-              <div className="bg-slate-50 rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-slate-800">
+              <div className="bg-[#014e5c]/5 rounded-md p-2 text-center">
+                <div className="text-sm font-bold text-[#014e5c]">
                   {userReferrals.filter(r => r.status === 'active').length}
                 </div>
-                <div className="text-sm text-slate-600">Active</div>
+                <div className="text-xs text-[#014e5c]/70">Active</div>
               </div>
-              <div className="bg-slate-50 rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-slate-800">
+              <div className="bg-[#014e5c]/5 rounded-md p-2 text-center">
+                <div className="text-sm font-bold text-[#014e5c]">
                   {userReferrals.filter(r => r.status === 'pending').length}
                 </div>
-                <div className="text-sm text-slate-600">Pending</div>
+                <div className="text-xs text-[#014e5c]/70">Pending</div>
               </div>
             </div>
           </div>
         )}
 
         {/* Recent Activity */}
-        <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6">
-          <h3 className="text-lg font-semibold text-slate-800 mb-4">Recent Activity</h3>
-          <div className="space-y-3">
-            <div className="flex items-center p-3 bg-slate-50 rounded-lg">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-              <span className="text-slate-700">Successfully signed in to your account</span>
-              <span className="ml-auto text-xs text-slate-500">Just now</span>
+        <div className="bg-white rounded-md shadow-sm border border-[#014e5c]/20 p-3">
+          <h3 className="text-sm font-semibold text-[#014e5c] mb-2">Recent Activity</h3>
+          <div className="space-y-1.5">
+            <div className="flex items-center p-1.5 bg-[#014e5c]/5 rounded-md">
+              <div className="w-1.5 h-1.5 bg-[#014e5c] rounded-full mr-1.5"></div>
+              <span className="text-[#014e5c] text-xs">Successfully signed in to your account</span>
+              <span className="ml-auto text-xs text-[#014e5c]/50">Just now</span>
             </div>
             {userPosts.length > 0 && (
-              <div className="flex items-center p-3 bg-slate-50 rounded-lg">
-                <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-                <span className="text-slate-700">You have {userPosts.length} active posts</span>
-                <span className="ml-auto text-xs text-slate-500">Today</span>
+              <div className="flex items-center p-1.5 bg-[#014e5c]/5 rounded-md">
+                <div className="w-1.5 h-1.5 bg-[#014e5c] rounded-full mr-1.5"></div>
+                <span className="text-[#014e5c] text-xs">You have {userPosts.length} active posts</span>
+                <span className="ml-auto text-xs text-[#014e5c]/50">Today</span>
               </div>
             )}
             {userReferrals.length > 0 && (
-              <div className="flex items-center p-3 bg-slate-50 rounded-lg">
-                <div className="w-2 h-2 bg-purple-500 rounded-full mr-3"></div>
-                <span className="text-slate-700">You have referred {userReferrals.length} users</span>
-                <span className="ml-auto text-xs text-slate-500">Today</span>
+              <div className="flex items-center p-1.5 bg-[#014e5c]/5 rounded-md">
+                <div className="w-1.5 h-1.5 bg-[#014e5c] rounded-full mr-1.5"></div>
+                <span className="text-[#014e5c] text-xs">You have referred {userReferrals.length} users</span>
+                <span className="ml-auto text-xs text-[#014e5c]/50">Today</span>
               </div>
             )}
           </div>

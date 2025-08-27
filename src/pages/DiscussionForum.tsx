@@ -85,6 +85,7 @@ const DiscussionForum: React.FC = () => {
 
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [showConstituencyFilter, setShowConstituencyFilter] = useState(false);
+  const [editingPost, setEditingPost] = useState<DiscussionPost | null>(null);
 
 
   const [activeTab, setActiveTab] = useState<'home' | 'discussion' | 'area'>('discussion');
@@ -193,6 +194,14 @@ const DiscussionForum: React.FC = () => {
     fetchData();
   }, [currentUser?.uid]);
 
+  // Debug: Log posts when they change
+  useEffect(() => {
+    console.log('📊 Posts updated in DiscussionForum:', posts.length);
+    if (posts.length > 0) {
+      console.log('📝 Sample post:', posts[0]);
+    }
+  }, [posts]);
+
   // Handle URL parameters for constituency selection
   useEffect(() => {
     const constituencyParam = searchParams.get('constituency');
@@ -236,6 +245,36 @@ const DiscussionForum: React.FC = () => {
       }
     }
   }, [searchParams, navigate, constituencies]);
+
+  // Handle edit parameter from URL - only after posts are loaded
+  useEffect(() => {
+    const editPostId = searchParams.get('edit');
+    if (editPostId && posts.length > 0) {
+      console.log('🔍 Edit parameter detected:', editPostId);
+      console.log('📝 Current posts count:', posts.length);
+      
+      // Find the post to edit
+      const postToEdit = posts.find(post => post.id === editPostId);
+      if (postToEdit) {
+        console.log('✅ Found post in current posts:', postToEdit);
+        setEditingPost(postToEdit);
+        setShowCreatePost(true);
+      } else {
+        console.log('❌ Post not found in current posts, fetching from Firebase...');
+        // If post not found in current posts, fetch it
+        fetchPostForEdit(editPostId);
+      }
+    }
+  }, [searchParams, posts]);
+
+  // Handle edit parameter immediately if available
+  useEffect(() => {
+    const editPostId = searchParams.get('edit');
+    if (editPostId && !isLoading && posts.length === 0) {
+      console.log('🔍 Edit parameter detected but no posts loaded, fetching from Firebase...');
+      fetchPostForEdit(editPostId);
+    }
+  }, [searchParams, isLoading, posts.length]);
 
   // Handle constituency selection
   const handleConstituencyChange = (constituencyId: number | null) => {
@@ -282,6 +321,59 @@ const DiscussionForum: React.FC = () => {
   // Handle post creation
   const handlePostCreated = () => {
     fetchData();
+    // Clear editing state after post is created/updated
+    setEditingPost(null);
+    // Clean up URL parameters
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.delete('edit');
+    navigate(`/discussion?${newSearchParams.toString()}`, { replace: true });
+  };
+
+  // Fetch post for editing if not found in current posts
+  const fetchPostForEdit = async (postId: string) => {
+    try {
+      setIsLoading(true);
+      console.log('🔄 Fetching post for edit:', postId);
+      
+      // Try to fetch the post from Firebase
+      const post = await FirebaseService.getDiscussionPost(postId);
+      console.log('📥 Fetched post from Firebase:', post);
+      
+      if (post) {
+        console.log('✅ Setting editing post and opening modal');
+        setEditingPost(post);
+        setShowCreatePost(true);
+      } else {
+        console.log('❌ Post not found in Firebase');
+        toast.error('Post not found for editing');
+        // Clean up URL parameters
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete('edit');
+        navigate(`/discussion?${newSearchParams.toString()}`, { replace: true });
+      }
+    } catch (error) {
+      console.error('❌ Error fetching post for edit:', error);
+      toast.error('Failed to load post for editing');
+      // Clean up URL parameters
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('edit');
+      navigate(`/discussion?${newSearchParams.toString()}`, { replace: true });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Function to render formatted text
+  const renderFormattedText = (text: string) => {
+    if (!text) return '';
+    
+    // Simple markdown-like formatting
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/__(.*?)__/g, '<u>$1</u>')
+      .replace(/^•\s/gm, '• ')
+      .replace(/^\d+\.\s/gm, (match) => match);
   };
 
   // Handle post deletion (user can only delete their own posts)
@@ -886,7 +978,10 @@ const DiscussionForum: React.FC = () => {
                             </h2>
                             
                             {/* Post Content */}
-                            <p className="text-gray-700 leading-relaxed mb-3 text-sm">{post.content}</p>
+                            <p 
+                              className="text-gray-700 leading-relaxed mb-3 text-sm"
+                              dangerouslySetInnerHTML={{ __html: renderFormattedText(post.content) }}
+                            />
                             
                             {/* Tags */}
                             {post.tags && post.tags.length > 0 && (
@@ -1213,8 +1308,16 @@ const DiscussionForum: React.FC = () => {
       {/* Create Post Modal */}
       <CreatePost
         isOpen={showCreatePost}
-        onClose={() => setShowCreatePost(false)}
+        onClose={() => {
+          setShowCreatePost(false);
+          setEditingPost(null);
+          // Clean up URL parameters
+          const newSearchParams = new URLSearchParams(searchParams);
+          newSearchParams.delete('edit');
+          navigate(`/discussion?${newSearchParams.toString()}`, { replace: true });
+        }}
         onPostCreated={handlePostCreated}
+        editingPost={editingPost}
       />
     </div>
   );

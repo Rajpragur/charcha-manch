@@ -25,6 +25,7 @@ interface CreatePostProps {
   isOpen: boolean;
   onClose: () => void;
   onPostCreated: () => void;
+  editingPost?: any | null;
 }
 
 interface Constituency {
@@ -41,7 +42,7 @@ interface MediaFile {
   type: 'image' | 'video';
 }
 
-const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated }) => {
+const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated, editingPost }) => {
   const { isEnglish } = useLanguage();
   const { currentUser } = useAuth();
   const [title, setTitle] = useState('');
@@ -55,6 +56,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
   const [newTag, setNewTag] = useState('');
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const constituencyInputRef = useRef<HTMLInputElement>(null);
 
@@ -112,7 +114,16 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
     }
   }, [currentUser?.uid, constituencies]);
 
-
+  // Handle editing post - populate form with existing data
+  useEffect(() => {
+    if (editingPost && isOpen) {
+      setTitle(editingPost.title || editingPost.titlefirst || '');
+      setPostContent(editingPost.content || '');
+      setSelectedConstituency(editingPost.constituency || null);
+      setTags(editingPost.tags || []);
+      // Note: Media files would need to be handled separately
+    }
+  }, [editingPost, isOpen]);
 
   // Filter constituencies based on search query
   useEffect(() => {
@@ -317,7 +328,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
       const titlefirst = titleWords[0] || '';
       const titlesecond = titleWords.slice(1).join(' ') || '';
 
-      // Create the post first to get the ID
+      // Create the post data
       const postData = {
         title: title.trim(),
         titlefirst,
@@ -335,7 +346,27 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
         media: []
       };
 
-      const postId = await FirebaseService.createDiscussionPost(postData);
+      let postId: string;
+
+      if (editingPost) {
+        // Update existing post
+        await FirebaseService.updateDiscussionPost(editingPost.id, {
+          title: postData.title,
+          titlefirst: postData.titlefirst,
+          titlesecond: postData.titlesecond,
+          content: postData.content,
+          constituency: postData.constituency,
+          constituencyName: postData.constituencyName,
+          tags: postData.tags,
+          updatedAt: new Date()
+        });
+        postId = editingPost.id;
+        toast.success('Post updated successfully!');
+      } else {
+        // Create new post
+        postId = await FirebaseService.createDiscussionPost(postData);
+        toast.success(content.postCreated);
+      }
 
       // Upload media files if any
       if (mediaFiles.length > 0) {
@@ -348,8 +379,6 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
         // Update post with media URLs
         await FirebaseService.updateDiscussionPost(postId, { media: uploadedMedia });
       }
-
-      toast.success(content.postCreated);
       
       // Reset form
       setTitle('');
@@ -390,40 +419,65 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
     return { status: 'published' };
   };
 
+  // Function to render formatted text
+  const renderFormattedText = (text: string) => {
+    if (!text) return '';
+    
+    // Simple markdown-like formatting
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/__(.*?)__/g, '<u>$1</u>')
+      .replace(/^•\s/gm, '• ')
+      .replace(/^\d+\.\s/gm, (match) => match);
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[95vh] overflow-hidden shadow-2xl">
+      <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[95vh] overflow-hidden shadow-2xl">
         {/* Header */}
-        <div className="bg-gradient-to-r from-sky-500 to-blue-600 text-white px-8 py-6 rounded-t-3xl">
+        <div className="bg-[#014e5c] text-white px-6 py-5 rounded-t-2xl">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-3xl font-bold">{content.title}</h2>
-              <p className="text-sky-100 mt-2 text-lg">{content.subtitle}</p>
+              <h2 className="text-2xl font-bold">{editingPost ? 'Edit Discussion Post' : content.title}</h2>
+              <p className="text-white/80 mt-1 text-sm">{editingPost ? 'Update your discussion post' : content.subtitle}</p>
             </div>
             <button
-              onClick={onClose}
-              className="p-3 text-white/80 hover:text-white hover:bg-white/20 rounded-full transition-all duration-200"
+              onClick={() => {
+                // Clear editing state when closing
+                if (editingPost) {
+                  // Reset form to clear editing data
+                  setTitle('');
+                  setPostContent('');
+                  setSelectedConstituency(null);
+                  setConstituencySearchQuery('');
+                  setTags([]);
+                  setMediaFiles([]);
+                }
+                onClose();
+              }}
+              className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-all duration-200"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="px-6 lg:px-8 py-6 max-h-[70vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="px-6 py-5 max-h-[70vh] overflow-y-auto">
           {/* Title Section */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#014e5c] to-[#004030] rounded-xl flex items-center justify-center">
-                <Bold className="w-5 h-5 text-white" />
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 bg-[#014e5c] rounded-lg flex items-center justify-center">
+                <Bold className="w-4 h-4 text-white" />
               </div>
               <div>
-                <label htmlFor="title" className="block text-xl font-bold text-gray-900">
+                <label htmlFor="title" className="block text-lg font-semibold text-[#014e5c]">
                   {content.postTitle}
                 </label>
-                <p className="text-sm text-gray-600">Create an engaging title for your discussion</p>
+                <p className="text-sm text-[#014e5c]/70">Create an engaging title for your discussion</p>
               </div>
             </div>
             <div className="relative">
@@ -433,14 +487,14 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder={content.postTitlePlaceholder}
-                className="w-full px-6 py-5 border-2 border-gray-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-green-100 focus:border-green-500 text-lg transition-all duration-300 bg-gray-50 hover:bg-white"
+                className="w-full px-4 py-3 border-2 border-[#014e5c]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#014e5c]/20 focus:border-[#014e5c] text-base transition-all duration-200 bg-white hover:bg-[#014e5c]/5"
                 maxLength={100}
                 required
               />
-              <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
-                  <span className="text-sm font-medium text-gray-500">
+                  <div className="w-2 h-2 rounded-full bg-[#014e5c] animate-pulse"></div>
+                  <span className="text-sm font-medium text-[#014e5c]/70">
                     {title.length}/100
                   </span>
                 </div>
@@ -449,23 +503,23 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
           </div>
 
           {/* Constituency Selection */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#014e5c] to-[#004030] rounded-xl flex items-center justify-center">
-                <MapPin className="w-5 h-5 text-white" />
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 bg-[#014e5c] rounded-lg flex items-center justify-center">
+                <MapPin className="w-4 h-4 text-white" />
               </div>
               <div>
-                <label htmlFor="constituency" className="block text-xl font-bold text-gray-900">
+                <label htmlFor="constituency" className="block text-lg font-semibold text-[#014e5c]">
                   {content.constituency}
                 </label>
-                <p className="text-sm text-gray-600">Select your constituency to target local discussions</p>
+                <p className="text-sm text-[#014e5c]/70">Select your constituency to target local discussions</p>
               </div>
             </div>
             <div className="relative">
               {selectedConstituency ? (
-                <Check className="absolute left-4 top-1/2 transform -translate-y-1/2 text-green-500 h-6 w-6" />
+                <Check className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#014e5c] h-5 w-5" />
               ) : (
-                <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-6 w-6" />
+                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#014e5c]/40 h-5 w-5" />
               )}
               <input
                 ref={constituencyInputRef}
@@ -476,10 +530,10 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
                 onFocus={() => setShowConstituencyDropdown(true)}
                 onKeyDown={handleKeyDown}
                 placeholder={content.selectConstituency}
-                className={`w-full pl-14 pr-12 py-5 border-2 rounded-2xl focus:outline-none focus:ring-4 focus:ring-green-100 focus:border-green-500 text-lg transition-all duration-300 ${
+                className={`w-full pl-12 pr-12 py-3 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#014e5c]/20 focus:border-[#014e5c] text-base transition-all duration-200 ${
                   selectedConstituency 
-                    ? 'border-green-500 bg-green-50 text-green-900' 
-                    : 'border-gray-200 bg-gray-50 hover:bg-white text-gray-900'
+                    ? 'border-[#014e5c] bg-[#014e5c]/5 text-[#014e5c]' 
+                    : 'border-[#014e5c]/20 bg-white hover:bg-[#014e5c]/5 text-[#014e5c]'
                 }`}
                 required
               />
@@ -493,16 +547,16 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
                     setSelectedConstituency(null);
                     setShowConstituencyDropdown(false);
                   }}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#014e5c]/60 hover:text-[#014e5c] transition-colors p-1 rounded-lg hover:bg-[#014e5c]/10"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4 w-4" />
                 </button>
               )}
             </div>
             
             {/* Scrollable Constituency Dropdown */}
             {showConstituencyDropdown && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-64 overflow-y-auto z-50">
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white border-2 border-[#014e5c]/20 rounded-lg shadow-xl max-h-64 overflow-y-auto z-50">
                 <div className="p-2">
                   {filteredConstituencies.length > 0 ? (
                     filteredConstituencies.map(constituency => (
@@ -510,16 +564,16 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
                         key={constituency.id}
                         type="button"
                         onClick={() => handleConstituencySelect(constituency)}
-                        className="w-full text-left px-4 py-3 hover:bg-green-50 rounded-lg transition-colors mb-1 last:mb-0"
+                        className="w-full text-left px-3 py-2 hover:bg-[#014e5c]/10 rounded-md transition-colors mb-1 last:mb-0"
                       >
-                        <div className="font-medium text-gray-900">{constituency.name}</div>
+                        <div className="font-medium text-[#014e5c]">{constituency.name}</div>
                         {constituency.district && (
-                          <div className="text-sm text-gray-500">{constituency.district}</div>
+                          <div className="text-sm text-[#014e5c]/70">{constituency.district}</div>
                         )}
                       </button>
                     ))
                   ) : (
-                    <div className="px-4 py-3 text-gray-500 text-center">
+                    <div className="px-3 py-2 text-[#014e5c]/70 text-center">
                       {isEnglish ? 'No constituencies found' : 'कोई निर्वाचन क्षेत्र नहीं मिला'}
                     </div>
                   )}
@@ -528,7 +582,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
             )}
             
             {/* Help text */}
-            <div className="mt-2 text-sm text-gray-600">
+            <div className="mt-2 text-sm text-[#014e5c]/70">
               {isEnglish 
                 ? 'Type to search for your constituency by name, area, or district' 
                 : 'अपने निर्वाचन क्षेत्र को नाम, क्षेत्र या जिले से खोजने के लिए टाइप करें'
@@ -537,7 +591,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
             
             {/* Selected constituency confirmation */}
             {selectedConstituency && (
-              <div className="mt-2 text-sm text-green-600 font-medium">
+              <div className="mt-2 text-sm text-[#014e5c] font-medium">
                 {isEnglish 
                   ? '✓ Constituency selected successfully' 
                   : '✓ निर्वाचन क्षेत्र सफलतापूर्वक चुना गया'
@@ -547,22 +601,22 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
           </div>
 
           {/* Tags */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#014e5c] to-[#004030] rounded-xl flex items-center justify-center">
-                <List className="w-5 h-5 text-white" />
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 bg-[#014e5c] rounded-lg flex items-center justify-center">
+                <List className="w-4 h-4 text-white" />
               </div>
               <div>
-                <label className="block text-xl font-bold text-gray-900">
+                <label className="block text-base font-semibold text-[#014e5c]">
                   {content.tags}
                 </label>
-                <p className="text-sm text-gray-600">Add relevant tags to help others discover your post</p>
+                <p className="text-xs text-[#014e5c]/70">Add relevant tags to help others discover your post</p>
               </div>
             </div>
             
             {/* Tag Suggestions */}
-            <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-3">Popular tags:</p>
+            <div className="mb-3">
+              <p className="text-xs text-[#014e5c]/70 mb-2">Popular tags:</p>
               <div className="flex flex-wrap gap-2">
                 {['roads', 'education', 'healthcare', 'water', 'electricity', 'transport'].map((suggestion) => (
                   <button
@@ -574,10 +628,10 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
                       }
                     }}
                     disabled={tags.includes(suggestion) || tags.length >= 5}
-                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    className={`px-2 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
                       tags.includes(suggestion)
-                        ? 'bg-green-100 text-green-700 cursor-not-allowed'
-                        : 'bg-gray-100 text-gray-700 hover:bg-green-100 hover:text-green-700'
+                        ? 'bg-[#014e5c]/20 text-[#014e5c] cursor-not-allowed'
+                        : 'bg-[#014e5c]/10 text-[#014e5c]/80 hover:bg-[#014e5c]/20 hover:text-[#014e5c]'
                     }`}
                   >
                     #{suggestion}
@@ -586,91 +640,91 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
               </div>
             </div>
             
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex flex-wrap gap-2 mb-3">
               {tags.map((tag, index) => (
                 <span
                   key={index}
-                  className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 rounded-full text-sm font-medium shadow-sm border border-green-200"
+                  className="inline-flex items-center px-3 py-1.5 bg-[#014e5c]/10 text-[#014e5c] rounded-full text-xs font-medium shadow-sm border border-[#014e5c]/20"
                 >
-                  <span className="mr-2">#{tag}</span>
+                  <span className="mr-1.5">#{tag}</span>
                   <button
                     type="button"
                     onClick={() => handleRemoveTag(tag)}
-                    className="w-5 h-5 rounded-full bg-green-200 hover:bg-green-300 transition-colors flex items-center justify-center"
+                    className="w-4 h-4 rounded-full bg-[#014e5c]/20 hover:bg-[#014e5c]/30 transition-colors flex items-center justify-center"
                   >
-                    <X className="h-3 w-3 text-green-700" />
+                    <X className="h-2.5 w-2.5 text-[#014e5c]" />
                   </button>
                 </span>
               ))}
             </div>
             
             {tags.length < 5 && (
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 <input
                   type="text"
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
                   placeholder={content.tagPlaceholder}
-                  className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-100 focus:border-green-500 transition-all duration-200"
+                  className="flex-1 px-3 py-2 border-2 border-[#014e5c]/20 rounded-md focus:outline-none focus:ring-2 focus:ring-[#014e5c]/20 focus:border-[#014e5c] transition-all duration-200 text-sm"
                   onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
                 />
                 <button
                   type="button"
                   onClick={handleAddTag}
-                  className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all duration-200 flex items-center gap-2 font-medium shadow-lg hover:shadow-xl"
+                  className="px-4 py-2 bg-[#014e5c] text-white rounded-md hover:bg-[#014e5c]/90 transition-all duration-200 flex items-center gap-2 font-medium shadow-md hover:shadow-lg text-sm"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-3 w-3" />
                   {content.addTag}
                 </button>
               </div>
             )}
             
-            <div className="mt-3 text-sm text-gray-500">
+            <div className="mt-2 text-xs text-[#014e5c]/60">
               {tags.length}/5 tags • Tags help categorize your discussion
             </div>
           </div>
           {/* Media Upload */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#014e5c] to-[#004030] rounded-xl flex items-center justify-center">
-                <Upload className="w-5 h-5 text-white" />
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 bg-[#014e5c] rounded-lg flex items-center justify-center">
+                <Upload className="w-4 h-4 text-white" />
               </div>
               <div>
-                <label className="block text-xl font-bold text-gray-900">
+                <label className="block text-base font-semibold text-[#014e5c]">
                   {content.media}
                 </label>
-                <p className="text-sm text-gray-600">Add images or videos to make your post more engaging</p>
+                <p className="text-xs text-[#014e5c]/70">Add images or videos to make your post more engaging</p>
               </div>
             </div>
             
             {/* Media Preview Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
               {mediaFiles.map((media, index) => (
                 <div key={index} className="relative group aspect-square">
                   {media.type === 'image' ? (
                     <img
                       src={media.preview}
                       alt="Preview"
-                      className="w-full h-full object-cover rounded-2xl shadow-lg"
+                      className="w-full h-full object-cover rounded-lg shadow-md"
                     />
                   ) : (
                     <video
                       src={media.preview}
-                      className="w-full h-full object-cover rounded-2xl shadow-lg"
+                      className="w-full h-full object-cover rounded-lg shadow-md"
                     />
                   )}
-                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                     <button
                       type="button"
                       onClick={() => handleRemoveMedia(index)}
-                      className="w-10 h-10 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors flex items-center justify-center shadow-lg"
+                      className="w-8 h-8 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors flex items-center justify-center shadow-md"
                     >
-                      <Trash2 className="h-5 w-5" />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="absolute top-3 left-3">
+                  <div className="absolute top-2 left-2">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${
-                      media.type === 'image' ? 'bg-blue-500' : 'bg-purple-500'
+                      media.type === 'image' ? 'bg-[#014e5c]' : 'bg-[#014e5c]/80'
                     }`}>
                       {media.type === 'image' ? 'Image' : 'Video'}
                     </span>
@@ -680,38 +734,38 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
             </div>
             
             {mediaFiles.length < 3 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-gray-300 rounded-2xl hover:border-green-400 hover:bg-green-50 transition-all duration-300 group"
+                  className="flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed border-[#014e5c]/30 rounded-lg hover:border-[#014e5c] hover:bg-[#014e5c]/5 transition-all duration-200 group"
                 >
-                  <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl flex items-center justify-center group-hover:from-green-200 group-hover:to-emerald-200 transition-all duration-300">
-                    <Upload className="h-8 w-8 text-green-600" />
+                  <div className="w-12 h-12 bg-[#014e5c]/10 rounded-lg flex items-center justify-center group-hover:bg-[#014e5c]/20 transition-all duration-200">
+                    <Upload className="h-6 w-6 text-[#014e5c]" />
                   </div>
                   <div className="text-center">
-                    <p className="font-medium text-gray-900">{content.uploadImage}</p>
-                    <p className="text-sm text-gray-500">JPG, PNG up to 10MB</p>
+                    <p className="font-medium text-[#014e5c] text-sm">{content.uploadImage}</p>
+                    <p className="text-xs text-[#014e5c]/70">JPG, PNG up to 10MB</p>
                   </div>
                 </button>
                 
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-gray-300 rounded-2xl hover:border-green-400 hover:bg-green-50 transition-all duration-300 group"
+                  className="flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed border-[#014e5c]/30 rounded-lg hover:border-[#014e5c] hover:bg-[#014e5c]/5 transition-all duration-200 group"
                 >
-                  <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl flex items-center justify-center group-hover:from-green-200 group-hover:to-emerald-200 transition-all duration-300">
-                    <Video className="h-8 w-8 text-green-600" />
+                  <div className="w-12 h-12 bg-[#014e5c]/10 rounded-lg flex items-center justify-center group-hover:bg-[#014e5c]/20 transition-all duration-200">
+                    <Video className="h-6 w-6 text-[#014e5c]" />
                   </div>
                   <div className="text-center">
-                    <p className="font-medium text-gray-900">{content.uploadVideo}</p>
-                    <p className="text-sm text-gray-500">MP4, MOV up to 10MB</p>
+                    <p className="font-medium text-[#014e5c] text-sm">{content.uploadVideo}</p>
+                    <p className="text-xs text-[#014e5c]/70">MP4, MOV up to 10MB</p>
                   </div>
                 </button>
               </div>
             )}
             
-            <div className="mt-4 text-sm text-gray-500 text-center">
+            <div className="mt-3 text-xs text-[#014e5c]/60 text-center">
               {mediaFiles.length}/3 files • Drag and drop files here or click to browse
             </div>
             
@@ -726,125 +780,147 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
           </div>
 
           {/* Content with Rich Text Tools */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#014e5c] to-[#004030] rounded-xl flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-white" />
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 bg-[#014e5c] rounded-lg flex items-center justify-center">
+                <MessageSquare className="w-4 h-4 text-white" />
               </div>
               <div>
-                <label htmlFor="content" className="block text-xl font-bold text-gray-900">
+                <label htmlFor="content" className="block text-base font-semibold text-[#014e5c]">
                   {content.postContent}
                 </label>
-                <p className="text-sm text-gray-600">Share your thoughts, questions, or concerns with your community</p>
+                <p className="text-xs text-[#014e5c]/70">Share your thoughts, questions, or concerns with your community</p>
               </div>
             </div>
             
             {/* Enhanced Rich Text Toolbar */}
-            <div className="bg-white border-2 border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-green-50 border-b border-gray-200">
+            <div className="bg-white border-2 border-[#014e5c]/20 rounded-lg overflow-hidden shadow-sm">
+              <div className="flex items-center justify-between p-3 bg-[#014e5c]/5 border-b border-[#014e5c]/20">
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => handleTextFormat('bold')}
-                    className="p-2 hover:bg-green-100 rounded-lg transition-colors group"
+                    className="p-1.5 hover:bg-[#014e5c]/20 rounded-md transition-colors group"
                     title="Bold"
                   >
-                    <Bold className="h-4 w-4 text-gray-700 group-hover:text-green-700" />
+                    <Bold className="h-3.5 w-3.5 text-[#014e5c] group-hover:text-[#014e5c]" />
                   </button>
                   <button
                     type="button"
                     onClick={() => handleTextFormat('italic')}
-                    className="p-2 hover:bg-green-100 rounded-lg transition-colors group"
+                    className="p-1.5 hover:bg-[#014e5c]/20 rounded-md transition-colors group"
                     title="Italic"
                   >
-                    <Italic className="h-4 w-4 text-gray-700 group-hover:text-green-700" />
+                    <Italic className="h-3.5 w-3.5 text-[#014e5c] group-hover:text-[#014e5c]" />
                   </button>
                   <button
                     type="button"
                     onClick={() => handleTextFormat('underline')}
-                    className="p-2 hover:bg-green-100 rounded-lg transition-colors group"
+                    className="p-1.5 hover:bg-[#014e5c]/20 rounded-md transition-colors group"
                     title="Underline"
                   >
-                    <Underline className="h-4 w-4 text-gray-700 group-hover:text-green-700" />
+                    <Underline className="h-3.5 w-3.5 text-[#014e5c] group-hover:text-[#014e5c]" />
                   </button>
                 </div>
                 
-                <div className="w-px h-6 bg-gray-300"></div>
+                <div className="w-px h-5 bg-[#014e5c]/30"></div>
                 
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => handleTextFormat('bullet')}
-                    className="p-2 hover:bg-green-100 rounded-lg transition-colors group"
+                    className="p-1.5 hover:bg-[#014e5c]/20 rounded-md transition-colors group"
                     title="Bullet List"
                   >
-                    <List className="h-4 w-4 text-gray-700 group-hover:text-green-700" />
+                    <List className="h-3.5 w-3.5 text-[#014e5c] group-hover:text-[#014e5c]" />
                   </button>
                   <button
                     type="button"
                     onClick={() => handleTextFormat('numbered')}
-                    className="p-2 hover:bg-green-100 rounded-lg transition-colors group"
+                    className="p-1.5 hover:bg-[#014e5c]/20 rounded-md transition-colors group"
                     title="Numbered List"
                   >
-                    <ListOrdered className="h-4 w-4 text-gray-700 group-hover:text-green-700" />
+                    <ListOrdered className="h-3.5 w-3.5 text-[#014e5c] group-hover:text-[#014e5c]" />
                   </button>
                 </div>
                 
-                <div className="text-sm text-gray-500 font-medium">
-                  Rich Text Editor
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowPreview(!showPreview)}
+                    className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                      showPreview 
+                        ? 'bg-[#014e5c] text-white' 
+                        : 'bg-[#014e5c]/10 text-[#014e5c] hover:bg-[#014e5c]/20'
+                    }`}
+                  >
+                    {showPreview ? 'Edit' : 'Preview'}
+                  </button>
+                  <div className="text-xs text-[#014e5c]/70 font-medium">
+                    Rich Text Editor
+                  </div>
                 </div>
               </div>
               
-              <textarea
-                id="content"
-                value={postContent}
-                onChange={(e) => setPostContent(e.target.value)}
-                placeholder={content.postContentPlaceholder}
-                rows={10}
-                className="w-full px-6 py-6 border-0 focus:outline-none text-lg resize-none transition-all duration-200 bg-white"
-                maxLength={2000}
-                required
-              />
+              {showPreview ? (
+                <div className="w-full px-4 py-4 border-0 text-base bg-white min-h-[200px]">
+                  <div 
+                    className="prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: renderFormattedText(postContent) || '<span class="text-gray-400">No content to preview</span>' }}
+                  />
+                </div>
+              ) : (
+                <textarea
+                  id="content"
+                  value={postContent}
+                  onChange={(e) => setPostContent(e.target.value)}
+                  placeholder={content.postContentPlaceholder}
+                  rows={8}
+                  className="w-full px-4 py-4 border-0 focus:outline-none text-base resize-none transition-all duration-200 bg-white"
+                  maxLength={2000}
+                  required
+                />
+              )}
             </div>
             
-            <div className="flex items-center justify-between mt-3">
-              <div className="flex items-center gap-4 text-sm text-gray-500">
+            <div className="flex items-center justify-between mt-2">
+              <div className="flex items-center gap-3 text-xs text-[#014e5c]/70">
                 <span>💡 Tip: Use formatting tools above to style your text</span>
                 <span>📝 {postContent.length}/2000 characters</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-400 animate-pulse"></div>
-                <span className="text-sm text-green-600 font-medium">Auto-saving...</span>
+                <div className="w-2 h-2 rounded-full bg-[#014e5c] animate-pulse"></div>
+                <span className="text-xs text-[#014e5c] font-medium">Auto-saving...</span>
               </div>
             </div>
           </div>
 
           {/* Guidelines */}
-          <div className="mb-8 p-6 bg-gradient-to-r from-green-50 via-emerald-50 to-teal-50 rounded-2xl border border-green-200 shadow-sm">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                <AlertTriangle className="h-6 w-6 text-white" />
+          <div className="mb-6 p-4 bg-[#014e5c]/5 rounded-lg border border-[#014e5c]/20 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-[#014e5c] rounded-lg flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="h-4 w-4 text-white" />
               </div>
               <div className="flex-1">
-                <h4 className="font-bold text-xl text-green-900 mb-3">{content.guidelines}</h4>
-                <p className="text-green-800 text-base leading-relaxed mb-4">{content.guidelinesText}</p>
+                <h4 className="font-semibold text-base text-[#014e5c] mb-2">{content.guidelines}</h4>
+                <p className="text-[#014e5c]/80 text-sm leading-relaxed mb-3">{content.guidelinesText}</p>
                 
                 {/* Quick Tips */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                  <div className="flex items-center gap-2 text-sm text-green-700">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                  <div className="flex items-center gap-2 text-xs text-[#014e5c]/80">
+                    <div className="w-1.5 h-1.5 bg-[#014e5c] rounded-full"></div>
                     <span>Keep discussions respectful and constructive</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-green-700">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <div className="flex items-center gap-2 text-xs text-[#014e5c]/80">
+                    <div className="w-1.5 h-1.5 bg-[#014e5c] rounded-full"></div>
                     <span>Focus on local community issues</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-green-700">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <div className="flex items-center gap-2 text-xs text-[#014e5c]/80">
+                    <div className="w-1.5 h-1.5 bg-[#014e5c] rounded-full"></div>
                     <span>Use clear and descriptive titles</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-green-700">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <div className="flex items-center gap-2 text-xs text-[#014e5c]/80">
+                    <div className="w-1.5 h-1.5 bg-[#014e5c] rounded-full"></div>
                     <span>Add relevant tags for better discovery</span>
                   </div>
                 </div>
@@ -853,28 +929,28 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated 
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+          <div className="flex justify-end space-x-3 pt-4 border-t border-[#014e5c]/20">
             <button
               type="button"
               onClick={onClose}
-              className="px-8 py-4 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 font-semibold text-lg"
+              className="px-6 py-2.5 border-2 border-[#014e5c]/30 text-[#014e5c] rounded-lg hover:bg-[#014e5c]/10 transition-all duration-200 font-medium text-sm"
             >
               {content.cancel}
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !title.trim() || !postContent.trim() || !selectedConstituency}
-              className="px-8 py-4 bg-[#014e5c] text-white rounded-xl hover:bg-[#013a47] transition-all duration-200 font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 shadow-lg hover:shadow-xl"
+              className="px-6 py-2.5 bg-[#014e5c] text-white rounded-lg hover:bg-[#014e5c]/90 transition-all duration-200 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md hover:shadow-lg"
             >
               {isSubmitting ? (
                 <>
-                  <Loader className="h-5 w-5 animate-spin" />
-                  Sharing...
+                  <Loader className="h-4 w-4 animate-spin" />
+                  {editingPost ? 'Updating...' : 'Sharing...'}
                 </>
               ) : (
                 <>
-                  <Upload className="h-5 w-5" />
-                  {content.createPost}
+                  <Upload className="h-4 w-4" />
+                  {editingPost ? 'Update Post' : content.createPost}
                 </>
               )}
             </button>

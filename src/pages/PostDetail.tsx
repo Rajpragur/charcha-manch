@@ -19,7 +19,12 @@ import {
   ChevronDown,
   ChevronUp,
   Check,
-  MessageCircle as ChatBubble
+  MessageCircle as ChatBubble,
+  Bold,
+  Italic,
+  Underline,
+  List,
+  ListOrdered
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import FirebaseService from '../services/firebaseService';
@@ -449,6 +454,103 @@ const PostDetail: React.FC = () => {
     }
   };
 
+  // Handle text formatting for comments
+  const handleTextFormat = (format: string) => {
+    const textarea = document.getElementById('commentText') as HTMLTextAreaElement;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = commentText.substring(start, end);
+    let formattedText = '';
+
+    switch (format) {
+      case 'bold':
+        formattedText = `**${selectedText}**`;
+        break;
+      case 'italic':
+        formattedText = `*${selectedText}*`;
+        break;
+      case 'underline':
+        formattedText = `__${selectedText}__`;
+        break;
+      case 'bullet':
+        formattedText = `• ${selectedText}`;
+        break;
+      case 'numbered':
+        formattedText = `1. ${selectedText}`;
+        break;
+      default:
+        formattedText = selectedText;
+    }
+
+    const newContent = commentText.substring(0, start) + formattedText + commentText.substring(end);
+    setCommentText(newContent);
+    
+    // Set cursor position after formatted text
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
+    }, 0);
+  };
+
+  // Handle text formatting for replies
+  const handleReplyTextFormat = (format: string, commentId: string) => {
+    const textarea = document.getElementById(`replyText_${commentId}`) as HTMLTextAreaElement;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentReplyText = replyText[commentId] || '';
+    const selectedText = currentReplyText.substring(start, end);
+    let formattedText = '';
+
+    switch (format) {
+      case 'bold':
+        formattedText = `**${selectedText}**`;
+        break;
+      case 'italic':
+        formattedText = `*${selectedText}*`;
+        break;
+      case 'underline':
+        formattedText = `__${selectedText}__`;
+        break;
+      case 'bullet':
+        formattedText = `• ${selectedText}`;
+        break;
+      case 'numbered':
+        formattedText = `1. ${selectedText}`;
+        break;
+      default:
+        formattedText = selectedText;
+    }
+
+    const newContent = currentReplyText.substring(0, start) + formattedText + currentReplyText.substring(end);
+    setReplyText(prev => ({
+      ...prev,
+      [commentId]: newContent
+    }));
+    
+    // Set cursor position after formatted text
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
+    }, 0);
+  };
+
+  // Function to render formatted text
+  const renderFormattedText = (text: string) => {
+    if (!text) return '';
+    
+    // Simple markdown-like formatting
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/__(.*?)__/g, '<u>$1</u>')
+      .replace(/^•\s/gm, '• ')
+      .replace(/^\d+\.\s/gm, (match) => match);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -562,7 +664,10 @@ const PostDetail: React.FC = () => {
                   </h1>
                   
                   {/* Post Content */}
-                  <p className="text-gray-700 leading-relaxed text-sm lg:text-base mb-4">{post.content}</p>
+                  <p 
+                  className="text-gray-700 leading-relaxed text-sm lg:text-base mb-4"
+                  dangerouslySetInnerHTML={{ __html: renderFormattedText(post.content) }}
+                />
                   
                   {/* Tags */}
                   {post.tags && post.tags.length > 0 && (
@@ -649,12 +754,58 @@ const PostDetail: React.FC = () => {
             <div className="space-y-3">
               {currentUser ? (
                 <div className="flex flex-col space-y-2">
+                  {/* Text Formatting Toolbar */}
+                  <div className="flex items-center gap-1 p-2 bg-[#014e5c]/5 border border-[#014e5c]/20 rounded-md">
+                    <button
+                      type="button"
+                      onClick={() => handleTextFormat('bold')}
+                      className="p-1 hover:bg-[#014e5c]/20 rounded transition-colors"
+                      title="Bold"
+                    >
+                      <Bold className="h-3 w-3 text-[#014e5c]" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTextFormat('italic')}
+                      className="p-1 hover:bg-[#014e5c]/20 rounded transition-colors"
+                      title="Italic"
+                    >
+                      <Italic className="h-3 w-3 text-[#014e5c]" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTextFormat('underline')}
+                      className="p-1 hover:bg-[#014e5c]/20 rounded transition-colors"
+                      title="Underline"
+                    >
+                      <Underline className="h-3 w-3 text-[#014e5c]" />
+                    </button>
+                    <div className="w-px h-4 bg-[#014e5c]/30 mx-1"></div>
+                    <button
+                      type="button"
+                      onClick={() => handleTextFormat('bullet')}
+                      className="p-1 hover:bg-[#014e5c]/20 rounded transition-colors"
+                      title="Bullet List"
+                    >
+                      <List className="h-3 w-3 text-[#014e5c]" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTextFormat('numbered')}
+                      className="p-1 hover:bg-[#014e5c]/20 rounded transition-colors"
+                      title="Numbered List"
+                    >
+                      <ListOrdered className="h-3 w-3 text-[#014e5c]" />
+                    </button>
+                  </div>
+                  
                   <textarea
+                    id="commentText"
                     placeholder={content.writeComment}
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     className="w-full px-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#014e5c] focus:border-[#014e5c] resize-none text-sm lg:text-base"
-                    rows={2}
+                    rows={3}
                   />
                   <div className="flex justify-end">
                     <button
@@ -708,7 +859,10 @@ const PostDetail: React.FC = () => {
                                   <span className="text-gray-400">•</span>
                                   <span className="text-gray-500 text-[10px] lg:text-sm">{comment.constituencyName}</span>
                                 </div>
-                                <p className="text-gray-700 text-[10px] lg:text-sm mb-2">{comment.content}</p>
+                                <p 
+                                  className="text-gray-700 text-[10px] lg:text-sm mb-2"
+                                  dangerouslySetInnerHTML={{ __html: renderFormattedText(comment.content) }}
+                                />
                               
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-3">
@@ -756,7 +910,53 @@ const PostDetail: React.FC = () => {
                         {showReplyInput[comment.id] && (
                           <div className="p-3 bg-gray-50 border-t border-gray-100">
                             <div className="flex flex-col space-y-2">
+                              {/* Text Formatting Toolbar for Replies */}
+                              <div className="flex items-center gap-1 p-1.5 bg-[#014e5c]/5 border border-[#014e5c]/20 rounded-md">
+                                <button
+                                  type="button"
+                                  onClick={() => handleReplyTextFormat('bold', comment.id)}
+                                  className="p-1 hover:bg-[#014e5c]/20 rounded transition-colors"
+                                  title="Bold"
+                                >
+                                  <Bold className="h-2.5 w-2.5 text-[#014e5c]" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleReplyTextFormat('italic', comment.id)}
+                                  className="p-1 hover:bg-[#014e5c]/20 rounded transition-colors"
+                                  title="Italic"
+                                >
+                                  <Italic className="h-2.5 w-2.5 text-[#014e5c]" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleReplyTextFormat('underline', comment.id)}
+                                  className="p-1 hover:bg-[#014e5c]/20 rounded transition-colors"
+                                  title="Underline"
+                                >
+                                  <Underline className="h-2.5 w-2.5 text-[#014e5c]" />
+                                </button>
+                                <div className="w-px h-3 bg-[#014e5c]/30 mx-1"></div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleReplyTextFormat('bullet', comment.id)}
+                                  className="p-1 hover:bg-[#014e5c]/20 rounded transition-colors"
+                                  title="Bullet List"
+                                >
+                                  <List className="h-2.5 w-2.5 text-[#014e5c]" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleReplyTextFormat('numbered', comment.id)}
+                                  className="p-1 hover:bg-[#014e5c]/20 rounded transition-colors"
+                                  title="Numbered List"
+                                >
+                                  <ListOrdered className="h-2.5 w-2.5 text-[#014e5c]" />
+                                </button>
+                              </div>
+                              
                               <textarea
+                                id={`replyText_${comment.id}`}
                                 placeholder={content.writeReply}
                                 value={replyText[comment.id] || ''}
                                 onChange={(e) => setReplyText(prev => ({
@@ -764,7 +964,7 @@ const PostDetail: React.FC = () => {
                                   [comment.id]: e.target.value
                                 }))}
                                 className="w-full px-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#014e5c] focus:border-[#014e5c] resize-none"
-                                rows={1}
+                                rows={2}
                               />
                               <div className="flex justify-end">
                                 <button
@@ -794,7 +994,10 @@ const PostDetail: React.FC = () => {
                                       <span className="text-gray-400">•</span>
                                       <span className="text-gray-500">{formatRelativeTime(reply.createdAt)}</span>
                                     </div>
-                                    <p className="text-gray-700 text-sm mb-2">{reply.content}</p>
+                                    <p 
+                                      className="text-gray-700 text-sm mb-2"
+                                      dangerouslySetInnerHTML={{ __html: renderFormattedText(reply.content) }}
+                                    />
                                     
                                     {/* Delete Button for replies (only show for reply owner or post owner) */}
                                     {(currentUser?.uid === reply.userId || currentUser?.uid === post?.userId) && (

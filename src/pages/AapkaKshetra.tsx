@@ -1141,9 +1141,9 @@ const AapkaKshetra: React.FC = () => {
         )}
         {/* Charcha Manch Button */}
         {candidateData && constituencyId && (
-          <div className="text-center mt-6 mb-4">
+          <div className="text-center mt-4 sm:mt-6 mb-3 sm:mb-4">
             <button 
-              className={`px-8 py-4 rounded-xl font-medium transition-all duration-200 shadow-lg text-lg flex items-center justify-center space-x-3 mx-auto ${
+              className={`px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-medium transition-all duration-200 shadow-lg text-base sm:text-lg flex items-center justify-center space-x-2 sm:space-x-3 mx-auto ${
                 englishConstituencyName 
                   ? 'bg-gray-700 text-white hover:bg-[#014e5c]/80 hover:shadow-xl transform hover:-translate-y-1' 
                   : 'bg-gray-400 text-gray-600 cursor-not-allowed'
@@ -1167,26 +1167,26 @@ const AapkaKshetra: React.FC = () => {
       
       {/* Bottom Navigation - Mobile */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20 shadow-lg">
-        <div className="flex items-center justify-around py-3 px-2">
+        <div className="flex items-center justify-around py-2 sm:py-3 px-2">
           <button
             onClick={() => navigate('/')}
             className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-gray-400`}
           >
-            <House className="w-5 h-5" />
+            <House className="w-4 h-4 sm:w-5 sm:h-5" />
             <span className="text-xs font-medium">{isEnglish ? 'Home' : 'होम'}</span>
           </button>
           <button
             onClick={() => navigate('/discussion')}
             className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-gray-400`}
           >
-            <MessageCircle className="w-5 h-5" />
+            <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
             <span className="text-xs font-medium">{isEnglish ? 'Discussion Forum' : 'चर्चा मंच'}</span>
           </button>
           <button
             onClick={() => navigate('/aapka-kshetra')}
             className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-[#014e5c] bg-[#014e5c]/10`}
           >
-            <MapPin className="w-5 h-5" />
+            <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
             <span className="text-xs font-medium">{isEnglish ? 'Your Area' : 'आपका क्षेत्र'}</span>
           </button>
         </div>

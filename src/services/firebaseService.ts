@@ -376,10 +376,37 @@ export class FirebaseService {
   static async getUserPosts(userId: string): Promise<any[]> {
     try {
       const postsRef = collection(db, 'discussion_posts');
-      const postsQuery = query(postsRef, where('user_id', '==', userId));
+      
+      // First, let's try to get all posts to see what's in the collection
+      console.log(`🔍 Attempting to get posts for userId: ${userId}`);
+      
+      try {
+        // Try to get all posts first to debug
+        const allPostsQuery = query(postsRef);
+        const allPostsSnapshot = await getDocs(allPostsQuery);
+        console.log(`📊 Total posts in collection: ${allPostsSnapshot.size}`);
+        
+        if (allPostsSnapshot.size > 0) {
+          console.log('📝 Sample post structure:', allPostsSnapshot.docs[0].data());
+        }
+      } catch (debugError) {
+        console.log('⚠️ Could not get all posts (might be permission issue):', debugError);
+      }
+      
+      // Now try to get user-specific posts
+      const postsQuery = query(postsRef, where('userId', '==', userId));
       const postsSnapshot = await getDocs(postsQuery);
 
-      return postsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log(`🔍 Searching for posts with userId: ${userId}`);
+      console.log(`📊 Found ${postsSnapshot.size} posts for this user`);
+      
+      const posts = postsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log(`📝 Post data:`, { id: doc.id, ...data });
+        return { id: doc.id, ...data };
+      });
+
+      return posts;
     } catch (error: any) {
       if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
         console.warn('Permission denied accessing user posts, returning empty array');
@@ -404,6 +431,78 @@ export class FirebaseService {
         return [];
       }
       console.error('Error getting user referrals:', error);
+      return [];
+    }
+  }
+
+  // Generate a unique 6-character referral code
+  static async generateReferralCode(): Promise<string> {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code: string;
+    let isUnique = false;
+    
+    do {
+      code = '';
+      for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      
+      // Check if code already exists
+      const referralsRef = collection(db, 'referrals');
+      const codeQuery = query(referralsRef, where('referral_code', '==', code));
+      const snapshot = await getDocs(codeQuery);
+      isUnique = snapshot.empty;
+    } while (!isUnique);
+    
+    return code;
+  }
+
+  // Create referral relationship
+  static async createReferral(referralData: {
+    referred_user_id: string;
+    referred_user_email: string;
+    referred_user_name?: string;
+    referral_code: string;
+    referred_by: string;
+  }): Promise<string> {
+    try {
+      const referralsRef = collection(db, 'referrals');
+      const newReferral = await addDoc(referralsRef, {
+        ...referralData,
+        status: 'pending',
+        created_at: serverTimestamp()
+      });
+      return newReferral.id;
+    } catch (error) {
+      console.error('Error creating referral:', error);
+      throw error;
+    }
+  }
+
+  // Update referral status
+  static async updateReferralStatus(referralId: string, status: 'pending' | 'completed' | 'active'): Promise<void> {
+    try {
+      const referralRef = doc(db, 'referrals', referralId);
+      await updateDoc(referralRef, {
+        status,
+        updated_at: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('Error updating referral status:', error);
+      throw error;
+    }
+  }
+
+  // Get referrals by referral code
+  static async getReferralsByCode(referralCode: string): Promise<any[]> {
+    try {
+      const referralsRef = collection(db, 'referrals');
+      const referralsQuery = query(referralsRef, where('referral_code', '==', referralCode));
+      const referralsSnapshot = await getDocs(referralsQuery);
+
+      return referralsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      console.error('Error getting referrals by code:', error);
       return [];
     }
   }
@@ -1593,6 +1692,46 @@ export class FirebaseService {
   }
 
   // Discussion Forum Methods
+  static async getDiscussionPost(postId: string): Promise<any | null> {
+    try {
+      const postRef = doc(db, 'discussion_posts', postId);
+      const postDoc = await getDoc(postRef);
+      
+      if (!postDoc.exists()) {
+        return null;
+      }
+      
+      const postData = postDoc.data() as FirebaseDiscussionPost;
+      
+      // Enrich post with user and constituency data
+      try {
+        const userProfile = await this.getUserProfile(postData.userId);
+        const constituencyName = await this.getConstituencyName(postData.constituency);
+        
+        return {
+          ...postData,
+          id: postDoc.id,
+          userName: postData.userName || userProfile?.display_name || 'User',
+          userConstituency: userProfile?.constituency_id,
+          constituencyName: constituencyName || `Constituency ${postData.constituency}`,
+          interactionsCount: (postData.likesCount || 0) + (postData.commentsCount || 0)
+        };
+      } catch (error) {
+        console.error('Error enriching post:', error);
+        return {
+          ...postData,
+          id: postDoc.id,
+          userName: postData.userName || 'User',
+          constituencyName: `Constituency ${postData.constituency}`,
+          interactionsCount: (postData.likesCount || 0) + (postData.commentsCount || 0)
+        };
+      }
+    } catch (error: any) {
+      console.error('Error getting discussion post:', error);
+      return null;
+    }
+  }
+
   static async getDiscussionPosts(): Promise<any[]> {
     try {
       const postsRef = collection(db, 'discussion_posts');

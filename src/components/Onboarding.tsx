@@ -8,7 +8,10 @@ import {
   User, 
   CheckCircle, 
   ArrowRight,
-  Loader2
+  Loader2,
+  Gift,
+  Copy,
+  Check
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -30,10 +33,13 @@ const Onboarding: React.FC = () => {
   const [firstVoteYear, setFirstVoteYear] = useState<number | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
+  const [referralCode, setReferralCode] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
+  const [copied, setCopied] = useState(false);
+  const [generatedReferralCode, setGeneratedReferralCode] = useState<string>('');
 
   // Load constituencies on component mount and check if user already has constituency
   useEffect(() => {
@@ -57,6 +63,32 @@ const Onboarding: React.FC = () => {
     
     checkExistingConstituency();
   }, [currentUser, navigate]);
+
+  // Generate referral code when component mounts
+  useEffect(() => {
+    if (currentUser) {
+      generateReferralCode();
+    }
+  }, [currentUser]);
+
+  // Generate a unique referral code
+  const generateReferralCode = () => {
+    const timestamp = Date.now().toString(36);
+    const randomStr = Math.random().toString(36).substring(2, 8);
+    const code = `${currentUser?.email?.split('@')[0] || 'USER'}_${timestamp}_${randomStr}`.toUpperCase();
+    setGeneratedReferralCode(code);
+  };
+
+  // Copy referral code to clipboard
+  const copyReferralCode = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedReferralCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy referral code:', err);
+    }
+  };
 
   // Load constituencies from JSON (derived from candidates data)
   const loadConstituencies = async () => {
@@ -117,7 +149,9 @@ const Onboarding: React.FC = () => {
         first_vote_year: firstVoteYear || undefined,
         constituency_id: selectedConstituency,
         tier_level: 1,
-        engagement_score: 0
+        engagement_score: 0,
+        referral_code: generatedReferralCode,
+        referred_by: referralCode || undefined
       });
 
       // Show success message before redirecting
@@ -147,6 +181,8 @@ const Onboarding: React.FC = () => {
         return firstVoteYear !== null;
       case 3:
         return true; // Profile info is optional
+      case 4:
+        return true; // Referral code is optional
       default:
         return false;
     }
@@ -155,7 +191,7 @@ const Onboarding: React.FC = () => {
   // Next step handler
   const handleNext = () => {
     if (canProceedToNext()) {
-      if (step === 3) {
+      if (step === 4) {
         saveOnboardingData();
       } else {
         setStep(step + 1);
@@ -172,7 +208,7 @@ const Onboarding: React.FC = () => {
 
   // Skip profile step
   const handleSkipProfile = () => {
-    saveOnboardingData();
+    setStep(4); // Go to referral code step instead of saving directly
   };
 
   if (!currentUser) {
@@ -218,7 +254,7 @@ const Onboarding: React.FC = () => {
         {/* Progress Bar */}
         <div className="mb-4 lg:mb-8">
           <div className="flex items-center justify-between mb-2">
-            {[1, 2, 3].map((stepNumber) => (
+            {[1, 2, 3, 4].map((stepNumber) => (
               <div
                 key={stepNumber}
                 className={`w-6 h-6 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-xs lg:text-sm font-medium ${
@@ -234,10 +270,11 @@ const Onboarding: React.FC = () => {
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div
               className="bg-[#014e5c] h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(step / 3) * 100}%` }}
+              style={{ width: `${(step / 4) * 100}%` }}
             />
           </div>
         </div>
+
         {/* Step Content */}
         <div className="mb-4 lg:mb-8">
           {step === 1 && (
@@ -275,6 +312,7 @@ const Onboarding: React.FC = () => {
               </div>
             </div>
           )}
+
           {step === 2 && (
             <div className="space-y-6">
               <div className="text-center">
@@ -357,6 +395,78 @@ const Onboarding: React.FC = () => {
               </div>
             </div>
           )}
+
+          {step === 4 && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <Gift className="h-7 w-7 lg:h-12 lg:w-12 text-[#014e5c] mx-auto mb-4" />
+                <h2 className="text-sm lg:text-2xl font-semibold text-gray-900 mb-2">
+                  {isEnglish ? 'Referral & Rewards' : 'रेफरल और पुरस्कार'}
+                </h2>
+                <p className="text-gray-600 text-xs lg:text-base">
+                  {isEnglish ? 'Get your referral code and enter one if you were referred' : 'अपना रेफरल कोड प्राप्त करें और यदि आपको रेफर किया गया था तो एक दर्ज करें'}
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                {/* Your Referral Code */}
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+                  <h3 className="text-sm lg:text-base font-semibold text-green-800 mb-2">
+                    {isEnglish ? 'Your Referral Code' : 'आपका रेफरल कोड'}
+                  </h3>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1 font-mono text-lg lg:text-xl font-bold text-green-800 bg-white px-3 py-2 rounded-lg border-2 border-green-300">
+                      {generatedReferralCode}
+                    </div>
+                    <button
+                      onClick={copyReferralCode}
+                      className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      title={isEnglish ? 'Copy code' : 'कोड कॉपी करें'}
+                    >
+                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <p className="text-xs lg:text-sm text-green-600 mt-2">
+                    {isEnglish 
+                      ? 'Share this code with friends to earn rewards!'
+                      : 'पुरस्कार कमाने के लिए इस कोड को दोस्तों के साथ साझा करें!'
+                    }
+                  </p>
+                </div>
+
+                {/* Enter Referral Code */}
+                <div>
+                  <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1 lg:mb-2">
+                    {isEnglish ? 'Were you referred? (Optional)' : 'क्या आपको रेफर किया गया था? (वैकल्पिक)'}
+                  </label>
+                  <input
+                    type="text"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                    placeholder={isEnglish ? 'Enter referral code if you have one' : 'यदि आपके पास रेफरल कोड है तो दर्ज करें'}
+                    className="w-full p-2 lg:p-3 border-2 border-gray-200 rounded-3xl focus:border-[#014e5c] focus:outline-none"
+                  />
+                  {referralCode && (
+                    <p className="text-xs text-green-600 mt-1">
+                      {isEnglish ? '✅ Referral code entered' : '✅ रेफरल कोड दर्ज किया गया'}
+                    </p>
+                  )}
+                </div>
+
+                {/* Benefits Info */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <h4 className="text-xs lg:text-sm font-semibold text-blue-800 mb-1">
+                    {isEnglish ? 'How Referrals Work' : 'रेफरल कैसे काम करते हैं'}
+                  </h4>
+                  <ul className="text-xs lg:text-sm text-blue-700 space-y-1">
+                    <li>• {isEnglish ? 'Share your code with friends' : 'अपना कोड दोस्तों के साथ साझा करें'}</li>
+                    <li>• {isEnglish ? 'Both you and your friend get benefits' : 'आप और आपके दोस्त दोनों को लाभ मिलता है'}</li>
+                    <li>• {isEnglish ? 'Earn engagement points and rewards' : 'एंगेजमेंट पॉइंट्स और पुरस्कार कमाएं'}</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Error Message */}
@@ -415,7 +525,7 @@ const Onboarding: React.FC = () => {
               ) : (
                 <>
                   <span className="text-xs lg:text-base">
-                    {step === 3 
+                    {step === 4 
                       ? (isEnglish ? 'Complete' : 'पूरा करें')
                       : (isEnglish ? 'Next' : 'अगला')
                     }
