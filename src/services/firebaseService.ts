@@ -2758,6 +2758,87 @@ export class FirebaseService {
     }
   }
 
+  // Delete a reply (admin override - can delete any reply)
+  static async deleteReplyAsAdmin(replyId: string): Promise<void> {
+    try {
+      console.log(`🔍 Admin attempting to delete reply ${replyId}`);
+      
+      const replyRef = doc(db, 'comment_replies', replyId);
+      const replySnapshot = await getDoc(replyRef);
+      
+      if (!replySnapshot.exists()) {
+        throw new Error('Reply not found');
+      }
+      
+      console.log(`✅ Reply found, proceeding with admin deletion`);
+      
+      // Delete the reply
+      await deleteDoc(replyRef);
+      
+      console.log('✅ Reply deleted successfully by admin');
+    } catch (error: any) {
+      console.error('❌ Error deleting reply as admin:', error);
+      console.error('❌ Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  // Update a reply (only by reply owner, post owner, or admin)
+  static async updateReply(replyId: string, userId: string, postId: string, newContent: string, isAdmin: boolean = false): Promise<void> {
+    try {
+      console.log(`🔍 Attempting to update reply ${replyId} by user ${userId} from post ${postId}`);
+      
+      const replyRef = doc(db, 'comment_replies', replyId);
+      const replySnapshot = await getDoc(replyRef);
+      
+      if (!replySnapshot.exists()) {
+        throw new Error('Reply not found');
+      }
+      
+      const replyData = replySnapshot.data();
+      console.log(`🔍 Reply data:`, replyData);
+      
+      // Get post data to check if user is post owner
+      const postRef = doc(db, 'discussion_posts', postId);
+      const postDoc = await getDoc(postRef);
+      const postData = postDoc.data();
+      
+      if (!postData) {
+        throw new Error('Post not found');
+      }
+      
+      console.log(`🔍 Post data:`, postData);
+      console.log(`🔍 Checking permissions: reply owner: ${replyData.userId}, post owner: ${postData.userId}, current user: ${userId}, isAdmin: ${isAdmin}`);
+      
+      // Check if user is the reply owner, post owner, or admin
+      if (!isAdmin && replyData.userId !== userId && postData.userId !== userId) {
+        throw new Error('Only reply owner, post owner, or admin can edit this reply');
+      }
+      
+      console.log(`✅ Permission check passed, proceeding with update`);
+      
+      // Update the reply
+      await updateDoc(replyRef, {
+        content: newContent,
+        updatedAt: serverTimestamp()
+      });
+      
+      console.log('✅ Reply updated successfully');
+    } catch (error: any) {
+      console.error('❌ Error updating reply:', error);
+      console.error('❌ Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
   // Delete a comment (only by comment owner or post owner)
   static async deleteComment(commentId: string, userId: string, postId: string): Promise<void> {
     try {
@@ -2810,6 +2891,100 @@ export class FirebaseService {
       console.log('✅ Comment deleted successfully');
     } catch (error: any) {
       console.error('❌ Error deleting comment:', error);
+      console.error('❌ Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  // Update a comment (only by comment owner, post owner, or admin)
+  static async updateComment(commentId: string, userId: string, postId: string, newContent: string, isAdmin: boolean = false): Promise<void> {
+    try {
+      console.log(`🔍 Attempting to update comment ${commentId} by user ${userId} from post ${postId}`);
+      
+      const commentRef = doc(db, 'comments', commentId);
+      const commentSnapshot = await getDoc(commentRef);
+      
+      if (!commentSnapshot.exists()) {
+        throw new Error('Comment not found');
+      }
+      
+      const commentData = commentSnapshot.data();
+      console.log(`🔍 Comment data:`, commentData);
+      
+      // Get post data to check if user is post owner
+      const postRef = doc(db, 'discussion_posts', postId);
+      const postDoc = await getDoc(postRef);
+      const postData = postDoc.data();
+      
+      if (!postData) {
+        throw new Error('Post not found');
+      }
+      
+      console.log(`🔍 Post data:`, postData);
+      console.log(`🔍 Checking permissions: comment owner: ${commentData.userId}, post owner: ${postData.userId}, current user: ${userId}, isAdmin: ${isAdmin}`);
+      
+      // Check if user is the comment owner, post owner, or admin
+      if (!isAdmin && commentData.userId !== userId && postData.userId !== userId) {
+        throw new Error('Only comment owner, post owner, or admin can edit this comment');
+      }
+      
+      console.log(`✅ Permission check passed, proceeding with update`);
+      
+      // Update the comment
+      await updateDoc(commentRef, {
+        content: newContent,
+        updatedAt: serverTimestamp()
+      });
+      
+      console.log('✅ Comment updated successfully');
+    } catch (error: any) {
+      console.error('❌ Error updating comment:', error);
+      console.error('❌ Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  // Delete a comment (admin override - can delete any comment)
+  static async deleteCommentAsAdmin(commentId: string, postId: string): Promise<void> {
+    try {
+      console.log(`🔍 Admin attempting to delete comment ${commentId} from post ${postId}`);
+      
+      const commentRef = doc(db, 'comments', commentId);
+      const commentSnapshot = await getDoc(commentRef);
+      
+      if (!commentSnapshot.exists()) {
+        throw new Error('Comment not found');
+      }
+      
+      console.log(`✅ Comment found, proceeding with admin deletion`);
+      
+      // Use a batch to ensure atomic operations
+      const batch = writeBatch(db);
+      
+      // Delete the comment
+      batch.delete(commentRef);
+      
+      // Update post comment count
+      const postRef = doc(db, 'discussion_posts', postId);
+      batch.update(postRef, {
+        commentsCount: increment(-1),
+        updatedAt: serverTimestamp()
+      });
+      
+      // Commit the batch
+      await batch.commit();
+      
+      console.log('✅ Comment deleted successfully by admin');
+    } catch (error: any) {
+      console.error('❌ Error deleting comment as admin:', error);
       console.error('❌ Error details:', {
         code: error.code,
         message: error.message,

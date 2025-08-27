@@ -2,6 +2,20 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper function to check if user is post owner
+    function isPostOwner(postId) {
+      return request.auth != null && 
+        exists(/databases/$(database)/documents/discussion_posts/$(postId)) &&
+        get(/databases/$(database)/documents/discussion_posts/$(postId)).data.userId == request.auth.uid;
+    }
+    
+    // Helper function to check if user has admin role (simplified)
+    function hasAdminRole() {
+      return request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin', 'moderator'];
+    }
+    
     // Allow authenticated users to read and write their own data
     match /user_profiles/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
@@ -90,7 +104,7 @@ service cloud.firestore {
       allow update: if request.auth != null; // Allow all authenticated users to update (for like/dislike counts)
       allow delete: if request.auth != null && (
         resource.data.userId == request.auth.uid || // Users can delete their own posts
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' // Admins can delete any post
+        hasAdminRole() // Admins can delete any post
       );
     }
     
@@ -100,11 +114,13 @@ service cloud.firestore {
       allow create: if request.auth != null; // Only authenticated users can create
       allow update: if request.auth != null && (
         resource.data.userId == request.auth.uid || // Users can edit their own comments
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' // Admins can edit any comment
+        isPostOwner(resource.data.postId) || // Post owners can edit any comment on their post
+        hasAdminRole() // Admins can edit any comment
       );
       allow delete: if request.auth != null && (
         resource.data.userId == request.auth.uid || // Users can delete their own comments
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' // Admins can delete any comment
+        isPostOwner(resource.data.postId) || // Post owners can delete any comment on their post
+        hasAdminRole() // Admins can delete any comment
       );
     }
     
@@ -132,11 +148,13 @@ service cloud.firestore {
       allow create: if request.auth != null; // Only authenticated users can create
       allow update: if request.auth != null && (
         resource.data.userId == request.auth.uid || // Users can edit their own replies
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' // Admins can edit any reply
+        isPostOwner(resource.data.postId) || // Post owners can edit any reply on their post
+        hasAdminRole() // Admins can edit any reply
       );
       allow delete: if request.auth != null && (
         resource.data.userId == request.auth.uid || // Users can delete their own replies
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' // Admins can delete any reply
+        isPostOwner(resource.data.postId) || // Post owners can delete any reply on their post
+        hasAdminRole() // Admins can delete any reply
       );
     }
     

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useAdmin } from '../contexts/AdminContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft,
@@ -24,7 +25,10 @@ import {
   Italic,
   Underline,
   List,
-  ListOrdered
+  ListOrdered,
+  Edit3,
+  Trash2,
+  Crown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import FirebaseService from '../services/firebaseService';
@@ -78,6 +82,7 @@ const PostDetail: React.FC = () => {
   const navigate = useNavigate();
   const { isEnglish } = useLanguage();
   const { currentUser } = useAuth();
+  const { isAdmin } = useAdmin();
   const [post, setPost] = useState<DiscussionPost | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -91,6 +96,8 @@ const PostDetail: React.FC = () => {
   const [expandedComments, setExpandedComments] = useState<{ [commentId: string]: boolean }>({});
   const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
   const [userConstituency, setUserConstituency] = useState<string | null>(null);
+  const [isEditingComment, setIsEditingComment] = useState<{ [commentId: string]: boolean }>({});
+  const [editedCommentContent, setEditedCommentContent] = useState<{ [commentId: string]: string }>({});
 
   const content = {
     backToForum: isEnglish ? 'Back to Forum' : 'फोरम पर वापस जाएं',
@@ -109,6 +116,9 @@ const PostDetail: React.FC = () => {
     signInToLike: isEnglish ? 'Please sign in to like posts' : 'पोस्ट को लाइक करने के लिए साइन इन करें',
     signInToDislike: isEnglish ? 'Please sign in to dislike posts' : 'पोस्ट को डिसलाइक करने के लिए साइन इन करें',
     delete: isEnglish ? 'Delete' : 'हटाएं',
+    edit: isEnglish ? 'Edit' : 'संपादित करें',
+    save: isEnglish ? 'Save' : 'सहेजें',
+    cancel: isEnglish ? 'Cancel' : 'रद्द करें',
     deleteCommentConfirm: isEnglish ? 'Are you sure you want to delete this comment? This action cannot be undone.' : 'क्या आप वाकई इस टिप्पणी को हटाना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।',
     commentDeleted: isEnglish ? 'Comment deleted successfully' : 'टिप्पणी सफलतापूर्वक हटा दी गई',
     deleteCommentFailed: isEnglish ? 'Failed to delete comment' : 'टिप्पणी हटाने में विफल',
@@ -551,6 +561,80 @@ const PostDetail: React.FC = () => {
       .replace(/^\d+\.\s/gm, (match) => match);
   };
 
+  const handleEditComment = async (commentId: string) => {
+    if (!currentUser?.uid) {
+      toast.error('Please sign in to edit comments');
+      return;
+    }
+
+    const newContent = editedCommentContent[commentId]?.trim();
+    if (!newContent) {
+      toast.error('Comment content cannot be empty');
+      return;
+    }
+
+    try {
+      await FirebaseService.updateComment(commentId, currentUser.uid, postId!, newContent, isAdmin);
+      toast.success('Comment updated successfully!');
+      setIsEditingComment(prev => ({ ...prev, [commentId]: false }));
+      setEditedCommentContent(prev => ({ ...prev, [commentId]: '' }));
+
+      // Refresh comments
+      const fetchedComments = await FirebaseService.getComments(postId!);
+      setComments(fetchedComments);
+
+      // Refresh post to update comment count
+      const posts = await FirebaseService.getDiscussionPosts();
+      const updatedPost = posts.find(p => p.id === postId);
+      if (updatedPost) {
+        setPost(updatedPost);
+      }
+
+    } catch (error: any) {
+      console.error('Error updating comment:', error);
+      toast.error(error.message || 'Failed to update comment');
+    }
+  };
+
+  // Admin functions for comment management
+  const handleAdminDeleteComment = async (commentId: string) => {
+    if (!isAdmin) {
+      toast.error('Admin access required');
+      return;
+    }
+
+    if (window.confirm('Are you sure you want to delete this comment as an admin? This action cannot be undone.')) {
+      try {
+        await FirebaseService.deleteCommentAsAdmin(commentId, postId!);
+        toast.success('Comment deleted successfully by admin');
+        
+        // Refresh comments
+        const fetchedComments = await FirebaseService.getComments(postId!);
+        setComments(fetchedComments);
+        
+        // Refresh post to update comment count
+        const posts = await FirebaseService.getDiscussionPosts();
+        const updatedPost = posts.find(p => p.id === postId);
+        if (updatedPost) {
+          setPost(updatedPost);
+        }
+      } catch (error: any) {
+        console.error('Error deleting comment as admin:', error);
+        toast.error(error.message || 'Failed to delete comment as admin');
+      }
+    }
+  };
+
+  const startEditingComment = (commentId: string, currentContent: string) => {
+    setIsEditingComment(prev => ({ ...prev, [commentId]: true }));
+    setEditedCommentContent(prev => ({ ...prev, [commentId]: currentContent }));
+  };
+
+  const cancelEditingComment = (commentId: string) => {
+    setIsEditingComment(prev => ({ ...prev, [commentId]: false }));
+    setEditedCommentContent(prev => ({ ...prev, [commentId]: '' }));
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -858,11 +942,50 @@ const PostDetail: React.FC = () => {
                                   <span className="text-gray-500 text-[10px] lg:text-sm">{formatRelativeTime(comment.createdAt)}</span>
                                   <span className="text-gray-400">•</span>
                                   <span className="text-gray-500 text-[10px] lg:text-sm">{comment.constituencyName}</span>
+                                  {isAdmin && (
+                                    <>
+                                      <span className="text-gray-400">•</span>
+                                      <span className="text-yellow-600 text-xs flex items-center gap-1">
+                                        <Crown className="h-3 w-3" />
+                                        Admin
+                                      </span>
+                                    </>
+                                  )}
                                 </div>
-                                <p 
-                                  className="text-gray-700 text-[10px] lg:text-sm mb-2"
-                                  dangerouslySetInnerHTML={{ __html: renderFormattedText(comment.content) }}
-                                />
+                                
+                                {/* Comment Content - Show edit form or display content */}
+                                {isEditingComment[comment.id] ? (
+                                  <div className="mb-3">
+                                    <textarea
+                                      value={editedCommentContent[comment.id] || ''}
+                                      onChange={(e) => setEditedCommentContent(prev => ({
+                                        ...prev,
+                                        [comment.id]: e.target.value
+                                      }))}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#014e5c] focus:border-[#014e5c] resize-none text-sm"
+                                      rows={3}
+                                    />
+                                    <div className="flex items-center gap-2 mt-2">
+                                      <button
+                                        onClick={() => handleEditComment(comment.id)}
+                                        className="bg-[#014e5c] hover:bg-[#014e5c]/90 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+                                      >
+                                        {content.save}
+                                      </button>
+                                      <button
+                                        onClick={() => cancelEditingComment(comment.id)}
+                                        className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+                                      >
+                                        {content.cancel}
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p 
+                                    className="text-gray-700 text-[10px] lg:text-sm mb-2"
+                                    dangerouslySetInnerHTML={{ __html: renderFormattedText(comment.content) }}
+                                  />
+                                )}
                               
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-3">
@@ -874,13 +997,25 @@ const PostDetail: React.FC = () => {
                                     {content.reply}
                                   </button>
                                   
-                                  {/* Delete Button (only show for comment owner or post owner) */}
-                                  {(currentUser?.uid === comment.userId || currentUser?.uid === post?.userId) && (
+                                  {/* Edit Button (only show for comment owner, post owner, or admin) */}
+                                  {(currentUser?.uid === comment.userId || currentUser?.uid === post?.userId || isAdmin) && (
                                     <button
-                                      onClick={() => handleDeleteComment(comment.id)}
+                                      onClick={() => startEditingComment(comment.id, comment.content)}
+                                      className="text-[#014e5c] hover:bg-[#014e5c]/10 px-1.5 py-0.5 rounded text-[10px] lg:text-xs font-medium transition-colors"
+                                    >
+                                      <Edit3 className="h-3 w-3 inline mr-1" />
+                                      {content.edit}
+                                    </button>
+                                  )}
+                                  
+                                  {/* Delete Button (only show for comment owner, post owner, or admin) */}
+                                  {(currentUser?.uid === comment.userId || currentUser?.uid === post?.userId || isAdmin) && (
+                                    <button
+                                      onClick={() => isAdmin ? handleAdminDeleteComment(comment.id) : handleDeleteComment(comment.id)}
                                       className="text-red-500 hover:bg-red-50 hover:text-red-600 px-1.5 py-0.5 rounded text-[10px] lg:text-xs font-medium transition-colors"
                                     >
-                                      {content.delete}
+                                      <Trash2 className="h-3 w-3 inline mr-1" />
+                                      {isAdmin ? 'Delete (Admin)' : 'Delete'}
                                     </button>
                                   )}
                                 </div>
