@@ -194,13 +194,6 @@ const DiscussionForum: React.FC = () => {
     fetchData();
   }, [currentUser?.uid]);
 
-  // Debug: Log posts when they change
-  useEffect(() => {
-    console.log('📊 Posts updated in DiscussionForum:', posts.length);
-    if (posts.length > 0) {
-      console.log('📝 Sample post:', posts[0]);
-    }
-  }, [posts]);
 
   // Handle URL parameters for constituency selection
   useEffect(() => {
@@ -250,17 +243,13 @@ const DiscussionForum: React.FC = () => {
   useEffect(() => {
     const editPostId = searchParams.get('edit');
     if (editPostId && posts.length > 0) {
-      console.log('🔍 Edit parameter detected:', editPostId);
-      console.log('📝 Current posts count:', posts.length);
       
       // Find the post to edit
       const postToEdit = posts.find(post => post.id === editPostId);
       if (postToEdit) {
-        console.log('✅ Found post in current posts:', postToEdit);
         setEditingPost(postToEdit);
         setShowCreatePost(true);
       } else {
-        console.log('❌ Post not found in current posts, fetching from Firebase...');
         // If post not found in current posts, fetch it
         fetchPostForEdit(editPostId);
       }
@@ -271,7 +260,6 @@ const DiscussionForum: React.FC = () => {
   useEffect(() => {
     const editPostId = searchParams.get('edit');
     if (editPostId && !isLoading && posts.length === 0) {
-      console.log('🔍 Edit parameter detected but no posts loaded, fetching from Firebase...');
       fetchPostForEdit(editPostId);
     }
   }, [searchParams, isLoading, posts.length]);
@@ -333,18 +321,15 @@ const DiscussionForum: React.FC = () => {
   const fetchPostForEdit = async (postId: string) => {
     try {
       setIsLoading(true);
-      console.log('🔄 Fetching post for edit:', postId);
+      
       
       // Try to fetch the post from Firebase
       const post = await FirebaseService.getDiscussionPost(postId);
-      console.log('📥 Fetched post from Firebase:', post);
       
       if (post) {
-        console.log('✅ Setting editing post and opening modal');
         setEditingPost(post);
         setShowCreatePost(true);
       } else {
-        console.log('❌ Post not found in Firebase');
         toast.error('Post not found for editing');
         // Clean up URL parameters
         const newSearchParams = new URLSearchParams(searchParams);
