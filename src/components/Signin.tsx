@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { RecaptchaVerifier } from 'firebase/auth';
 import { auth } from '../configs/firebase';
-import { Mail, Lock, Phone, Eye, EyeOff, ArrowRight, Smartphone } from 'lucide-react';
+import { Mail, Lock, Phone, Eye, EyeOff, ArrowRight, Smartphone, X } from 'lucide-react';
 
 const Signin: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'email' | 'phone'>('email');
@@ -127,37 +127,54 @@ const Signin: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-green-200 overflow-hidden">
+    <div className="min-h-screen bg-[#c1cad1] flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden relative">
+        {/* Close Button */}
+        <button
+          onClick={() => navigate('/')}
+          className="absolute top-4 right-4 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 transition-colors z-10"
+        >
+          <X className="w-4 h-4 text-gray-600" />
+        </button>
+
         {/* Header */}
-        <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-8 py-6 text-white text-center">
-          <h1 className="text-3xl font-bold mb-2">Welcome Back</h1>
-          <p className="text-sky-100">Sign in to your Charcha Manch account</p>
+        <div className="px-8 py-8 text-center">
+          {/* Community Icon */}
+          <div className="w-20 h-20 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-12 h-12 text-white flex items-center justify-center">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12">
+                <path d="M16 4c0-1.11.89-2 2-2s2 .89 2 2-.89 2-2 2-2-.89-2-2zm4 18v-6h2v6h-2zm-8-4v-6h2v6h-2zm-8-4v-6h2v6H4zm4 4v-6h2v6H8zm4 4v-6h2v6h-2z"/>
+              </svg>
+            </div>
+          </div>
+          
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">आपका चुनावी साथी</h1>
+          <p className="text-gray-600 text-sm">लोकतंत्र में भागीदारी का नया तरीका</p>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-green-200">
+        <div className="flex border-b border-gray-200 mx-8">
           <button
             onClick={() => setActiveTab('email')}
-            className={`flex-1 py-4 px-6 text-sm font-medium transition-colors ${
+            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
               activeTab === 'email'
-                ? 'text-green-600 border-b-2 border-green-600'
-                : 'text-slate-500 hover:text-slate-700'
+                ? 'text-gray-800 border-b-2 border-gray-700'
+                : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             <Mail className="h-4 w-4 inline mr-2" />
-            Email
+            ईमेल
           </button>
           <button
             onClick={() => setActiveTab('phone')}
-            className={`flex-1 py-4 px-6 text-sm font-medium transition-colors ${
+            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
               activeTab === 'phone'
-                ? 'text-green-600 border-b-2 border-green-600'
-                : 'text-slate-500 hover:text-slate-700'
+                ? 'text-gray-800 border-b-2 border-gray-700'
+                : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             <Phone className="h-4 w-4 inline mr-2" />
-            Phone
+            फोन
           </button>
         </div>
 
@@ -181,7 +198,7 @@ const Signin: React.FC = () => {
           <button
             onClick={handleGoogleSignin}
             disabled={loading}
-            className="w-full bg-white border-2 border-green-200 text-slate-700 py-3 px-4 rounded-lg hover:bg-green-50 disabled:opacity-50 transition-colors mb-6 flex items-center justify-center"
+            className="w-full bg-white border-2 border-gray-200 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors mb-6 flex items-center justify-center"
           >
             <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -189,15 +206,15 @@ const Signin: React.FC = () => {
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
-            Continue with Google
+            Google से जारी रखें
           </button>
 
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-green-200"></div>
+              <div className="w-full border-t border-gray-200"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-green-600">Or continue with</span>
+              <span className="px-2 bg-white text-gray-500">या जारी रखें</span>
             </div>
           </div>
 
@@ -205,50 +222,50 @@ const Signin: React.FC = () => {
           {activeTab === 'email' && (
             <form onSubmit={handleEmailSignin} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Email Address</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">ईमेल पता</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-colors"
-                    placeholder="Enter your email"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+                    placeholder="अपना ईमेल दर्ज करें"
                     required
                   />
                 </div>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">पासवर्ड</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-12 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-colors"
-                    placeholder="Enter your password"
+                    className="w-full pl-10 pr-12 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+                    placeholder="अपना पासवर्ड दर्ज करें"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
               
-                              <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 px-4 rounded-lg hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 transition-all duration-200 font-medium flex items-center justify-center"
-                >
-                  {loading ? 'Signing In...' : 'Sign In'}
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-gray-700 text-white py-3 px-4 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-all duration-200 font-medium flex items-center justify-center"
+              >
+                {loading ? 'साइन इन हो रहा है...' : 'साइन इन करें'}
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </button>
             </form>
           )}
 
@@ -258,62 +275,62 @@ const Signin: React.FC = () => {
               {!codeSent ? (
                 <form onSubmit={handlePhoneSignin} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Phone Number</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">मोबाइल नंबर</label>
                     <div className="relative">
-                      <Smartphone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+                      <Smartphone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <input
                         type="tel"
                         value={phoneNumber}
                         onChange={(e) => setPhoneNumber(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
                         placeholder="+91 98765 43210"
                         required
                       />
                     </div>
                   </div>
                   
-                                       <button
-                       type="submit"
-                       disabled={loading}
-                       className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 px-4 rounded-lg hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 transition-all duration-200 font-medium flex items-center justify-center"
-                     >
-                       {loading ? 'Sending Code...' : 'Send Verification Code'}
-                       <ArrowRight className="h-4 w-4 ml-2" />
-                     </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-gray-700 text-white py-3 px-4 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-all duration-200 font-medium flex items-center justify-center"
+                  >
+                    {loading ? 'कोड भेज रहा है...' : 'सत्यापन कोड भेजें'}
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </button>
                 </form>
               ) : (
                 <form onSubmit={handleVerifyCode} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Verification Code</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">सत्यापन कोड</label>
                     <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <input
                         type="text"
                         value={verificationCode}
                         onChange={(e) => setVerificationCode(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                        placeholder="Enter 6-digit code"
+                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+                        placeholder="6 अंकों का कोड दर्ज करें"
                         maxLength={6}
                         required
                       />
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">We've sent a 6-digit code to {phoneNumber}</p>
+                    <p className="text-xs text-gray-500 mt-1">हमने {phoneNumber} पर 6 अंकों का कोड भेजा है</p>
                   </div>
                   
                   <div className="flex space-x-3">
                     <button
                       type="button"
                       onClick={resetForm}
-                      className="flex-1 bg-slate-100 text-slate-700 py-3 px-4 rounded-lg hover:bg-slate-200 transition-colors font-medium"
+                      className="flex-1 bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200 transition-colors font-medium"
                     >
-                      Back
+                      वापस
                     </button>
                     <button
                       type="submit"
                       disabled={loading}
-                      className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 px-4 rounded-lg hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 transition-all duration-200 font-medium flex items-center justify-center"
+                      className="flex-1 bg-gray-700 text-white py-3 px-4 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-all duration-200 font-medium flex items-center justify-center"
                     >
-                      {loading ? 'Verifying...' : 'Verify Code'}
+                      {loading ? 'सत्यापित हो रहा है...' : 'कोड सत्यापित करें'}
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </button>
                   </div>
@@ -327,10 +344,10 @@ const Signin: React.FC = () => {
 
           {/* Sign Up Link */}
           <div className="mt-8 text-center">
-            <p className="text-slate-600">
-              Don't have an account?{' '}
-              <Link to="/signup" className="text-green-600 hover:text-green-700 font-medium transition-colors">
-                Sign up here
+            <p className="text-gray-600">
+              खाता नहीं है?{' '}
+              <Link to="/signup" className="text-gray-700 hover:text-gray-800 font-medium transition-colors">
+                यहां साइन अप करें
               </Link>
             </p>
           </div>
@@ -339,9 +356,9 @@ const Signin: React.FC = () => {
           <div className="mt-6 text-center">
             <Link 
               to="/" 
-              className="text-slate-500 hover:text-slate-700 text-sm transition-colors"
+              className="text-gray-500 hover:text-gray-700 text-sm transition-colors"
             >
-              Continue without account
+              खाते के बिना जारी रखें
             </Link>
           </div>
         </div>

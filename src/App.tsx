@@ -6,7 +6,7 @@ import About from './pages/About';
 import Contact from './pages/Contact';
 import BlogPost from './pages/BlogPost';
 import BlogDetail from './pages/BlogDetail';
-import DiscussionForum from './pages/DiscussionForum';
+import DiscussionForum from  './pages/DiscussionForum';
 import Constituency from './pages/Constituency';
 import ConstituencyDetails from './pages/ConstituencyDetails';
 import Dashboard from './pages/Dashboard';
@@ -35,7 +35,7 @@ const App: React.FC = () => {
           <Router>
             <div className="App min-h-screen flex flex-col">
               <Navbar />
-              <main className="flex-grow">
+              <main className="flex-grow pb-20 md:pb-0">
                 <Routes>
                   {/* Public routes - no constituency check needed */}
                   <Route path="/signup" element={<Signup />} />
@@ -45,8 +45,6 @@ const App: React.FC = () => {
                   <Route path="/admin-setup" element={<AdminSetup />} />
                   <Route path="/admin/blog/create" element={<BlogCreate />} />
                   <Route path="/admin/blog/edit/:blogId" element={<BlogCreate />} />
-                  
-                  {/* Routes that require constituency verification */}
                   <Route path="/" element={
                     <ConstituencyCheck>
                       <Home />

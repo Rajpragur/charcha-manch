@@ -66,7 +66,7 @@ const Navbar: React.FC = () => {
           <div className="flex items-center gap- lg:gap-4 justify-start">
             <button
               onClick={toggleLanguage}
-              className="flex items-center gap-2 px-1.5 sm:px-3 py-1 rounded-lg hover:text-blue-600 shrink-0"
+              className="flex items-center gap-2 px-1.5 sm:px-3 py-1 rounded-lg hover:text-[#014e5c] shrink-0"
             >
               {isEnglish ? (
                 <ToggleLeft className="h-4 w-4 max-[340px]:h-3 sm:h-5 sm:w-5 md:h-6 md:w-6" />
@@ -99,12 +99,12 @@ const Navbar: React.FC = () => {
               <CircleUserRound className="h-6 w-6 max-[340px]:h-3 sm:h-6 sm:w-6 text-gray-700" />
               </button>
               {showProfile && (
-                <div className="absolute right-0 mt-3 w-56 bg-white border border-gray-200 rounded-xl shadow-xl py-3 z-50 backdrop-blur-sm bg-white/95">
+                <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-xl py-1 z-50 backdrop-blur-sm bg-white/95">
                   {currentUser ? (
                     <>
-                      <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-green-50 to-emerald-50">
+                      <div className="px-4 py-3 border-b border-gray-100 bg-[#014e5c]/30">
                         <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                          <div className="w-10 h-10 bg-[#014e5c] rounded-full flex items-center justify-center text-white text-sm font-semibold">
                             {currentUser.displayName?.charAt(0).toUpperCase() || currentUser.email?.charAt(0).toUpperCase() || 'U'}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -122,8 +122,8 @@ const Navbar: React.FC = () => {
                           to="/dashboard"
                           className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-all duration-200 rounded-lg mx-2"
                         >
-                          <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
-                            <User className="h-4 w-4 text-green-600" />
+                          <div className="w-8 h-8 bg-[#014e5c] rounded-lg flex items-center justify-center mr-3">
+                            <User className="h-4 w-4 text-white" />
                           </div>
                           <span className="font-medium">{isEnglish ? "Dashboard" : "डैशबोर्ड"}</span>
                         </Link>
@@ -131,8 +131,8 @@ const Navbar: React.FC = () => {
                           to="/profile"
                           className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-all duration-200 rounded-lg mx-2"
                         >
-                          <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                            <User className="h-4 w-4 text-blue-600" />
+                          <div className="w-8 h-8 bg-[#014e5c] rounded-lg flex items-center justify-center mr-3">
+                            <User className="h-4 w-4 text-white" />
                           </div>
                           <span className="font-medium">{isEnglish ? "My Profile" : "मेरी प्रोफाइल"}</span>
                         </Link>
@@ -140,8 +140,8 @@ const Navbar: React.FC = () => {
                           to="/settings"
                           className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-all duration-200 rounded-lg mx-2"
                         >
-                          <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
-                            <Settings className="h-4 w-4 text-purple-600" />
+                          <div className="w-8 h-8 bg-[#014e5c] rounded-lg flex items-center justify-center mr-3">
+                            <Settings className="h-4 w-4 text-white" />
                           </div>
                           <span className="font-medium">{isEnglish ? "Settings" : "सेटिंग्स"}</span>
                         </Link>
@@ -150,8 +150,8 @@ const Navbar: React.FC = () => {
                             to="/admin"
                             className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-700 transition-all duration-200 rounded-lg mx-2"
                           >
-                            <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mr-3">
-                              <Shield className="h-4 w-4 text-red-600" />
+                            <div className="w-8 h-8 bg-[#014e5c] rounded-lg flex items-center justify-center mr-3">
+                              <Shield className="h-4 w-4 font-bold text-white" />
                             </div>
                             <span className="font-medium">{isEnglish ? "Admin Panel" : "एडमिन पैनल"}</span>
                           </Link>
@@ -180,8 +180,8 @@ const Navbar: React.FC = () => {
                           to="/signin"
                           className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-all duration-200 rounded-lg mx-2"
                         >
-                          <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
-                            <LogIn className="h-4 w-4 text-green-600" />
+                          <div className="w-8 h-8 bg-[#014e5c] rounded-lg flex items-center justify-center mr-3">
+                            <LogIn className="h-4 w-4 text-white" />
                           </div>
                           <span className="font-medium">{isEnglish ? "Sign In" : "साइन इन"}</span>
                         </Link>
@@ -189,8 +189,8 @@ const Navbar: React.FC = () => {
                           to="/signup"
                           className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-all duration-200 rounded-lg mx-2"
                         >
-                          <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                            <UserPlus className="h-4 w-4 text-blue-600" />
+                          <div className="w-8 h-8 bg-[#014e5c] rounded-lg flex items-center justify-center mr-3">
+                            <UserPlus className="h-4 w-4 text-white" />
                           </div>
                           <span className="font-medium">{isEnglish ? "Sign Up" : "साइन अप"}</span>
                         </Link>
@@ -224,7 +224,7 @@ const Navbar: React.FC = () => {
                 to={item.href}
                 className={`px-3 py-2 rounded-md text-sm font-medium transition ${
                   location.pathname === item.href
-                    ? "text-blue-600 bg-blue-100"
+                    ? "text-white bg-[#014e5c]"
                     : "text-gray-700 hover:text-blue-600 hover:bg-gray-100"
                 }`}
               >
@@ -246,7 +246,7 @@ const Navbar: React.FC = () => {
                 onClick={() => setIsOpen(false)}
                 className={`block px-3 py-2 rounded-md text-base font-medium ${
                   location.pathname === item.href
-                    ? "text-blue-600 bg-blue-100"
+                    ? "text-white bg-[#014e5c]"
                     : "text-gray-700 hover:text-blue-600 hover:bg-gray-100"
                 }`}
               >

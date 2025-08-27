@@ -361,14 +361,14 @@ const Onboarding: React.FC = () => {
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-800 text-sm">{error}</p>
+          <div className="mb-6 p-2 lg:p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-800 text-xs lg:text-sm">{error}</p>
           </div>
         )}
 
         {/* Success Message */}
         {message && (
-          <div className={`mb-6 p-4 rounded-lg border ${
+          <div className={`mb-6 p-2 lg:p-4 rounded-lg border ${
             messageType === 'success' 
               ? 'bg-[#014e5c] text-white border-[#014e5c]' 
               : 'bg-blue-50 text-blue-800 border-blue-200'

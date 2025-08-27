@@ -23,3 +23,36 @@
 .animate-slide-in {
   animation: slide-in 0.3s ease-out forwards;
 }
+
+/* Bottom navbar styles */
+.bottom-navbar {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.bottom-navbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Ensure content doesn't get hidden behind bottom navbar on mobile */
+@media (max-width: 768px) {
+  .pb-safe {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+  
+  /* Add safe area support for devices with notches */
+  .bottom-navbar {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Smooth transitions for bottom navbar */
+.bottom-navbar * {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Active state animations */
+.bottom-navbar .active {
+  transform: translateY(-2px);
+}

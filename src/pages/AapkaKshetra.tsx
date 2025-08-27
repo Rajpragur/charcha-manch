@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import FirebaseService from '../services/firebaseService';
-import { Calendar, GraduationCap, House, MapPin, MessageCircle,Scale, CircleQuestionMark, IndianRupee } from 'lucide-react';
+import { Calendar, GraduationCap, House, MapPin, MessageCircle,Scale, CircleQuestionMark, IndianRupee,BanknoteArrowUp,Hospital, School, Tractor, BriefcaseBusiness } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../configs/firebase';
 
 interface CandidateData {
   area_name: string;
@@ -52,6 +54,7 @@ const AapkaKshetra: React.FC = () => {
   
   const [constituencies, setConstituencies] = useState<string[]>([]);
   const [selectedConstituency, setSelectedConstituency] = useState<string>('');
+  const [englishConstituencyName, setEnglishConstituencyName] = useState<string>('');
   const [candidateData, setCandidateData] = useState<CandidateData | null>(null);
   const [satisfactionVote, setSatisfactionVote] = useState<'yes' | 'no' | null>(null);
   const [showConstituencySelector, setShowConstituencySelector] = useState(true);
@@ -59,20 +62,106 @@ const AapkaKshetra: React.FC = () => {
   const [constituencyId, setConstituencyId] = useState<number | null>(null);
   const [currentSatisfactionYes, setCurrentSatisfactionYes] = useState<number>(0);
   const [currentSatisfactionNo, setCurrentSatisfactionNo] = useState<number>(0);
+  const [scoresLoaded, setScoresLoaded] = useState<boolean>(false);
   const [departmentRatings, setDepartmentRatings] = useState<Record<string, number>>({});
   const [hasSubmittedQuestionnaire, setHasSubmittedQuestionnaire] = useState(false);
   const [otherCandidates, setOtherCandidates] = useState<CandidateData[]>([]);
+  const [userSurveys, setUserSurveys] = useState<Set<string>>(new Set());
+  const checkedConstituencies = useRef<Set<string>>(new Set());
+  const [initialLoadComplete, setInitialLoadComplete] = useState<boolean>(false);
 
   useEffect(() => {
-    fetchConstituencies();
+    const initializeComponent = async () => {
+      await fetchConstituencies();
+      if (currentUser) {
+        await checkUserConstituency();
+      }
+      
+      // After constituencies are loaded, check URL parameters
+      const constituencyParam = searchParams.get('constituency');
+      const constituencyNameParam = searchParams.get('name');
+      
+      if (constituencyParam || constituencyNameParam) {
+        // URL parameters exist, so we need to wait for constituencies to load
+        // The other useEffect will handle this once constituencies are available
+      }
+      
+      // Note: Satisfaction vote status will be checked by the useEffect when constituencyId changes
+      setInitialLoadComplete(true);
+    };
+    
+    initializeComponent();
+  }, [currentUser, searchParams]);
+
+  // Single useEffect to check satisfaction vote status when constituencyId changes
+  useEffect(() => {
+    if (currentUser && constituencyId) {
+      setScoresLoaded(false); // Reset loading state for new constituency
+      checkSatisfactionVoteStatus();
+    }
+  }, [currentUser, constituencyId]);
+
+  // Clear checked constituencies when user changes
+  useEffect(() => {
     if (currentUser) {
-      checkUserConstituency();
+      checkedConstituencies.current.clear();
+
     }
   }, [currentUser]);
+
+  // Debug useEffect to show when satisfaction vote status is checked
+  useEffect(() => {
+  }, [hasSubmittedQuestionnaire, satisfactionVote, constituencyId]);
 
   useEffect(() => {
     if (selectedConstituency) {
       fetchCandidateData(selectedConstituency);
+      
+      // Also set the English constituency name when selectedConstituency changes
+      const setEnglishName = async () => {
+        try {
+          const response = await fetch('/data/candidates_en.json');
+          const englishData: CandidateData[] = await response.json();
+          const constituencyIndex = englishData.findIndex((item: CandidateData) => item.area_name === selectedConstituency);
+          if (constituencyIndex !== -1) {
+            setEnglishConstituencyName(selectedConstituency);
+          } else {
+            // If not found in English data, try to find by index in current data
+            const currentDataFile = isEnglish ? '/data/candidates_en.json' : '/data/candidates.json';
+            const currentResponse = await fetch(currentDataFile);
+            const currentData: CandidateData[] = await currentResponse.json();
+            const currentIndex = currentData.findIndex((item: CandidateData) => item.area_name === selectedConstituency);
+            if (currentIndex !== -1) {
+              const englishConstituency = englishData[currentIndex];
+              if (englishConstituency) {
+                setEnglishConstituencyName(englishConstituency.area_name);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error setting English constituency name:', error);
+          setEnglishConstituencyName(selectedConstituency);
+        }
+        
+        // Check if user has already voted on satisfaction survey for this constituency
+        if (currentUser) {
+          try {
+            const dataFile = isEnglish ? '/data/candidates_en.json' : '/data/candidates.json';
+            const response = await fetch(dataFile);
+            const data: CandidateData[] = await response.json();
+            const constituencyIndex = data.findIndex((item: CandidateData) => item.area_name === selectedConstituency);
+            if (constituencyIndex !== -1) {
+              const constituencyId = constituencyIndex + 1;
+              // Set the constituency ID temporarily to check satisfaction vote status
+              setConstituencyId(constituencyId);
+              // The useEffect will automatically call checkSatisfactionVoteStatus when constituencyId changes
+            }
+          } catch (error) {
+            console.error('Error checking user satisfaction vote:', error);
+          }
+        }
+      };
+      setEnglishName();
     }
   }, [selectedConstituency, isEnglish]);
 
@@ -96,37 +185,79 @@ const AapkaKshetra: React.FC = () => {
   }, [currentUser, constituencyId]);
 
   useEffect(() => {
-    const constituencyParam = searchParams.get('constituency');
-    const constituencyNameParam = searchParams.get('name');
-    
-    if (constituencies.length > 0) {
-      if (constituencyParam && !isNaN(Number(constituencyParam))) {
-        const constituencyId = Number(constituencyParam);
-        const constituency = constituencies.find((_, index) => index + 1 === constituencyId);
-        
-        if (constituency) {
-          setSelectedConstituency(constituency);
-          setShowConstituencySelector(false);
+    const handleConstituencyParams = async () => {
+      const constituencyParam = searchParams.get('constituency');
+      const constituencyNameParam = searchParams.get('name');
+      
+      if (constituencies.length > 0) {
+        if (constituencyParam && !isNaN(Number(constituencyParam))) {
+          const constituencyId = Number(constituencyParam);
+          const constituency = constituencies.find((_, index) => index + 1 === constituencyId);
           
-          const newSearchParams = new URLSearchParams(searchParams);
-          newSearchParams.delete('constituency');
-          newSearchParams.delete('name');
-          navigate(`/aapka-kshetra?${newSearchParams.toString()}`, { replace: true });
-        }
-      } else if (constituencyNameParam) {
-        const decodedName = decodeURIComponent(constituencyNameParam);
-        if (constituencies.includes(decodedName)) {
-          setSelectedConstituency(decodedName);
-          setShowConstituencySelector(false);
-          
-          const newSearchParams = new URLSearchParams(searchParams);
-          newSearchParams.delete('constituency');
-          newSearchParams.delete('name');
-          navigate(`/aapka-kshetra?${newSearchParams.toString()}`, { replace: true });
+          if (constituency) {
+            setSelectedConstituency(constituency);
+            setConstituencyId(constituencyId);
+            setShowConstituencySelector(false);
+            
+            // Also set the English constituency name
+            try {
+              const englishResponse = await fetch('/data/candidates_en.json');
+              const englishData: CandidateData[] = await englishResponse.json();
+              const englishConstituency = englishData[constituencyId - 1];
+              if (englishConstituency) {
+                setEnglishConstituencyName(englishConstituency.area_name);
+              }
+            } catch (error) {
+              console.error('Error fetching English constituency name:', error);
+              setEnglishConstituencyName(constituency);
+            }
+            
+            // Check if user has already voted on satisfaction survey for this constituency
+            if (currentUser) {
+              await checkSatisfactionVoteStatus();
+            }
+            
+            const newSearchParams = new URLSearchParams(searchParams);
+            newSearchParams.delete('constituency');
+            newSearchParams.delete('name');
+            navigate(`/aapka-kshetra?${newSearchParams.toString()}`, { replace: true });
+          }
+        } else if (constituencyNameParam) {
+          const decodedName = decodeURIComponent(constituencyNameParam);
+          if (constituencies.includes(decodedName)) {
+            setSelectedConstituency(decodedName);
+            setShowConstituencySelector(false);
+            
+            // Get the constituency ID and set it properly
+            try {
+              const dataFile = isEnglish ? '/data/candidates_en.json' : '/data/candidates.json';
+              const response = await fetch(dataFile);
+              const data: CandidateData[] = await response.json();
+              const constituencyIndex = data.findIndex((item: CandidateData) => item.area_name === decodedName);
+              if (constituencyIndex !== -1) {
+                const constituencyId = constituencyIndex + 1;
+                setConstituencyId(constituencyId);
+                
+                // Check if user has already voted on satisfaction survey for this constituency
+                if (currentUser) {
+                  await checkSatisfactionVoteStatus();
+                }
+              }
+            } catch (error) {
+              console.error('Error checking user satisfaction vote:', error);
+            }
+            
+            const newSearchParams = new URLSearchParams(searchParams);
+            newSearchParams.delete('constituency');
+            newSearchParams.delete('name');
+            navigate(`/aapka-kshetra?${newSearchParams.toString()}`, { replace: true });
+          }
         }
       }
-    }
-  }, [searchParams, constituencies, navigate]);
+    };
+    
+    handleConstituencyParams();
+  }, [searchParams, constituencies, navigate, currentUser]);
 
   const fetchConstituencies = async () => {
     try {
@@ -159,10 +290,103 @@ const AapkaKshetra: React.FC = () => {
         if (constituency) {
           setSelectedConstituency(constituency.area_name);
           setCandidateData(constituency);
+          
+          // Also set the English constituency name
+          try {
+            const englishResponse = await fetch('/data/candidates_en.json');
+            const englishData: CandidateData[] = await englishResponse.json();
+            const englishConstituency = englishData[userProfile.constituency_id - 1];
+            if (englishConstituency) {
+              setEnglishConstituencyName(englishConstituency.area_name);
+            }
+          } catch (error) {
+            console.error('Error fetching English constituency name:', error);
+            setEnglishConstituencyName(constituency.area_name);
+          }
+          
+          // Check if user has already voted on satisfaction survey
+          try {
+            const constituencyScores = await FirebaseService.getConstituencyScores(userProfile.constituency_id);
+            if (constituencyScores) {
+              setCurrentSatisfactionYes(constituencyScores.satisfaction_yes || 0);
+              setCurrentSatisfactionNo(constituencyScores.satisfaction_no || 0);
+            }
+            
+            // Check if user has already submitted questionnaire
+            const hasSubmitted = await FirebaseService.hasSubmittedQuestionnaire(currentUser.uid, userProfile.constituency_id);
+            if (hasSubmitted) {
+              setHasSubmittedQuestionnaire(true);
+            }
+            
+            // Check if user has already voted on satisfaction survey by checking if they have a satisfaction vote
+            // We'll check this by looking at the constituency scores and user's previous interactions
+            // For now, we'll assume if they have submitted questionnaire, they have also voted on satisfaction
+          } catch (error) {
+            console.error('Error checking user satisfaction vote:', error);
+          }
         }
       }
     } catch (error) {
       console.error('Error checking user constituency:', error);
+    }
+  };
+
+  const checkSatisfactionVoteStatus = async () => {
+    if (!currentUser || !constituencyId) return;
+    
+    const constituencyKey = `${currentUser.uid}-${constituencyId}`;
+    
+    // Prevent multiple calls for the same constituency
+    if (checkedConstituencies.current.has(constituencyKey)) {
+      return;
+    }
+    
+    try {      
+      // Check if user has already voted on satisfaction survey for this constituency
+      const hasSubmitted = await FirebaseService.hasSubmittedQuestionnaire(currentUser.uid, constituencyId);      
+      if (hasSubmitted) {
+        setHasSubmittedQuestionnaire(true);        
+        // Try to get the user's specific vote from the questionnaire submission
+        try {
+          const submissionsRef = collection(db, 'questionnaire_submissions');
+          const q = query(
+            submissionsRef,
+            where('user_id', '==', currentUser.uid),
+            where('constituency_id', '==', constituencyId)
+          );
+          const snapshot = await getDocs(q);
+          
+          if (!snapshot.empty) {
+            const submission = snapshot.docs[0].data();
+            if (submission.satisfaction_vote !== undefined) {
+              const userVote = submission.satisfaction_vote ? 'yes' : 'no';
+              setSatisfactionVote(userVote);
+            }
+          }
+        } catch (error) {
+          console.error('Error retrieving user vote:', error);
+        }
+      } else {
+        setHasSubmittedQuestionnaire(false);
+        setSatisfactionVote(null);
+      }
+      
+      // Also refresh the constituency scores
+      const constituencyScores = await FirebaseService.getConstituencyScores(constituencyId);
+      if (constituencyScores) {
+        setCurrentSatisfactionYes(constituencyScores.satisfaction_yes || 0);
+        setCurrentSatisfactionNo(constituencyScores.satisfaction_no || 0);
+        setScoresLoaded(true);
+      }
+      
+      // Mark this constituency as checked
+      checkedConstituencies.current.add(constituencyKey);
+      
+    } catch (error) {
+      console.error('Error checking satisfaction vote status:', error);
+      // If there's an error, assume user hasn't voted to be safe
+      setHasSubmittedQuestionnaire(false);
+      setSatisfactionVote(null);
     }
   };
 
@@ -177,6 +401,20 @@ const AapkaKshetra: React.FC = () => {
         const idx = data.findIndex((item: CandidateData) => item.area_name === constituency);
         if (idx !== -1) {
           setConstituencyId(idx + 1);
+          
+          // Also fetch the English constituency name for navigation purposes
+          try {
+            const englishResponse = await fetch('/data/candidates_en.json');
+            const englishData: CandidateData[] = await englishResponse.json();
+            const englishConstituency = englishData[idx];
+            if (englishConstituency) {
+              setEnglishConstituencyName(englishConstituency.area_name);
+            }
+          } catch (error) {
+            console.error('Error fetching English constituency name:', error);
+            // Fallback to current constituency name
+            setEnglishConstituencyName(constituency);
+          }
         }
         
         // Fetch other candidates from the same constituency
@@ -191,6 +429,11 @@ const AapkaKshetra: React.FC = () => {
           initialRatings[dept.dept_name] = 0;
         });
         setDepartmentRatings(initialRatings);
+        
+        // Check if user has already voted on satisfaction survey for this constituency
+        if (currentUser && constituencyId) {
+          await checkSatisfactionVoteStatus();
+        }
       }
     } catch (error) {
       console.error('Error fetching candidate data:', error);
@@ -198,10 +441,22 @@ const AapkaKshetra: React.FC = () => {
   };
 
   const handleSatisfactionVote = async (vote: 'yes' | 'no') => {
-    if (currentUser && constituencyId) {
+    if (currentUser && constituencyId && !hasSubmittedQuestionnaire) {
       try {
+        
         setSatisfactionVote(vote);
+        
+        // First, update the constituency satisfaction vote counts
         await FirebaseService.updateSatisfactionVote(constituencyId, vote);
+        
+        // Then, store the user's individual vote in Firebase
+        await FirebaseService.submitQuestionnaire({
+          user_id: currentUser.uid,
+          constituency_id: constituencyId,
+          satisfaction_vote: vote === 'yes',
+          department_ratings: {}, // Empty for now since this is just satisfaction vote
+          manifesto_score: 0, // Default value for satisfaction vote only
+        });
         
         if (vote === 'yes') {
           setCurrentSatisfactionYes(prev => prev + 1);
@@ -218,10 +473,25 @@ const AapkaKshetra: React.FC = () => {
         } catch (error) {
           console.error('Error refreshing constituency scores after vote:', error);
         }
+        
+        // Mark that the user has submitted their satisfaction vote
+        setHasSubmittedQuestionnaire(true);
+        
+        // Force a re-check to ensure state consistency
+        setTimeout(() => {
+          checkSatisfactionVoteStatus();
+        }, 100);
+        
+        // Show success message
+        alert(isEnglish ? 'Your vote has been recorded successfully!' : 'आपका वोट सफलतापूर्वक दर्ज किया गया है!');
       } catch (error) {
         console.error('Error recording satisfaction vote:', error);
         setSatisfactionVote(null);
         alert(isEnglish ? 'Failed to record vote. Please try again.' : 'वोट रिकॉर्ड करने में विफल। कृपया पुनः प्रयास करें।');
+      }
+    } else {
+      if (hasSubmittedQuestionnaire) {
+        alert(isEnglish ? 'You have already voted on this question!' : 'आपने इस प्रश्न पर पहले ही वोट कर दिया है!');
       }
     }
   };
@@ -237,7 +507,6 @@ const AapkaKshetra: React.FC = () => {
 
   const canSubmitQuestionnaire = () => {
     if (!currentUser || hasSubmittedQuestionnaire) return false;
-    if (satisfactionVote === null) return false;
     const deptValues = Object.values(departmentRatings);
     if (deptValues.length === 0) return false;
     if (deptValues.some(v => v === 0)) return false;
@@ -253,11 +522,11 @@ const AapkaKshetra: React.FC = () => {
       const deptValues = Object.values(departmentRatings);
       const newManifestoScore = deptValues.reduce((sum, rating) => sum + rating, 0) / deptValues.length;
       
-      // Submit questionnaire with calculated manifesto score
+      // Submit questionnaire with calculated manifesto score (satisfaction vote is handled separately)
       await FirebaseService.submitQuestionnaire({
         user_id: currentUser.uid,
         constituency_id: constituencyId,
-        satisfaction_vote: satisfactionVote === 'yes',
+        satisfaction_vote: false, // Default value since satisfaction vote is handled separately
         department_ratings: departmentRatings,
         manifesto_score: newManifestoScore,
       });
@@ -337,8 +606,13 @@ const AapkaKshetra: React.FC = () => {
   };
 
   const handleCharchaManchClick = () => {
-    if (constituencyId) {
-      navigate(`/discussion?constituency=${selectedConstituency}&name=${encodeURIComponent(selectedConstituency)}`);
+    if (constituencyId && englishConstituencyName) {
+      // Always use English constituency name for navigation, similar to CharchitVidhanSabha
+      navigate(`/discussion?constituency=${englishConstituencyName}&name=${encodeURIComponent(englishConstituencyName)}`);
+    } else if (constituencyId && candidateData) {
+      // Fallback: if English name is not available, use current constituency name
+      // This ensures the button still works even if there's an issue fetching English data
+      navigate(`/discussion?constituency=${candidateData.area_name}&name=${encodeURIComponent(candidateData.area_name)}`);
     }
   };
 
@@ -365,9 +639,25 @@ const AapkaKshetra: React.FC = () => {
       if (constituencyIndex !== -1) {
         const constituencyId = constituencyIndex + 1;
         
+        // Also set the English constituency name for navigation purposes
+        try {
+          const englishResponse = await fetch('/data/candidates_en.json');
+          const englishData: CandidateData[] = await englishResponse.json();
+          const englishConstituency = englishData[constituencyIndex];
+          if (englishConstituency) {
+            setEnglishConstituencyName(englishConstituency.area_name);
+          }
+        } catch (error) {
+          console.error('Error fetching English constituency name:', error);
+          setEnglishConstituencyName(selectedConstituency);
+        }
+        
         await FirebaseService.updateUserProfile(currentUser.uid, {
           constituency_id: constituencyId
         });
+        
+        // Check if user has already voted on satisfaction survey for this constituency
+        await checkSatisfactionVoteStatus();
         
         setShowConstituencySelector(false);
         alert(isEnglish ? 'Constituency confirmed! This cannot be changed.' : 'क्षेत्र की पुष्टि हो गई! इसे नहीं बदला जा सकता।');
@@ -449,66 +739,78 @@ const AapkaKshetra: React.FC = () => {
         {candidateData && (
           <div className="bg-white rounded-lg p-4 lg:p-6 mb-2 lg:mb-4 shadow-sm">
             <h3 className="text-xs lg:text-lg font-medium text-black mb-2">
-              {isEnglish ? 'Are you happy with the performance of the last five years?' : 'क्या आप पिछले पांच साल के कार्यकाल से खुश हैं?'}
+              {isEnglish ? 'Are you satisfied with the last five years of tenure?' : 'क्या आप पिछले पांच साल के कार्यकाल से संतुष्ट हैं?'}
             </h3>
             
-            {hasSubmittedQuestionnaire ? (
-              <div className="text-center py-4">
-                <p className="text-green-600 text-sm mb-2">
-                  {isEnglish ? 'You have already voted on this question' : 'आपने इस प्रश्न पर पहले ही वोट कर दिया है'}
-                </p>
-                <div className="text-center">
-                  <p className="text-gray-600 text-xs lg:text-lg">{isEnglish ? 'Public satisfaction' : 'जनता की संतुष्टि'}</p>
-                  <p className="text-sm lg:text-2xl font-bold text-black">
-                    {currentSatisfactionYes + currentSatisfactionNo > 0 
-                      ? Math.round((currentSatisfactionYes / (currentSatisfactionYes + currentSatisfactionNo)) * 100)
-                      : 67}%
-                  </p>
+            {/* Show voting buttons only if user hasn't voted */}
+            {currentUser && !hasSubmittedQuestionnaire ? (
+              <div className="flex items-center space-x-2 mb-2">
+                <button 
+                  onClick={() => handleSatisfactionVote('yes')}
+                  className="px-3 py-1 text-xs rounded-full transition-colors bg-white text-gray-700 border border-gray-300 hover:bg-green-50 hover:border-green-300"
+                >
+                  {isEnglish ? "Yes" : "हाँ"}
+                </button>
+                <button 
+                  onClick={() => handleSatisfactionVote('no')}
+                  className="px-3 py-1 text-xs rounded-full transition-colors bg-white text-gray-700 border border-gray-300 hover:bg-red-50 hover:border-red-300"
+                >
+                  {isEnglish ? "No" : "ना"}
+                </button>
+              </div>
+            ) : currentUser && hasSubmittedQuestionnaire ? (
+              /* Show vote counts and user's vote if they have already voted */
+              <div className="mb-2">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-600">
+                      {isEnglish ? "Your vote:" : "आपका वोट:"}
+                    </span>
+                    {hasSubmittedQuestionnaire && satisfactionVote === 'yes' ? (
+                      <span className="px-2 py-1 text-xs rounded-full bg-[#014e5c] text-white">
+                        {isEnglish ? "Yes" : "हाँ"}
+                      </span>
+                    ) : hasSubmittedQuestionnaire && satisfactionVote === 'no' ? (
+                      <span className="px-2 py-1 text-xs rounded-full bg-red-500 text-white">
+                        {isEnglish ? "No" : "ना"}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="text-sm font-bold text-green-600">
+                    {!initialLoadComplete || !scoresLoaded ? (
+                      <span className="text-gray-400">Loading...</span>
+                    ) : currentSatisfactionYes + currentSatisfactionNo > 0 ? (
+                      Math.round(
+                        (currentSatisfactionYes /
+                          (currentSatisfactionYes + currentSatisfactionNo)) *
+                          100,
+                      )
+                    ) : (
+                      0
+                    )}
+                    {initialLoadComplete && scoresLoaded && "% "}
+                    {initialLoadComplete && scoresLoaded && (isEnglish ? "Satisfied" : "संतुष्ट")}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-600">
+                  <span>
+                    {isEnglish ? "Yes:" : "हाँ:"} {!initialLoadComplete || !scoresLoaded ? "..." : currentSatisfactionYes || 0}
+                  </span>
+                  <span>
+                    {isEnglish ? "No:" : "ना:"} {!initialLoadComplete || !scoresLoaded ? "..." : currentSatisfactionNo || 0}
+                  </span>
+                  <span>
+                    {isEnglish ? "Total:" : "कुल:"} {!initialLoadComplete || !scoresLoaded ? "..." : currentSatisfactionYes + currentSatisfactionNo || 0}
+                  </span>
                 </div>
               </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center justify-between gap-2 lg:gap-5">
-                    <button
-                      onClick={() => handleSatisfactionVote('yes')}
-                      className={`px-4 py-2 rounded-full text-xs lg:text-lg font-medium transition-colors ${
-                        satisfactionVote === 'yes' 
-                          ? 'bg-green-600 text-white' 
-                          : 'bg-gray-200 text-gray-700'
-                      }`}
-                    >
-                      {isEnglish ? 'Yes' : 'हाँ'}
-                    </button>
-                    <button
-                      onClick={() => handleSatisfactionVote('no')}
-                      className={`px-6 py-2 rounded-full text-xs lg:text-lg font-medium transition-colors ${
-                        satisfactionVote === 'no' 
-                          ? 'bg-red-600 text-white' 
-                          : 'bg-gray-200 text-gray-700'
-                      }`}
-                    >
-                      {isEnglish ? 'No' : 'ना'}
-                    </button>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-gray-600 text-xs lg:text-lg">{isEnglish ? 'Public satisfaction' : 'जनता की संतुष्टि'}</p>
-                    <p className="text-sm lg:text-2xl font-bold text-black">
-                      {currentSatisfactionYes + currentSatisfactionNo > 0 
-                        ? Math.round((currentSatisfactionYes / (currentSatisfactionYes + currentSatisfactionNo)) * 100)
-                        : 67}%
-                    </p>
-                  </div>
-                </div>
-                
-                {satisfactionVote && (
-                  <div className="text-center mb-2">
-                    <p className="text-sm text-emerald-600 font-medium">
-                      {isEnglish ? `You voted: ${satisfactionVote === 'yes' ? 'Yes' : 'No'}` : `आपने वोट किया: ${satisfactionVote === 'yes' ? 'हाँ' : 'नहीं'}`}
-                    </p>
-                  </div>
-                )}
-              </>
+            ) : null}
+            
+            {/* Show sign in message if not logged in */}
+            {!currentUser && (
+              <div className="text-xs text-gray-500 text-center mt-1">
+                {isEnglish ? 'Sign in to vote' : 'मतदान के लिए साइन इन करें'}
+              </div>
             )}
           </div>
         )}
@@ -584,7 +886,7 @@ const AapkaKshetra: React.FC = () => {
             {/* Fund Utilization */}
             <div className="bg-white rounded-lg p-2 lg:p-3 shadow-sm flex items-center">
               <div className="w-8 h-8 lg:w-10 lg:h-10 bg-teal-100 rounded-full flex items-center justify-center mr-3">
-                <span className="text-teal-600 text-base lg:text-xl">💵</span>
+                <BanknoteArrowUp className="text-teal-600 text-base lg:text-xl" />
               </div>
               <div>
                 <p className="text-xs lg:text-sm text-black mb-0.5">{isEnglish ? 'Fund utilization' : 'निधि उपयोग'}</p>
@@ -627,7 +929,7 @@ const AapkaKshetra: React.FC = () => {
                   <div className="flex items-center space-x-2 mb-3">
                     <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                       <span className="text-blue-600 text-lg">
-                        {dept.dept_name === 'स्वास्थ्य' || dept.dept_name === 'Health' ? '❤️' : '📚'}
+                        {dept.dept_name === 'स्वास्थ्य' || dept.dept_name === 'Health' ? <Hospital /> : '📚'}
                       </span>
                     </div>
                     <h4 className="text-lg font-semibold text-black">{dept.dept_name}</h4>
@@ -654,7 +956,7 @@ const AapkaKshetra: React.FC = () => {
                                 : 'border-gray-300 hover:border-yellow-400 hover:bg-yellow-50 text-gray-600 hover:text-yellow-600'
                             }`}
                           >
-                            ⭐
+                            {rating}
                           </button>
                         ))}
                       </div>
@@ -668,11 +970,6 @@ const AapkaKshetra: React.FC = () => {
                   </div>
                   
                   <div className="flex items-center justify-between text-sm">
-                    <div className="text-left">
-                      <p className="text-gray-600">
-                        {isEnglish ? '68% people are satisfied with this subject' : '68% लोग इस विषय से संतुष्ट हैं'}
-                      </p>
-                    </div>
                     <div className="text-right">
                       <div className="flex items-center space-x-4">
                         <div className="text-center">
@@ -705,7 +1002,7 @@ const AapkaKshetra: React.FC = () => {
                   <button
                     onClick={handleQuestionnaireSubmit}
                     disabled={!canSubmitQuestionnaire()}
-                    className="bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-[#014e5c] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#014e5c]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isEnglish ? 'Submit Ratings' : 'रेटिंग सबमिट करें'}
                   </button>
@@ -777,7 +1074,7 @@ const AapkaKshetra: React.FC = () => {
               {selectedConstituency && currentUser && (
                 <div className="text-center pt-4">
                   <button
-                    className="bg-green-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-60 text-base"
+                    className="bg-[#014e5c] text-white px-8 py-3 rounded-lg font-medium hover:[#014e5c]/80 transition-colors disabled:opacity-60 text-base"
                     onClick={handleConstituencyConfirm}
                     disabled={isLoading}
                   >
@@ -799,15 +1096,25 @@ const AapkaKshetra: React.FC = () => {
         )}
 
         {/* Charcha Manch Button */}
-        {candidateData && (
+        {candidateData && constituencyId && (
           <div className="text-center mt-6 mb-4">
             <button 
-              className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-4 rounded-xl font-medium hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1 text-lg flex items-center justify-center space-x-3 mx-auto"
+              className={`px-8 py-4 rounded-xl font-medium transition-all duration-200 shadow-lg text-lg flex items-center justify-center space-x-3 mx-auto ${
+                englishConstituencyName 
+                  ? 'bg-[#014e5c] text-white hover:bg-[#014e5c]/80 hover:shadow-xl transform hover:-translate-y-1' 
+                  : 'bg-gray-400 text-gray-600 cursor-not-allowed'
+              }`}
               onClick={handleCharchaManchClick}
+              disabled={!englishConstituencyName}
             >
-              <MessageCircle className="w-6 h-6" />
-              <span>{isEnglish ? 'Charcha Manch' : 'चर्चा मंच'}</span>
+              <MessageCircle className="w-4 h-4 lg:w-6 lg:h-6" />
+              <span className="text-sm lg:text-base">{isEnglish ? 'Charcha Manch' : 'चर्चा मंच'}</span>
             </button>
+            {!englishConstituencyName && (
+              <p className="text-xs text-gray-500 mt-2">
+                {isEnglish ? 'Loading constituency data...' : 'क्षेत्र डेटा लोड हो रहा है...'}
+              </p>
+            )}
           </div>
         )}
       </div>

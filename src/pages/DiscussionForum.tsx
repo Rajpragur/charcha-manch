@@ -196,18 +196,46 @@ const DiscussionForum: React.FC = () => {
   // Handle URL parameters for constituency selection
   useEffect(() => {
     const constituencyParam = searchParams.get('constituency');
+    const constituencyNameParam = searchParams.get('name');
     
-    if (constituencyParam && !isNaN(Number(constituencyParam))) {
-      const constituencyId = Number(constituencyParam);
-      setSelectedConstituencies([constituencyId]);
-      setSelectedConstituency(constituencyId);
-      setShowAllConstituencies(false);
-      const newSearchParams = new URLSearchParams(searchParams);
-      newSearchParams.delete('constituency');
-      newSearchParams.delete('name');
-      navigate(`/discussion?${newSearchParams.toString()}`, { replace: true });
+    if (constituencies.length > 0) {
+      let constituencyId: number | null = null;
+      
+      // Try to find constituency by ID first
+      if (constituencyParam && !isNaN(Number(constituencyParam))) {
+        const id = Number(constituencyParam);
+        const constituencyExists = constituencies.find(c => c.id === id);
+        if (constituencyExists) {
+          constituencyId = id;
+        }
+      }
+      
+      // If no ID found, try to find by name
+      if (!constituencyId && constituencyNameParam) {
+        const constituencyByName = constituencies.find(c => 
+          c.name.toLowerCase().includes(constituencyNameParam.toLowerCase()) ||
+          (c.area_name && c.area_name.toLowerCase().includes(constituencyNameParam.toLowerCase()))
+        );
+        if (constituencyByName) {
+          constituencyId = constituencyByName.id;
+        }
+      }
+      
+      // Set the constituency if found
+      if (constituencyId) {
+        setSelectedConstituencies([constituencyId]);
+        setSelectedConstituency(constituencyId);
+        setShowAllConstituencies(false);
+        
+        // Clean up URL parameters after setting the constituency
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete('constituency');
+        newSearchParams.delete('name');
+        navigate(`/discussion?${newSearchParams.toString()}`, { replace: true });
+      } else if (constituencyParam || constituencyNameParam) {
+      }
     }
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, constituencies]);
 
   // Handle constituency selection
   const handleConstituencyChange = (constituencyId: number | null) => {
@@ -332,38 +360,45 @@ const DiscussionForum: React.FC = () => {
       const fetchedConstituencies = await FirebaseService.getAllConstituencies();
       setConstituencies(fetchedConstituencies);
       
-      // Auto-select constituencies based on threshold and user login status
-      if (currentUser?.uid) {
-        // If logged in, check if user's constituency has enough posts
-        const userConstituencyPosts = fetchedPosts.filter(post => 
-          post.userId === currentUser.uid
-        );
-        
-        if (userConstituencyPosts.length > 0) {
-          const userConstituency = userConstituencyPosts[0].constituency;
-          const constituencyPostCount = fetchedPosts.filter(post => 
-            post.constituency === userConstituency
-          ).length;
+      // Check if there's a URL parameter for constituency selection
+      const constituencyParam = searchParams.get('constituency');
+      const constituencyNameParam = searchParams.get('name');
+      const hasUrlConstituency = (constituencyParam && !isNaN(Number(constituencyParam))) || constituencyNameParam;
+      
+      if (!hasUrlConstituency) {
+        // Auto-select constituencies based on threshold and user login status only if no URL parameter
+        if (currentUser?.uid) {
+          // If logged in, check if user's constituency has enough posts
+          const userConstituencyPosts = fetchedPosts.filter(post => 
+            post.userId === currentUser.uid
+          );
           
-          if (constituencyPostCount >= constituencyThreshold) {
-            setSelectedConstituencies([userConstituency]);
-            setSelectedConstituency(userConstituency);
-            setShowAllConstituencies(false);
+          if (userConstituencyPosts.length > 0) {
+            const userConstituency = userConstituencyPosts[0].constituency;
+            const constituencyPostCount = fetchedPosts.filter(post => 
+              post.constituency === userConstituency
+            ).length;
+            
+            if (constituencyPostCount >= constituencyThreshold) {
+              setSelectedConstituencies([userConstituency]);
+              setSelectedConstituency(userConstituency);
+              setShowAllConstituencies(false);
+            } else {
+              setSelectedConstituencies([]);
+              setSelectedConstituency(null);
+              setShowAllConstituencies(true);
+            }
           } else {
             setSelectedConstituencies([]);
             setSelectedConstituency(null);
             setShowAllConstituencies(true);
           }
         } else {
+          // If not logged in, show all constituencies by default
           setSelectedConstituencies([]);
           setSelectedConstituency(null);
           setShowAllConstituencies(true);
         }
-      } else {
-        // If not logged in, show all constituencies by default
-        setSelectedConstituencies([]);
-        setSelectedConstituency(null);
-        setShowAllConstituencies(true);
       }
       
       // Fetch user reactions for all posts if logged in
@@ -547,63 +582,63 @@ const DiscussionForum: React.FC = () => {
       <div className="lg:hidden h-4 bg-[#c1cad1]"></div>
       
       {/* Main Title Card - Mobile */}
-      <div className="text-center lg:hidden bg-white mx-4 rounded-xl shadow-sm border border-gray-200 p-3">
-        <h1 className="text-3xl font-bold bg-[#014e5c] bg-clip-text text-transparent mb-2">
+      <div className="text-center lg:hidden bg-white mx-2 rounded-lg shadow-sm border border-gray-200 p-2">
+        <h1 className="text-xl font-bold bg-[#014e5c] bg-clip-text text-transparent mb-1">
           {content.titlefirst} <span className="text-[#dc3b21]">{content.titlesecond}</span>
         </h1>
-        <p className="text-gray-600 text-lg">{content.subtitle}</p>
+        <p className="text-gray-600 text-sm">{content.subtitle}</p>
       </div>
 
       {/* Main Title Section */}
-      <div className="hidden lg:block max-w-7xl mx-auto px-4 lg:px-6 py-6">
+      <div className="hidden lg:block max-w-5xl mx-auto px-3 lg:px-4 py-4">
             <div className="flex items-center justify-center flex-col">
-                <h1 className="text-4xl lg:text-5xl font-bold text-[#004030] mb-4">
+                <h1 className="text-2xl lg:text-3xl font-bold text-[#004030] mb-2">
                     {content.titlefirst} <span className="text-[#dc3b21]">{content.titlesecond}</span>
                 </h1>
-                <p className="text-xl lg:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+                <p className="text-base lg:text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
                     {content.subtitle}
                 </p>
             </div>
-            <div className="mt-10 flex items-center justify-center flex-col">
+            <div className="mt-6 flex items-center justify-center flex-col">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setShowCreatePost(true)}
-                className="bg-[#014e5c] text-white px-6 py-2 rounded-full hover:from-green-600 hover:to-red-600 transition-all duration-200 font-medium flex items-center space-x-2 shadow-lg"
+                className="bg-[#014e5c] text-white px-4 py-1.5 rounded-full hover:from-green-600 hover:to-red-600 transition-all duration-200 font-medium flex items-center space-x-2 shadow-md text-sm"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3 h-3" />
                 <span>{content.createPost}</span>
               </motion.button>
             </div>
         {/* Search Bar Section */}
-        <div className="max-w-5xl mx-auto mt-8">
+        <div className="max-w-4xl mx-auto mt-6">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <input
               type="text"
               placeholder={content.searchPlaceholder}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 text-lg transition-all duration-200 bg-white shadow-sm"
+              className="w-full pl-10 pr-3 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500 text-base transition-all duration-200 bg-white shadow-sm"
             />
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 lg:px-6 py-4 lg:py-6 pb-24 lg:pb-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="max-w-5xl mx-auto px-3 lg:px-4 py-3 lg:py-4 pb-20 lg:pb-4">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           {/* Left Sidebar - Desktop Only */}
-          <div className="hidden lg:block lg:col-span-1 space-y-6">
+          <div className="hidden lg:block lg:col-span-1 space-y-4">
             {/* Constituency Filter */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
-                <Filter className="w-5 h-5 text-gray-600" />
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center space-x-2">
+                <Filter className="w-4 h-4 text-gray-600" />
                 <span>{content.selectConstituency}</span>
               </h3>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
                 <button
                   onClick={() => handleConstituencyChange(null)}
-                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                  className={`w-full text-left px-2 py-1.5 rounded-md transition-colors text-sm ${
                     showAllConstituencies
                       ? 'bg-[#014e5c] text-white border border-green-200'
                       : 'text-gray-700 hover:bg-gray-50'
@@ -615,7 +650,7 @@ const DiscussionForum: React.FC = () => {
                   <button
                     key={constituency.id}
                     onClick={() => handleConstituencyChange(constituency.id)}
-                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                    className={`w-full text-left px-2 py-1.5 rounded-md transition-colors text-sm ${
                       selectedConstituency === constituency.id
                         ? 'bg-[#014e5c] text-white'
                         : 'text-gray-700 hover:bg-gray-50'
@@ -628,9 +663,9 @@ const DiscussionForum: React.FC = () => {
             </div>
 
             {/* Sort Options */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Sort by</h3>
-              <div className="space-y-2">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <h3 className="text-base font-semibold text-gray-900 mb-3">Sort by</h3>
+              <div className="space-y-1.5">
                 {[
                   { key: 'recent', label: 'Latest', icon: Clock },
                   { key: 'trending', label: 'Trending', icon: Flame },
@@ -640,13 +675,13 @@ const DiscussionForum: React.FC = () => {
                   <button
                     key={option.key}
                     onClick={() => setSortBy(option.key as any)}
-                    className={`w-full flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 ${
+                    className={`w-full flex items-center space-x-2 p-2 rounded-md transition-all duration-200 text-sm ${
                       sortBy === option.key
                         ? 'bg-[#014e5c] text-white border border-green-200'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    <option.icon className={`w-4 h-4 ${sortBy === option.key ? 'text-white' : 'text-gray-500'}`} />
+                    <option.icon className={`w-3 h-3 ${sortBy === option.key ? 'text-white' : 'text-gray-500'}`} />
                     <span className="font-medium">{option.label}</span>
                   </button>
                 ))}
@@ -655,20 +690,20 @@ const DiscussionForum: React.FC = () => {
           </div>
 
           {/* Main Content */}
-          <div className="lg:col-span-3 space-y-4 lg:space-y-6 mb-4">
+          <div className="lg:col-span-3 space-y-3 lg:space-y-4 mb-3">
             {/* Constituency Filter - Mobile */}
-            <div className="lg:hidden bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-4">
+            <div className="lg:hidden bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+              <div className="flex items-center justify-between mb-3">
                 <button
                 onClick={() => setShowConstituencyFilter(!showConstituencyFilter)}
                 className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
-                  <Filter className="w-5 h-5 text-gray-600" />
+                <h3 className="text-base font-semibold text-gray-900 flex items-center space-x-2">
+                  <Filter className="w-4 h-4 text-gray-600" />
                   <span>{content.selectConstituency}</span>
                   {showConstituencyFilter ? (
-                    <X className="w-5 h-5 text-gray-600" />
+                    <X className="w-4 h-4 text-gray-600" />
                   ) : (
-                    <ChevronDown className="w-5 h-5 text-gray-600" />
+                    <ChevronDown className="w-4 h-4 text-gray-600" />
                   )}
                 </h3>
                   
@@ -676,10 +711,10 @@ const DiscussionForum: React.FC = () => {
               </div>
               
               {showConstituencyFilter && (
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <div className="space-y-1.5 max-h-36 overflow-y-auto">
                                   <button
                   onClick={() => handleConstituencyChange(null)}
-                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                  className={`w-full text-left px-2 py-1.5 rounded-md transition-colors text-sm ${
                     selectedConstituencies.length === 0
                       ? 'bg-green-100 text-green-700 border border-green-200'
                       : 'text-gray-700 hover:bg-gray-50'
@@ -691,7 +726,7 @@ const DiscussionForum: React.FC = () => {
                   <button
                     key={constituency.id}
                     onClick={() => handleMultiConstituencyChange(constituency.id)}
-                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                    className={`w-full text-left px-2 py-1.5 rounded-md transition-colors text-sm ${
                       selectedConstituencies.includes(constituency.id)
                         ? 'bg-[#014e5c] text-white'
                         : 'text-gray-700 hover:bg-gray-50'
@@ -705,34 +740,34 @@ const DiscussionForum: React.FC = () => {
             </div>
 
             {/* Search Bar */}
-            <div className="lg:hidden bg-white rounded-xl shadow-sm border border-gray-200 p-2">
+            <div className="lg:hidden bg-white rounded-lg shadow-sm border border-gray-200 p-2">
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3" />
                 <input
                   type="text"
                   placeholder={content.searchPlaceholder}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-2 py-1 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg"
+                  className="w-full pl-10 pr-2 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
                 />
               </div>
             </div>
 
             {/* Posts List */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               {isLoading ? (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">{content.loading}</p>
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-3"></div>
+                  <p className="text-gray-600 text-sm">{content.loading}</p>
                 </div>
               ) : filteredPosts.length === 0 ? (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-                  <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">{content.noPosts}</h3>
-                  <p className="text-gray-600 mb-6">{content.noPostsDescription}</p>
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+                  <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{content.noPosts}</h3>
+                  <p className="text-gray-600 mb-4 text-sm">{content.noPostsDescription}</p>
                   <button
                     onClick={() => setShowCreatePost(true)}
-                    className="bg-[#004e5c] text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-red-600 transition-all duration-200 font-medium"
+                    className="bg-[#004e5c] text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-red-600 transition-all duration-200 font-medium text-sm"
                   >
                     {content.createPost}
                   </button>
@@ -746,26 +781,26 @@ const DiscussionForum: React.FC = () => {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
                       transition={{ delay: index * 0.1 }}
-                      className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-200 cursor-pointer"
+                      className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-200 cursor-pointer"
                       onClick={() => handlePostClick(post.id)}
                     >
                       {post.status === 'removed' ? (
-                        <div className="p-8 text-center">
-                          <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-                          <p className="text-gray-600 text-lg">{content.postRemoved}</p>
+                        <div className="p-6 text-center">
+                          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-3" />
+                          <p className="text-gray-600 text-base">{content.postRemoved}</p>
                         </div>
                       ) : (
-                        <div className="p-4 lg:p-6">
+                        <div className="p-3 lg:p-4">
                           {/* Post Header */}
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 bg-[#014e5c] rounded-full flex items-center justify-center">
-                                <User className="h-4 w-4 text-white" />
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-8 h-8 bg-[#014e5c] rounded-full flex items-center justify-center">
+                                <User className="h-3 w-3 text-white" />
                               </div>
                               <div>
-                                <h3 className="font-semibold text-gray-900">{post.userName || 'User'}</h3>
-                                <div className="flex items-center space-x-2 text-sm text-gray-500">
-                                  <MapPin className="h-4 w-4" />
+                                <h3 className="font-semibold text-gray-900 text-sm">{post.userName || 'User'}</h3>
+                                <div className="flex items-center space-x-1.5 text-xs text-gray-500">
+                                  <MapPin className="h-3 w-3" />
                                   <span>{post.constituencyName || `Constituency ${post.constituency}`}</span>
                                   <span>•</span>
                                   <span>{formatRelativeTime(post.createdAt)}</span>
@@ -773,11 +808,11 @@ const DiscussionForum: React.FC = () => {
                               </div>
                             </div>
                             
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1.5">
                               {/* Status Badge */}
                               {post.status === 'under_review' && (
-                                <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full flex items-center">
-                                  <Shield className="h-3 w-3 mr-1" />
+                                <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full flex items-center">
+                                  <Shield className="h-2.5 w-2.5 mr-1" />
                                   {content.underReview}
                                 </span>
                               )}
@@ -790,13 +825,13 @@ const DiscussionForum: React.FC = () => {
                                       e.stopPropagation();
                                       togglePostMenu(post.id);
                                     }}
-                                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                                    className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
                                   >
-                                    <MoreVertical className="h-4 w-4 text-gray-500" />
+                                    <MoreVertical className="h-3 w-3 text-gray-500" />
                                   </button>
                                   
                                   {showPostMenu[post.id] && (
-                                    <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[120px]">
+                                    <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[100px]">
                                       {/* User can delete their own posts */}
                                       {currentUser?.uid === post.userId && (
                                         <button
@@ -805,9 +840,9 @@ const DiscussionForum: React.FC = () => {
                                             handleDeletePost(post.id);
                                             setShowPostMenu(prev => ({ ...prev, [post.id]: false }));
                                           }}
-                                          className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                                          className="w-full px-3 py-1.5 text-left text-red-600 hover:bg-red-50 flex items-center space-x-1.5 text-sm"
                                         >
-                                          <Trash2 className="h-4 w-4" />
+                                          <Trash2 className="h-3 w-3" />
                                           <span>{content.delete}</span>
                                         </button>
                                       )}
@@ -820,9 +855,9 @@ const DiscussionForum: React.FC = () => {
                                             handleAdminRemovePost(post.id);
                                             setShowPostMenu(prev => ({ ...prev, [post.id]: false }));
                                           }}
-                                          className="w-full px-4 py-2 text-left text-orange-600 hover:bg-orange-50 flex items-center space-x-2"
+                                          className="w-full px-3 py-1.5 text-left text-orange-600 hover:bg-orange-50 flex items-center space-x-1.5 text-sm"
                                         >
-                                          <Shield className="h-4 w-4" />
+                                          <Shield className="h-3 w-3" />
                                           <span>Remove Post</span>
                                         </button>
                                       )}
@@ -834,32 +869,32 @@ const DiscussionForum: React.FC = () => {
                           </div>
 
                           {/* Post Content */}
-                          <div className="mb-4">
+                          <div className="mb-3">
                             {/* Poster Name - Above Title */}
-                            <div className="mb-2">
-                              <span className="text-sm text-gray-600">
+                            <div className="mb-1.5">
+                              <span className="text-xs text-gray-600">
                                 {isEnglish ? `Posted by ${post.userName || 'User'}` : `${post.userName || 'उपयोगकर्ता'} द्वारा पोस्ट किया गया`}
                               </span>
                             </div>
                             
                             {/* Post Title - More Prominent */}
                             <h2 
-                              className="text-xl lg:text-2xl font-bold text-gray-900 mb-4 hover:text-green-600 transition-colors cursor-pointer leading-tight"
+                              className="text-lg lg:text-xl font-bold text-gray-900 mb-3 hover:text-green-600 transition-colors cursor-pointer leading-tight"
                               onClick={() => handlePostClick(post.id)}
                             >
                               {post.titlefirst} {post.titlesecond}
                             </h2>
                             
                             {/* Post Content */}
-                            <p className="text-gray-700 leading-relaxed mb-4 text-base">{post.content}</p>
+                            <p className="text-gray-700 leading-relaxed mb-3 text-sm">{post.content}</p>
                             
                             {/* Tags */}
                             {post.tags && post.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mb-4">
+                              <div className="flex flex-wrap gap-1.5 mb-3">
                                 {post.tags.map((tag, tagIndex) => (
                                   <span
                                     key={tagIndex}
-                                    className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full"
+                                    className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full"
                                   >
                                     #{tag}
                                   </span>
@@ -869,15 +904,15 @@ const DiscussionForum: React.FC = () => {
                           </div>
 
                           {/* Engagement Section */}
-                          <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                            <div className="flex items-center space-x-6">
+                          <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                            <div className="flex items-center space-x-4">
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleLike(post.id);
                                 }}
                                 disabled={userReactions[post.id]?.disliked}
-                                className={`flex items-center space-x-2 p-2 rounded-lg transition-colors ${
+                                className={`flex items-center space-x-1.5 p-1.5 rounded-md transition-colors ${
                                   userReactions[post.id]?.liked 
                                     ? 'text-red-500 bg-red-50' 
                                     : userReactions[post.id]?.disliked
@@ -885,8 +920,8 @@ const DiscussionForum: React.FC = () => {
                                     : 'text-gray-500 hover:text-red-500 hover:bg-red-50'
                                 }`}
                               >
-                                <Heart className={`h-4 w-4 ${userReactions[post.id]?.liked ? 'fill-current' : ''}`} />
-                                <span className="text-sm font-medium">{post.likesCount || 0}</span>
+                                <Heart className={`h-3 w-3 ${userReactions[post.id]?.liked ? 'fill-current' : ''}`} />
+                                <span className="text-xs font-medium">{post.likesCount || 0}</span>
                               </button>
 
                               <button 
@@ -895,7 +930,7 @@ const DiscussionForum: React.FC = () => {
                                   handleDislike(post.id);
                                 }}
                                 disabled={userReactions[post.id]?.liked}
-                                className={`flex items-center space-x-2 p-2 rounded-lg transition-colors ${
+                                className={`flex items-center space-x-1.5 p-1.5 rounded-md transition-colors ${
                                   userReactions[post.id]?.disliked 
                                     ? 'text-blue-500 bg-blue-50' 
                                     : userReactions[post.id]?.liked
@@ -903,8 +938,8 @@ const DiscussionForum: React.FC = () => {
                                     : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50'
                                 }`}
                               >
-                                <ThumbsDown className={`h-4 w-4 ${userReactions[post.id]?.disliked ? 'fill-current' : ''}`} />
-                                <span className="text-sm font-medium">{post.dislikesCount || 0}</span>
+                                <ThumbsDown className={`h-3 w-3 ${userReactions[post.id]?.disliked ? 'fill-current' : ''}`} />
+                                <span className="text-xs font-medium">{post.dislikesCount || 0}</span>
                               </button>
 
                               {/* Share Button */}
@@ -913,15 +948,15 @@ const DiscussionForum: React.FC = () => {
                                   e.stopPropagation();
                                   handleShare(post.id);
                                 }}
-                                className="flex items-center space-x-2 p-2 rounded-lg transition-colors text-gray-500 hover:text-green-600 hover:bg-green-50"
+                                className="flex items-center space-x-1.5 p-1.5 rounded-md transition-colors text-gray-500 hover:text-green-600 hover:bg-green-50"
                                 title={isEnglish ? 'Share this post' : 'इस पोस्ट को शेयर करें'}
                               >
                                 {copiedPostId === post.id ? (
-                                  <Check className="h-5 w-5 text-green-600" />
+                                  <Check className="h-4 w-4 text-green-600" />
                                 ) : (
-                                  <Share2 className="h-5 w-5" />
+                                  <Share2 className="h-4 w-4" />
                                 )}
-                                <span className="text-sm font-medium">
+                                <span className="text-xs font-medium">
                                   {copiedPostId === post.id ? (isEnglish ? 'Copied!' : 'कॉपी किया!') : (isEnglish ? 'Share' : 'शेयर')}
                                 </span>
                               </button>
@@ -929,7 +964,7 @@ const DiscussionForum: React.FC = () => {
                             
                             <button
                               onClick={() => toggleComments(post.id)}
-                              className="text-sm text-gray-500 hover:text-green-600 transition-colors"
+                              className="text-xs text-gray-500 hover:text-green-600 transition-colors"
                             >
                             {showComments[post.id] ? isEnglish ? 'Hide Comments' : 'टिप्पणियाँ छुपाएं' : isEnglish ? `Show ${post.commentsCount || 0} Comments` : `${post.commentsCount || 0} टिप्पणियाँ दिखाएं `}
                             </button>
@@ -937,10 +972,10 @@ const DiscussionForum: React.FC = () => {
 
                           {/* Comments Section */}
                           {showComments[post.id] && (
-                            <div className="mt-4 pt-4 border-t border-gray-100">
-                              <div className="space-y-3">
+                            <div className="mt-3 pt-3 border-t border-gray-100">
+                              <div className="space-y-2">
                                 {/* Comments will be loaded from Firebase here */}
-                                <div className="text-center text-gray-500 py-4">
+                                <div className="text-center text-gray-500 py-3 text-sm">
                                   No comments yet. Be the first to comment!
                                 </div>
                               </div>
@@ -959,13 +994,13 @@ const DiscussionForum: React.FC = () => {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200"
+                className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200"
               >
                 <div className="text-center">
-                  <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                  <h3 className="text-base font-semibold text-blue-900 mb-2">
                     {isEnglish ? 'Limited Posts in Selected Constituency' : 'चयनित निर्वाचन क्षेत्र में सीमित पोस्ट'}
                   </h3>
-                  <p className="text-blue-700 mb-4">
+                  <p className="text-blue-700 mb-3 text-sm">
                     {isEnglish 
                       ? `Only ${filteredPosts.length} posts found in the selected constituency. View posts from all constituencies for more discussions.`
                       : `चयनित निर्वाचन क्षेत्र में केवल ${filteredPosts.length} पोस्ट मिले। अधिक चर्चाओं के लिए सभी निर्वाचन क्षेत्रों के पोस्ट देखें।`
@@ -973,7 +1008,7 @@ const DiscussionForum: React.FC = () => {
                   </p>
                   <button
                     onClick={handleShowAllConstituencies}
-                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
                   >
                     {isEnglish ? 'Show All Constituencies' : 'सभी निर्वाचन क्षेत्र दिखाएं'}
                   </button>
@@ -985,13 +1020,13 @@ const DiscussionForum: React.FC = () => {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-6 p-6 bg-white rounded-xl border border-green-200"
+                className="mt-4 p-4 bg-white rounded-lg border border-green-200"
               >
                 <div className="text-center">
-                  <h3 className="text-lg font-semibold text-green-900 mb-2">
+                  <h3 className="text-base font-semibold text-green-900 mb-2">
                     {isEnglish ? 'Limited Search Results' : 'सीमित खोज परिणाम'}
                   </h3>
-                  <p className="text-black mb-4">
+                  <p className="text-black mb-3 text-sm">
                     {isEnglish 
                       ? `Only ${filteredPosts.length} results found for "${searchTerm}". View all posts for more discussions.`
                       : `"${searchTerm}" के लिए केवल ${filteredPosts.length} परिणाम मिले। अधिक चर्चाओं के लिए सभी पोस्ट देखें।`
@@ -999,7 +1034,7 @@ const DiscussionForum: React.FC = () => {
                   </p>
                   <button
                     onClick={() => setSearchTerm('')}
-                    className="px-6 py-3 bg-[#014e5c] text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                    className="px-4 py-2 bg-[#014e5c] text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm"
                   >
                     {isEnglish ? 'Show All Posts' : 'सभी पोस्ट दिखाएं'}
                   </button>
@@ -1010,47 +1045,166 @@ const DiscussionForum: React.FC = () => {
         </div>
       </div>
 
+      {/* Community Rules Section */}
+      <div className="mt-1 mb-2 px-2">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-xl shadow-lg p-4 lg:p-6">
+            {/* Header Section */}
+            <div className="text-center mb-6">
+              <h2 className="text-xl lg:text-2xl font-bold text-[#014e5c] mb-2">
+                {isEnglish ? 'Community Rules' : 'समुदायिक नियम'}
+              </h2>
+              <p className="text-sm text-gray-600 max-w-xl mx-auto">
+                {isEnglish 
+                  ? 'Guidelines to ensure a respectful and productive discussion environment'
+                  : 'सम्मानजनक और उत्पादक चर्चा वातावरण सुनिश्चित करने के लिए दिशानिर्देश'
+                }
+              </p>
+            </div>
+            
+            {/* Rules Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
+              {/* Rule 1: Respectful Dialogue */}
+              <div className="group hover:shadow-md transition-all duration-300 bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 border border-gray-100">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-[#014e5c] to-[#016a7a] rounded-xl flex items-center justify-center shadow-md group-hover:scale-105 transition-transform duration-300">
+                    <MessageSquare className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-bold text-gray-900 mb-2">
+                      {isEnglish ? 'Respectful Dialogue' : 'सम्मानजनक संवाद'}
+                    </h3>
+                    <p className="text-gray-700 text-xs leading-relaxed">
+                      {isEnglish ? 'Engage in conversations with courtesy, empathy, and respect for all participants. Foster an environment where diverse perspectives are valued and constructive discussions thrive.' : 'सभी प्रतिभागियों के साथ शिष्टाचार, सहानुभूति और सम्मान के साथ बातचीत करें। ऐसा वातावरण बनाएं जहां विविध दृष्टिकोणों को महत्व दिया जाए और रचनात्मक चर्चाएं फलें-फूलें।'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rule 2: Factual Information */}
+              <div className="group hover:shadow-md transition-all duration-300 bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 border border-gray-100">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-[#014e5c] to-[#016a7a] rounded-xl flex items-center justify-center shadow-md group-hover:scale-105 transition-transform duration-300">
+                    <Shield className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-bold text-gray-900 mb-2">
+                      {isEnglish ? 'Factual Information' : 'तथ्यपरक जानकारी'}
+                    </h3>
+                    <p className="text-gray-700 text-xs leading-relaxed">
+                      {isEnglish ? 'Share only verified, accurate, and well-researched information. Avoid spreading rumors, unverified claims, or misleading content that could harm the community.' : 'केवल सत्यापित, सटीक और अच्छी तरह से शोधित जानकारी साझा करें। अफवाहें, असत्यापित दावे, या भ्रामक सामग्री फैलाने से बचें जो समुदाय को नुकसान पहुंचा सकती है।'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rule 3: Community Welfare */}
+              <div className="group hover:shadow-md transition-all duration-300 bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 border border-gray-100">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-[#014e5c] to-[#016a7a] rounded-xl flex items-center justify-center shadow-md group-hover:scale-105 transition-transform duration-300">
+                    <div className="w-5 h-5 text-white flex items-center justify-center">
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                        <path d="M16 4c0-1.11.89-2 2-2s2 .89 2 2-.89 2-2 2-2-.89-2-2zm4 18v-6h2v6h-2zm-8-4v-6h2v6h-2zm-8-4v-6h2v6H4zm4 4v-6h2v6H8zm4 4v-6h2v6h-2z"/>
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-bold text-gray-900 mb-2">
+                      {isEnglish ? 'Community Welfare' : 'समुदायिक भलाई'}
+                    </h3>
+                    <p className="text-gray-700 text-xs leading-relaxed">
+                      {isEnglish ? 'Contribute content that benefits the community as a whole. Focus on solutions, positive initiatives, and discussions that promote collective growth and development.' : 'ऐसी सामग्री योगदान करें जो समुदाय के समग्र कल्याण में मदद करे। समाधानों, सकारात्मक पहलों और सामूहिक विकास और प्रगति को बढ़ावा देने वाली चर्चाओं पर ध्यान केंद्रित करें।'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rule 4: National Unity */}
+              <div className="group hover:shadow-md transition-all duration-300 bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 border border-gray-100">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-[#014e5c] to-[#016a7a] rounded-xl flex items-center justify-center shadow-md group-hover:scale-105 transition-transform duration-300">
+                    <div className="w-5 h-5 text-white flex items-center justify-center">
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                        <path d="M3 3h18v2H3V3zm0 8h18v2H3v-2zm0 8h18v2H3v-2z"/>
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-bold text-gray-900 mb-2">
+                      {isEnglish ? 'National Unity' : 'राष्ट्रीय एकता'}
+                    </h3>
+                    <p className="text-gray-700 text-xs leading-relaxed">
+                      {isEnglish ? 'Promote harmony and unity among all communities. Avoid content that discriminates based on religion, caste, language, or any other divisive factors.' : 'सभी समुदायों के बीच सद्भाव और एकता को बढ़ावा दें। धर्म, जाति, भाषा या किसी अन्य विभाजनकारी कारकों के आधार पर भेदभाव करने वाली सामग्री से बचें।'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Note Section */}
+            <div className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-4 border-l-4 border-[#014e5c]">
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0 w-8 h-8 bg-[#014e5c] rounded-full flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-gray-900 mb-2">
+                    {isEnglish ? 'Important Note' : 'महत्वपूर्ण नोट'}
+                  </h4>
+                  <p className="text-gray-700 text-xs leading-relaxed">
+                    {isEnglish 
+                      ? 'Posts that violate these community rules may be removed. Repeated violations or spreading false information may result in account suspension. We are committed to maintaining a safe and respectful environment for all users.'
+                      : 'इन समुदायिक नियमों का उल्लंघन करने वाली पोस्ट हटाई जा सकती हैं। बार-बार उल्लंघन या गलत जानकारी फैलाने पर खाता निलंबित किया जा सकता है। हम सभी उपयोगकर्ताओं के लिए एक सुरक्षित और सम्मानजनक वातावरण बनाए रखने के लिए प्रतिबद्ध हैं।'
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Floating Action Button - Mobile */}
-      <div className="lg:hidden fixed bottom-24 right-4 z-30">
+      <div className="lg:hidden fixed bottom-20 right-3 z-30">
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowCreatePost(true)}
-          className="w-25 h-14 bg-[#014e5c] text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center"
+          className="w-20 h-10 bg-[#014e5c] text-white rounded-full shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center"
         >
-          <Plus className="w-6 h-6 mr-1" />
+          <Plus className="w-4 h-4 mr-1" />
           <span className="text-xs font-medium">{isEnglish ? 'Create Post' : 'नई चर्चा'}</span>
         </motion.button>
       </div>
 
       {/* Bottom Navigation - Mobile */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20 shadow-lg">
-        <div className="flex items-center justify-around py-3 px-2">
+        <div className="flex items-center justify-around py-2 px-1">
           <button
             onClick={() => navigate('/')}
-            className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
+            className={`flex flex-col items-center space-y-0.5 p-1.5 rounded-md transition-colors ${
               activeTab === 'home' ? 'text-[#014e5c] bg-[#014e5c]/10' : 'text-gray-500'
             }`}
           >
-            <Home className="w-5 h-5" />
+            <Home className="w-4 h-4" />
             <span className="text-xs font-medium">{content.home}</span>
           </button>
           <button
             onClick={() => setActiveTab('discussion')}
-            className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
+            className={`flex flex-col items-center space-y-0.5 p-1.5 rounded-md transition-colors ${
               activeTab === 'discussion' ? 'text-[#014e5c] bg-[#014e5c]/10' : 'text-gray-500'
             }`}
           >
-            <ChatBubble className="w-5 h-5" />
+            <ChatBubble className="w-4 h-4" />
             <span className="text-xs font-medium">{content.discussion}</span>
           </button>
           <button
             onClick={() => navigate('/aapka-kshetra')}
-            className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
+            className={`flex flex-col items-center space-y-0.5 p-1.5 rounded-md transition-colors ${
               activeTab === 'area' ? 'text-[#014e5c] bg-[#014e5c]/10' : 'text-gray-500'
             }`}
           >
-            <MapPin className="w-5 h-5" />
+            <MapPin className="w-4 h-4" />
             <span className="text-xs font-medium">{content.area}</span>
           </button>
         </div>
