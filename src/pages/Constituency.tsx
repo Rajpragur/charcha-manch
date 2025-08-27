@@ -1,22 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, 
   MapPin, 
-  User, 
-  Award, 
-  FileText, 
-  Share2, 
-  TrendingUp,
-  Users,
-  Building,
-  Star,
-  BarChart3,
-  DollarSign,
-  Search
+  GraduationCap,
+  IndianRupee,
+  Scale,
+  Calendar,
+  CircleQuestionMark,
+  BanknoteArrowUp,
+  MessageCircle,
+  House
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import PlaceholderImages from '../components/PlaceholderImages';
+import AllConstituencies from '../components/AllConstituencies';
 
 interface CandidateData {
   area_name: string;
@@ -66,6 +62,30 @@ interface CandidateData {
   }>;
 }
 
+interface ConstituencyData {
+  id: string;
+  profileImage: string | undefined;
+  age: number;
+  constituencyName: { en: string; hi: string };
+  candidateName: { en: string; hi: string };
+  partyName: { name: string; nameHi: string; color: string };
+  experience: { en: string; hi: string };
+  education: { en: string; hi: string };
+  satisfactionYes: number;
+  satisfactionNo: number;
+  satisfactionTotal: number;
+  news: { title: { en: string; hi: string }; date: string };
+  manifestoScore: number;
+  interactionCount: number;
+  activePostCount: number;
+  criminalCases: number;
+  netWorth: number;
+  attendance: string;
+  questionsAsked: string;
+  fundsUtilization: string;
+  rawData: CandidateData;
+}
+
 const Constituency: React.FC = () => {
   const { isEnglish } = useLanguage();
   const { constituencySlug } = useParams<{ constituencySlug: string }>();
@@ -89,24 +109,11 @@ const Constituency: React.FC = () => {
   const [allConstituencies, setAllConstituencies] = useState<CandidateData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedParty, setSelectedParty] = useState<string>('all');
-  const [englishData, setEnglishData] = useState<CandidateData[]>([]);
-  const [hindiData, setHindiData] = useState<CandidateData[]>([]);
+  const [, setEnglishData] = useState<CandidateData[]>([]);
+  const [, setHindiData] = useState<CandidateData[]>([]);
+  const [transformedConstituencies, setTransformedConstituencies] = useState<ConstituencyData[]>([]);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showDropdown && !(event.target as Element).closest('.search-container')) {
-        setShowDropdown(false);
-      }
-    };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showDropdown]);
 
   // Clear constituency data when constituency changes
   useEffect(() => {
@@ -135,6 +142,60 @@ const Constituency: React.FC = () => {
         setAllConstituencies(hindiData);
         console.log('Loaded English candidates:', englishData.length);
         console.log('Loaded Hindi candidates:', hindiData.length);
+        
+        // Transform data into ConstituencyData format for AllConstituencies component
+        const transformedData: ConstituencyData[] = englishData.map((candidate, index) => {
+          const hindiCandidate = hindiData[index];
+          const constituencyId = index.toString();
+          
+          return {
+            id: constituencyId,
+            profileImage: candidate.vidhayak_info.image_url,
+            constituencyName: {
+              en: candidate.area_name,
+              hi: hindiCandidate?.area_name || candidate.area_name
+            },
+            candidateName: {
+              en: candidate.vidhayak_info.name,
+              hi: hindiCandidate?.vidhayak_info.name || candidate.vidhayak_info.name
+            },
+            partyName: {
+              name: candidate.vidhayak_info.party_name,
+              nameHi: hindiCandidate?.vidhayak_info.party_name || candidate.vidhayak_info.party_name,
+              color: getPartyColor(candidate.vidhayak_info.party_name)
+            },
+            experience: {
+              en: candidate.vidhayak_info.experience,
+              hi: hindiCandidate?.vidhayak_info.experience || candidate.vidhayak_info.experience
+            },
+            education: {
+              en: candidate.vidhayak_info.metadata.education,
+              hi: hindiCandidate?.vidhayak_info.metadata.education || candidate.vidhayak_info.metadata.education
+            },
+            satisfactionYes: 0,
+            satisfactionNo: 0,
+            satisfactionTotal: 0,
+            news: {
+              title: {
+                en: candidate.latest_news?.[0]?.title || 'No news available',
+                hi: 'कोई समाचार उपलब्ध नहीं'
+              },
+              date: 'No date available'
+            },
+            age: candidate.vidhayak_info.age,
+            manifestoScore: candidate.vidhayak_info.manifesto_score || 0,
+            interactionCount: 0,
+            activePostCount: 0,
+            criminalCases: candidate.vidhayak_info.metadata.criminal_cases,
+            netWorth: candidate.vidhayak_info.metadata.net_worth,
+            attendance: candidate.vidhayak_info.metadata.attendance,
+            questionsAsked: candidate.vidhayak_info.metadata.questions_asked,
+            fundsUtilization: candidate.vidhayak_info.metadata.funds_utilisation,
+            rawData: candidate
+          };
+        });
+        
+        setTransformedConstituencies(transformedData);
       } catch (err) {
         console.error('Error loading candidates data:', err);
         setError('Failed to load candidates data');
@@ -297,9 +358,52 @@ const Constituency: React.FC = () => {
       'नोटा': 'bg-gray-600',
       'हिंदुस्तानी अवाम मोर्चा (धर्मनिरपेक्ष)':'bg-zinc-800',
       'अखिल भारतीय मजलिस-ए-इटिहादुल मुस्लिमीन': 'bg-emerald-900',
-      'कम्युनिस्ट पार्टी ऑफ इंडिया (मार्क्सवादी-लेनिनवादी) (मुक्ति)': 'bg-red-600'
+      'कम्युनिस्ट पार्टी ऑफ इंडिया (मार्क्सवादी-लेनिनवादी) (मुक्ति)': 'bg-red-600',
+      'Bharatiya Janata Party': 'bg-amber-600',
+      'Janata Dal (United)': 'bg-emerald-600',
+      'Rashtriya Janata Dal': 'bg-green-600',
+      'Indian National Congress': 'bg-sky-600',
+      'Communist Party of India': 'bg-red-500',
+      'Lok Janshakti Party': 'bg-purple-600',
+      'Hindustani Awam Front (Secular)': 'bg-green-600',
+      'Rashtriya Lok Samta Party': 'bg-blue-600',
+      'Bahujan Samaj Party': 'bg-blue-500',
+      'Jan Adhikar Party (Democratic)': 'bg-orange-600',
+      'Communist Party of India (Marxist)': 'bg-rose-500',
+      'Communist Party of India (Marxist-Leninist) (Liberation)': 'bg-red-600',
+      'All India Majlis-e-Itihadul Muslimeen': 'bg-emerald-900',
+      'Independent': 'bg-yellow-600',
+      'NOTA': 'bg-gray-600'
     };
     return partyColors[partyName] || 'bg-slate-600';
+  };
+
+  const fetchPartyIcon = (partyName: string) => {
+    const partyIcons: Record<string, string> = {
+      'Bharatiya Janata Party': '/images/party_logo/bjp.png',
+      'Janata Dal (United)': '/images/party_logo/jdu.png',
+      'Rashtriya Janata Dal': '/images/party_logo/rjd.png',
+      'Indian National Congress': '/images/party_logo/inc.png',
+      'Communist Party of India': '/images/party_logo/cpi.png',
+      'Hindustani Awam Front (Secular)': '/images/party_logo/HAM.png',
+      'Communist Party of India (Marxist)': '/images/party_logo/cpim.png',
+      'Communist Party of India (Marxist-Leninist) (Liberation)': '/images/party_logo/cpiml.png',
+      'All India Majlis-e-Itihadul Muslimeen': '/images/party_logo/aimim.png',
+      'Independent': '/images/party_logo/independent.png',
+      'NOTA': '/images/party_logo/nota.png',
+      'भारतीय जनता पार्टी': '/images/party_logo/bjp.png',
+      'जनता दल (यूनाइटेड)': '/images/party_logo/jdu.png',
+      'राष्ट्रिया जनता दल': '/images/party_logo/rjd.png',
+      'भारतीय राष्ट्रीय कांग्रेस': '/images/party_logo/inc.png',
+      'कम्युनिस्ट पार्टी ऑफ इंडिया': '/images/party_logo/cpi.png',
+      'हिंदुस्तानी अवाम मोर्चा': '/images/party_logo/HAM.png',
+      'कम्युनिस्ट पार्टी ऑफ इंडिया (मार्क्सवादी)': '/images/party_logo/cpim.png',
+      'कम्युनिस्ट पार्टी ऑफ इंडिया (मार्क्सवादी-लेनिनवादी) (मुक्ति)': '/images/party_logo/cpiml.png',
+      'हिंदुस्तानी अवाम मोर्चा (धर्मनिरपेक्ष)': '/images/party_logo/HAM.png',
+      'अखिल भारतीय मजलिस-ए-इटिहादुल मुस्लिमीन': '/images/party_logo/aimim.png',
+      'नोटा': '/images/party_logo/nota.png',
+    };
+    return partyIcons[partyName] || '/images/party_logo/independent.png';
   };
 
   // Format currency
@@ -356,203 +460,15 @@ const Constituency: React.FC = () => {
     );
   }
 
-  const { vidhayak_info, dept_info, other_candidates, latest_news } = constituencyData || {};
+
   console.log(constituencyData);
   // If showing all constituencies, render the all constituencies view
   if (showAll) {
     return (
-      <div className="min-h-screen bg-slate-50">
-        {/* Header */}
-        <div className="bg-white shadow-sm border-b border-slate-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between">
-              <Link
-                to="/"
-                className="flex items-center space-x-2 text-slate-600 hover:text-slate-800 transition-colors"
-              >
-                <ArrowLeft className="h-5 w-5" />
-                <span>{isEnglish ? 'Back to Home' : 'होम पर वापस जाएं'}</span>
-              </Link>
-              
-              <div className="text-center">
-                <h1 className="text-xl font-semibold text-slate-800">
-                  {isEnglish ? 'All Constituencies' : 'सभी निर्वाचन क्षेत्र'}
-                </h1>
-                <p className="text-sm text-slate-500">
-                  {isEnglish ? `${allConstituencies.length} constituencies in Bihar` : `बिहार के ${allConstituencies.length} निर्वाचन क्षेत्र`}
-                </p>
-              </div>
-              
-              <button className="p-2 text-slate-600 hover:text-slate-800 transition-colors">
-                <Share2 className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Search and Filter Section */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="bg-white rounded-lg shadow-md border border-slate-200 p-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Search - Always search in English data */}
-              <div className="search-container">
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  {isEnglish ? 'Search Constituencies' : 'निर्वाचन क्षेत्र खोजें'}
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder={isEnglish ? 'Search by name, candidate, or party...' : 'नाम, उम्मीदवार, या पार्टी से खोजें...'}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onFocus={() => setShowDropdown(true)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-                  />
-                  <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                </div>
-                
-                {/* Search Dropdown */}
-                {showDropdown && searchQuery.trim() && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {englishData
-                      .filter((constituency, ) => {
-                        const searchLower = searchQuery.toLowerCase();
-                        return constituency.area_name.toLowerCase().includes(searchLower) ||
-                               constituency.vidhayak_info.name.toLowerCase().includes(searchLower) ||
-                               constituency.vidhayak_info.party_name.toLowerCase().includes(searchLower);
-                      })
-                      .slice(0, 10)
-                      .map((constituency, index) => {
-                        // Find corresponding Hindi data for display
-                        const hindiConstituency = hindiData[index] || constituency;
-                        return (
-                          <button
-                            key={index}
-                            onClick={() => {
-                              navigate(`/constituency/${constituency.area_name.toLowerCase().replace(/\s+/g, '-')}-${index}?id=${index}`);
-                              setShowDropdown(false);
-                              setSearchQuery('');
-                            }}
-                            className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-b-0 text-sm text-slate-900 transition-colors"
-                          >
-                            <div className="font-medium">
-                              {isEnglish ? constituency.area_name : hindiConstituency.area_name}
-                            </div>
-                            <div className="text-xs text-slate-500">
-                              {isEnglish ? constituency.vidhayak_info.name : hindiConstituency.vidhayak_info.name} - {isEnglish ? constituency.vidhayak_info.party_name : hindiConstituency.vidhayak_info.party_name}
-                            </div>
-                          </button>
-                        );
-                      })}
-                  </div>
-                )}
-              </div>
-              
-              {/* Party Filter */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  {isEnglish ? 'Filter by Party' : 'पार्टी से फ़िल्टर करें'}
-                </label>
-                <select
-                  value={selectedParty}
-                  onChange={(e) => {
-                    setSelectedParty(e.target.value);
-                    console.log('Party filter changed to:', e.target.value);
-                  }}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-                >
-                  <option value="all">{isEnglish ? 'All Parties' : 'सभी पार्टियां'}</option>
-                  {Array.from(new Set(
-                    // Get unique party names from English data for accurate filtering
-                    englishData.map(c => c.vidhayak_info.party_name).filter(Boolean)
-                  )).sort().map(party => (
-                    <option key={party} value={party}>{party}</option>
-                  ))}
-                </select>
-                {/* Debug info */}
-                <div className="text-xs text-slate-500 mt-1">
-                  {isEnglish ? 'Available parties:' : 'उपलब्ध पार्टियां:'} {englishData.length > 0 ? englishData.slice(0, 3).map(c => c.vidhayak_info.party_name).join(', ') : 'Loading...'}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Constituencies Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-            {allConstituencies
-              .filter((_, index) => {
-                // Search in English data but filter Hindi data for display
-                const englishConstituency = englishData[index];
-                if (!englishConstituency) return false;
-                
-                const searchLower = searchQuery.toLowerCase();
-                const matchesSearch = searchQuery === '' || 
-                  englishConstituency.area_name.toLowerCase().includes(searchLower) ||
-                  englishConstituency.vidhayak_info.name.toLowerCase().includes(searchLower) ||
-                  englishConstituency.vidhayak_info.party_name.toLowerCase().includes(searchLower);
-                
-                const matchesParty = selectedParty === 'all' || 
-                  englishConstituency.vidhayak_info.party_name === selectedParty;
-                
-                // Debug filtering
-                if (selectedParty !== 'all' && !matchesParty) {
-                  console.log('Party filter debug:', {
-                    constituency: englishConstituency.area_name,
-                    constituencyParty: englishConstituency.vidhayak_info.party_name,
-                    selectedParty,
-                    matchesParty
-                  });
-                }
-                
-                return matchesSearch && matchesParty;
-              })
-              .map((constituency, index) => {
-                // Get corresponding English data for search results
-                const englishConstituency = englishData[index];
-                return (
-                                  <Link
-                    key={index}
-                    to={`/constituency/${englishConstituency.area_name.toLowerCase().replace(/\s+/g, '-')}-${index}?id=${index}`}
-                    className="bg-white hover:bg-slate-50 rounded-lg p-4 text-left border border-slate-200 transition-all duration-200 hover:shadow-md hover:scale-105"
-                  >
-                    <div className="flex items-center space-x-3">
-                      {constituency.vidhayak_info.image_url ? (
-                        <img 
-                          src={constituency.vidhayak_info.image_url} 
-                          alt={constituency.vidhayak_info.name}
-                          className="w-12 h-12 rounded-full object-cover"
-                          onError={(e) => {
-                            // Fallback to placeholder if image fails to load
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                          }}
-                        />
-                      ) : null}
-                      {!constituency.vidhayak_info.image_url && (
-                        <PlaceholderImages type="profile" size="sm" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-slate-800 truncate text-sm">
-                          {isEnglish ? englishConstituency.area_name : constituency.area_name}
-                        </h3>
-                        <p className="text-xs text-slate-600 truncate">
-                          {isEnglish ? englishConstituency.vidhayak_info.name : constituency.vidhayak_info.name}
-                        </p>
-                        <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium text-white mt-1 ${getPartyColor(constituency.vidhayak_info.party_name)}`}>
-                          {isEnglish ? englishConstituency.vidhayak_info.party_name : constituency.vidhayak_info.party_name}
-                        </div>
-                        <div className="flex items-center space-x-1 mt-1 text-xs text-slate-500">
-                          <Award className="h-3 w-3" />
-                          <span>{constituency.vidhayak_info.last_election_vote_percentage}% votes</span>
-                        </div>
-                      </div>
-                    </div>
-                                    </Link>
-                );
-              })}
-          </div>
-        </div>
-      </div>
+      <AllConstituencies 
+        constituencies={transformedConstituencies}
+        isLoading={isLoading}
+      />
     );
   }
 
@@ -580,519 +496,272 @@ const Constituency: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <Link
-              to="/"
-              className="flex items-center space-x-2 text-slate-600 hover:text-slate-800 transition-colors"
-            >
-              <ArrowLeft className="h-5 w-5" />
-              <span>{isEnglish ? 'Back to Home' : 'होम पर वापस जाएं'}</span>
-            </Link>
-            
-            <div className="text-center">
-              <h1 className="text-xl font-semibold text-slate-800">
-                {isEnglish ? 
-                  (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.area_name : 'All Constituencies') :
-                  (constituencyData?.area_name || 'सभी निर्वाचन क्षेत्र')
-                }
-              </h1>
-              <p className="text-sm text-slate-500">
-                {isEnglish ? 'Constituency Details' : 'निर्वाचन क्षेत्र विवरण'}
-              </p>
-              <div className="mt-1">
-                <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                  isEnglish 
-                    ? 'bg-blue-100 text-blue-800' 
-                    : 'bg-green-100 text-green-800'
-                }`}>
-                  {isEnglish ? 'English' : 'हिंदी'}
-                </span>
+    <div className="min-h-screen bg-[#9ca8b4]">
+      <div className="px-4 py-3">
+        {/* Constituency Information Card */}
+        <div className="bg-white rounded-lg p-1 mb-4 shadow-sm text-center">
+          <h1 className="lg:text-2xl text-xl font-bold text-black mb-1">
+            {constituencyData ? constituencyData.area_name + ' ' + (isEnglish ? 'Vidhan Sabha Constituency' : 'विधानसभा क्षेत्र') : (isEnglish ? 'Constituency Details' : 'निर्वाचन क्षेत्र विवरण')}
+          </h1>
+          <p className="text-gray-600 text-sm">
+            {isEnglish ? 'Information about this constituency' : 'इस निर्वाचन क्षेत्र की जानकारी'}
+          </p>
+        </div>
+
+        {/* MLA Profile Card */}
+        {constituencyData && (
+          <div className="bg-white rounded-lg p-3 lg:p-5 mb-2 shadow-sm">
+            <div className="flex items-start space-x-4">
+              <div className="relative">
+                <img 
+                  src={constituencyData.vidhayak_info.image_url} 
+                  alt={constituencyData.vidhayak_info.name}
+                  className="w-15 h-15 lg:w-25 lg:h-25 rounded-full object-cover border-2 border-gray-200"
+                  onError={(e) => {
+                    e.currentTarget.src = '/images/logo.png';
+                  }}
+                />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-start justify-between mb-2">
+                  <h2 className="text-xl font-bold text-black">{constituencyData.vidhayak_info.name}</h2>
+                  <span className="bg-gray-200 text-black text-xs px-3 py-1 rounded-full">
+                    {isEnglish ? 'MLA' : 'विधायक'}
+                  </span>
+                </div>
+                <p className="text-gray-600 text-sm mb-3">
+                  {isEnglish ? `Age: ${constituencyData.vidhayak_info.age} years` : `उम्र: ${constituencyData.vidhayak_info.age} वर्ष`}
+                </p>
+                <div className="flex items-center space-x-3 mb-3">
+                  <span className={`px-2 py-1 rounded-full text-white text-xs font-medium ${getPartyColor(constituencyData.vidhayak_info.party_name)}`}>
+                    {constituencyData.vidhayak_info.party_name}
+                  </span>
+                  <div className="w-10 h-10 lg:w-10 lg:h-10 ml-10 lg:ml-320 rounded-full flex items-center justify-center border border-gray-200">
+                    <img 
+                      className="w-10 h-10 lg:w-10 lg:h-10 font-thin object-contain" 
+                      src={fetchPartyIcon(constituencyData.vidhayak_info.party_name)} 
+                      alt={`${constituencyData.vidhayak_info.party_name} logo`}
+                      onError={(e) => {
+                        e.currentTarget.src = '/images/party_logo/independent.png';
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between space-x-2">
+                  <span className="bg-[#e2ebf3] justify-left text-black text-xs px-2 py-[0.5px] rounded-full">
+                    {isEnglish ? `Last election: ${constituencyData.vidhayak_info.last_election_vote_percentage}% votes` : `अंतिम चुनाव: ${constituencyData.vidhayak_info.last_election_vote_percentage}% वोट`}
+                  </span>
+                  <div className="text-center">
+                    <div className="text-sm font-bold text-black">{constituencyData.vidhayak_info.experience}</div>
+                    <div className="text-xs text-gray-600">{isEnglish ? 'Post experience' : 'पद अनुभव'}</div>
+                  </div>
+                </div>
               </div>
             </div>
-            
-            <button className="p-2 text-slate-600 hover:text-slate-800 transition-colors">
-              <Share2 className="h-5 w-5" />
-            </button>
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Candidate Overview Card */}
-        <div className="bg-white rounded-xl shadow-lg border border-slate-200 mb-8 overflow-hidden">
-          <div className={`${getPartyColor(vidhayak_info?.party_name || 'नोटा')} h-2`}></div>
-          
-          <div className="p-6 lg:p-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Candidate Photo and Basic Info */}
-              <div className="lg:col-span-1 text-center lg:text-left">
-                {vidhayak_info?.image_url ? (
-                  <img 
-                    src={vidhayak_info.image_url} 
-                    alt={vidhayak_info.name}
-                    className="w-32 h-32 lg:w-40 lg:h-40 rounded-full object-cover mx-auto lg:mx-0 mb-4 border-4 border-slate-100"
-                    onError={(e) => {
-                      // Fallback to placeholder if image fails to load
-                      e.currentTarget.style.display = 'none';
-                      e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                    }}
-                  />
-                ) : null}
-                {!vidhayak_info?.image_url && (
-                  <PlaceholderImages type="profile" size="xl" className="mx-auto lg:mx-0 mb-4" />
-                )}
-                
-                <h2 className="text-2xl lg:text-3xl font-bold text-slate-800 mb-2">
-                  {isEnglish ? 
-                    (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.vidhayak_info.name : 'Not Specified') :
-                    (vidhayak_info?.name || 'Not Specified')
-                  }
-                </h2>
-                
-                <div className={`inline-block px-4 py-2 rounded-full text-sm font-medium text-white mb-4 ${getPartyColor(vidhayak_info?.party_name || 'नोटा')}`}>
-                  {isEnglish ? 
-                    (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.vidhayak_info.party_name : 'Not Specified') :
-                    (vidhayak_info?.party_name || 'Not Specified')
-                  }
-                </div>
-                
-                <div className="space-y-2 text-sm text-slate-600">
-                  <div className="flex items-center justify-center lg:justify-start space-x-2">
-                    <MapPin className="h-4 w-4" />
-                    <span>{isEnglish ? 
-                      (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.area_name : 'Not Specified') :
-                      (constituencyData?.area_name || 'Not Specified')
-                    }</span>
-                  </div>
-                  <div className="flex items-center justify-center lg:justify-start space-x-2">
-                    <User className="h-4 w-4" />
-                    <span>{vidhayak_info?.age || 'Not Specified'} years old</span>
-                  </div>
-                  <div className="flex items-center justify-center lg:justify-start space-x-2">
-                    <Award className="h-4 w-4" />
-                    <span>{vidhayak_info?.last_election_vote_percentage || 0}% votes</span>
-                  </div>
-                </div>
+        {/* Key Metrics Grid */}
+        {constituencyData && (
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            {/* Education */}
+            <div className="bg-white rounded-lg p-2 lg:p-3 shadow-sm flex items-center">
+              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                <GraduationCap className="w-4 h-4 lg:w-6 lg:h-6 text-blue-600" />
               </div>
+              <div>
+                <p className="text-xs lg:text-sm text-black mb-0.5">{isEnglish ? 'Education level' : 'शिक्षा स्तर'}</p>
+                <p className="text-blue-600 font-semibold text-xs lg:text-sm">
+                  {constituencyData.vidhayak_info.metadata.education}
+                </p>
+              </div>
+            </div>
 
-              {/* Key Metrics */}
-              <div className="lg:col-span-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                  <div className="bg-slate-50 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-sky-600 mb-1">
-                      {vidhayak_info?.manifesto_score || 0}%
-                    </div>
-                    <div className="text-sm text-slate-600">
-                      {isEnglish ? 'Manifesto Score' : 'घोषणापत्र स्कोर'}
-                    </div>
-                  </div>
-                  
-                  <div className="bg-slate-50 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-emerald-600 mb-1">
-                      {vidhayak_info?.metadata.criminal_cases || 0}
-                    </div>
-                    <div className="text-sm text-slate-600">
-                      {isEnglish ? 'Criminal Cases' : 'आपराधिक मामले'}
-                    </div>
-                  </div>
-                  
-                  <div className="bg-slate-50 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-amber-600 mb-1">
-                      {formatCurrency(vidhayak_info?.metadata.net_worth || 0)}
-                    </div>
-                    <div className="text-sm text-slate-600">
-                      {isEnglish ? 'Net Worth' : 'कुल संपत्ति'}
-                    </div>
-                  </div>
-                </div>
+            {/* Net Worth */}
+            <div className="bg-white rounded-lg p-2 lg:p-3 shadow-sm flex items-center">
+              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                <IndianRupee className="w-4 h-4 lg:w-6 lg:h-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs lg:text-sm text-black mb-0.5">{isEnglish ? 'Net Worth' : 'कुल संपत्ति'}</p>
+                <p className="text-blue-600 font-semibold text-xs lg:text-sm">
+                  {formatCurrency(constituencyData.vidhayak_info.metadata.net_worth)}
+                </p>
+              </div>
+            </div>
 
-                {/* Satisfaction Survey */}
-                {vidhayak_info?.survey_score && vidhayak_info.survey_score.length > 0 && (
-                  <div className="bg-slate-50 rounded-lg p-4">
-                    <h3 className="font-semibold text-slate-800 mb-3">
-                      {isEnglish ? 'Public Satisfaction Survey' : 'जनता संतुष्टि सर्वेक्षण'}
-                    </h3>
-                    <div className="space-y-3">
-                      {vidhayak_info.survey_score.map((survey: any, index: number) => (
-                        <div key={index}>
-                          <p className="text-sm text-slate-700 mb-2">{survey.question}</p>
-                          <div className="flex items-center space-x-4 text-sm">
-                            <span className="text-emerald-600">
-                              {isEnglish ? 'Yes' : 'हाँ'}: {survey.yes_votes}
-                            </span>
-                            <span className="text-rose-600">
-                              {isEnglish ? 'No' : 'नहीं'}: {survey.no_votes}
-                            </span>
-                            <span className="text-sky-600">
-                              {isEnglish ? 'Score' : 'स्कोर'}: {survey.score}
-                            </span>
+            {/* Criminal Cases */}
+            <div className="bg-white rounded-lg p-2 lg:p-3 shadow-sm flex items-center">
+              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
+                <Scale className="w-5 h-5 lg:w-6 lg:h-6 text-red-600" />
+              </div>
+              <div>
+                <p className="text-xs lg:text-sm text-black mb-0.5">{isEnglish ? 'Criminal cases' : 'आपराधिक मामले'}</p>
+                <p className="text-blue-600 font-semibold text-xs lg:text-sm">
+                  {constituencyData.vidhayak_info.metadata.criminal_cases}
+                </p>
+              </div>
+            </div>
+
+            {/* Assembly Attendance */}
+            <div className="bg-white rounded-lg p-2 lg:p-3 shadow-sm flex items-center">
+              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-purple-100 rounded-full flex items-center justify-center mr-3">
+                <Calendar className="w-5 h-5 lg:w-6 lg:h-6 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-xs lg:text-sm text-black mb-0.5">{isEnglish ? 'Assembly attendance' : 'विधानसभा उपस्थिति'}</p>
+                <p className="text-blue-600 font-semibold text-xs lg:text-sm">
+                  {constituencyData.vidhayak_info.metadata.attendance || '0%'}
+                </p>
+              </div>
+            </div>
+
+            {/* Questions Asked */}
+            <div className="bg-white rounded-lg p-2 lg:p-3 shadow-sm flex items-center">
+              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-orange-100 rounded-full flex items-center justify-center mr-3">
+                <CircleQuestionMark className="w-5 h-5 lg:w-6 lg:h-6 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-xs lg:text-sm text-black mb-0.5">{isEnglish ? 'Questions asked' : 'सवाल पूछे'}</p>
+                <p className="text-blue-600 font-semibold text-xs lg:text-sm">
+                  {constituencyData.vidhayak_info.metadata.questions_asked || '0'}
+                </p>
+              </div>
+            </div>
+
+            {/* Fund Utilization */}
+            <div className="bg-white rounded-lg p-2 lg:p-3 shadow-sm flex items-center">
+              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-teal-100 rounded-full flex items-center justify-center mr-3">
+                <BanknoteArrowUp className="text-teal-600 text-base lg:text-xl" />
+              </div>
+              <div>
+                <p className="text-xs lg:text-sm text-black mb-0.5">{isEnglish ? 'Fund utilization' : 'निधि उपयोग'}</p>
+                <p className="text-blue-600 font-semibold text-xs lg:text-sm">
+                  {constituencyData.vidhayak_info.metadata.funds_utilisation || '0%'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Manifesto Link */}
+        {constituencyData && constituencyData.vidhayak_info.manifesto_link && (
+          <div className="bg-white rounded-lg p-4 mb-2 shadow-sm text-center">
+            <a 
+              href={constituencyData.vidhayak_info.manifesto_link} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="inline-flex items-center space-x-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              <span className="text-lg">📜</span>
+              <span className="text-sm font-medium">
+                {isEnglish ? 'View Previous Manifesto' : 'पूर्व घोषणापत्र देखें'}
+              </span>
+            </a>
+          </div>
+        )}
+
+        {/* Other Candidates Section */}
+        {constituencyData && constituencyData.other_candidates && constituencyData.other_candidates.length > 0 && (
+          <div className="bg-white rounded-lg p-4 mb-2 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-black">
+                {isEnglish ? 'Other Major Candidates' : 'अन्य प्रमुख उम्मीदवार'}
+              </h3>
+              <span className="text-sm text-gray-500">
+                {isEnglish ? '(Previous Election)' : '(पिछला चुनाव)'}
+              </span>
+            </div>
+            {/* Navigation Arrows and Candidates Container */}
+            <div className="relative">
+              {/* Candidates Row - Show All */}
+              <div className="flex space-x-4 overflow-x-auto px-4 md:px-8 pb-2">
+                {constituencyData.other_candidates.map((candidate, index) => (
+                  <div key={index} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm min-w-[220px] flex-shrink-0">
+                    <div className="flex items-start space-x-3">
+                      <div className="relative">
+                                                 <img 
+                           src={candidate.candidate_party.toUpperCase() == 'NOTA' || candidate.candidate_party == 'नोटा' ? '/images/party_logo/nota.png' : (candidate.candidate_image_url || '/images/party_logo/independent.png')} 
+                           alt={candidate.candidate_name}
+                           className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+                           onError={(e) => {
+                             e.currentTarget.src = '/images/party_logo/nota.png';
+                           }}
+                         />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-black text-base mb-2">
+                          {candidate.candidate_name}
+                        </h4>
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className={`px-3 py-1 rounded-full text-white text-xs font-medium ${getPartyColor(candidate.candidate_party)}`}>
+                            {candidate.candidate_party}
+                          </span>
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center border border-gray-200">
+                            <img 
+                              className="w-6 h-6 object-contain" 
+                              src={fetchPartyIcon(candidate.candidate_party)} 
+                              alt={`${candidate.candidate_party} logo`}
+                              onError={(e) => {
+                                e.currentTarget.src = '/images/party_logo/independent.png';
+                              }}
+                            />
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs Navigation */}
-        <div className="bg-white rounded-lg shadow-md border border-slate-200 mb-8">
-          <div className="border-b border-slate-200">
-            <nav className="flex space-x-8 px-6">
-              {[
-                { id: 'overview', label: isEnglish ? 'Overview' : 'अवलोकन', icon: BarChart3 },
-                { id: 'departments', label: isEnglish ? 'Departments' : 'विभाग', icon: Building },
-                { id: 'candidates', label: isEnglish ? 'Candidates' : 'उम्मीदवार', icon: Users },
-                { id: 'news', label: isEnglish ? 'News' : 'समाचार', icon: FileText }
-              ].map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 transition-colors ${
-                      activeTab === tab.id
-                        ? 'border-sky-500 text-sky-600'
-                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
-          {/* Tab Content */}
-          <div className="p-6">
-            {/* Overview Tab */}
-            {activeTab === 'overview' && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Personal Information */}
-                  <div className="bg-slate-50 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-                      <User className="h-5 w-5 mr-2 text-sky-600" />
-                      {isEnglish ? 'Personal Information' : 'व्यक्तिगत जानकारी'}
-                    </h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">{isEnglish ? 'Age' : 'आयु'}</span>
-                        <span className="font-medium">{vidhayak_info?.age || 'Not Specified'} years</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">{isEnglish ? 'Education' : 'शिक्षा'}</span>
-                        <span className="font-medium">{isEnglish ? 
-                          (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.vidhayak_info.metadata.education : 'Not specified') :
-                          (vidhayak_info?.metadata.education || 'Not specified')
-                        }</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">{isEnglish ? 'Experience' : 'अनुभव'}</span>
-                        <span className="font-medium">{isEnglish ? 
-                          (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.vidhayak_info.experience : 'Not specified') :
-                          (vidhayak_info?.experience || 'Not specified')
-                        }</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Financial Information */}
-                  <div className="bg-slate-50 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-                      <DollarSign className="h-5 w-5 mr-2 text-emerald-600" />
-                      {isEnglish ? 'Financial Information' : 'वित्तीय जानकारी'}
-                    </h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">{isEnglish ? 'Net Worth' : 'कुल संपत्ति'}</span>
-                        <span className="font-medium">{formatCurrency(vidhayak_info?.metadata.net_worth || 0)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">{isEnglish ? 'Funds Utilisation' : 'धन उपयोग'}</span>
-                        <span className="font-medium">{isEnglish ? 
-                          (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.vidhayak_info.metadata.funds_utilisation : 'Not specified') :
-                          (vidhayak_info?.metadata.funds_utilisation || 'Not specified')
-                        }</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Performance Metrics */}
-                <div className="bg-slate-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-                    <TrendingUp className="h-5 w-5 mr-2 text-amber-600" />
-                    {isEnglish ? 'Performance Metrics' : 'कार्य प्रदर्शन मापदंड'}
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-sky-600 mb-1">
-                        {vidhayak_info?.last_election_vote_percentage || 0}%
-                      </div>
-                      <div className="text-sm text-slate-600">
-                        {isEnglish ? 'Vote Share' : 'वोट शेयर'}
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-emerald-600 mb-1">
-                        {isEnglish ? 
-                          (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.vidhayak_info.metadata.attendance : 'N/A') :
-                          (vidhayak_info?.metadata.attendance || 'N/A')
-                        }
-                      </div>
-                      <div className="text-sm text-slate-600">
-                        {isEnglish ? 'Attendance' : 'उपस्थिति'}
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-amber-600 mb-1">
-                        {isEnglish ? 
-                          (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.vidhayak_info.metadata.questions_asked : 'N/A') :
-                          (vidhayak_info?.metadata.questions_asked || 'N/A')
-                        }
-                      </div>
-                      <div className="text-sm text-slate-600">
-                        {isEnglish ? 'Questions Asked' : 'पूछे गए प्रश्न'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Departments Tab */}
-            {activeTab === 'departments' && (
-              <div className="space-y-6">
-                <div className="mb-6">
-                  <h3 className="text-xl font-semibold text-slate-800 mb-2">
-                    {isEnglish ? 'Department Performance & Surveys' : 'विभाग प्रदर्शन और सर्वेक्षण'}
-                  </h3>
-                  <p className="text-slate-600">
-                    {isEnglish ? 'Rate the performance of different departments and provide your feedback' : 'विभिन्न विभागों के प्रदर्शन को रेट करें और अपनी प्रतिक्रिया दें'}
-                  </p>
-                </div>
-                
-                {dept_info && dept_info.map((dept: any, index: number) => (
-                  <div key={index} className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                    {/* Department Header */}
-                    <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-semibold text-slate-800 flex items-center">
-                          <Building className="h-5 w-5 mr-2 text-sky-600" />
-                          {dept.dept_name}
-                        </h3>
-                        <div className="flex items-center space-x-2">
-                          <Star className="h-4 w-4 text-amber-500" />
-                          <span className="text-sm font-medium text-slate-700">
-                            {isEnglish ? 'Current Score' : 'वर्तमान स्कोर'}: {dept.average_score || 0}/5
+                        <div className="flex items-center justify-between">
+                          <span className="bg-gray-100 text-black text-xs px-2 py-1 rounded-full">
+                            {isEnglish ? `Vote Share: ${candidate.vote_share}%` : `वोट शेयर: ${candidate.vote_share}%`}
                           </span>
                         </div>
                       </div>
                     </div>
-                    
-                    <div className="p-6">
-                      {/* Work Information */}
-                      <div className="mb-6">
-                        <h4 className="font-semibold text-slate-700 mb-3 flex items-center">
-                          <FileText className="h-4 w-4 mr-2 text-emerald-600" />
-                          {isEnglish ? 'Work Information & Achievements' : 'कार्य जानकारी और उपलब्धियां'}
-                        </h4>
-                        <div className="bg-slate-50 rounded-lg p-4">
-                          <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line">
-                            {dept.work_info || 'No information available'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Interactive Survey */}
-                      <div className="mb-6">
-                        <h4 className="font-semibold text-slate-700 mb-3 flex items-center">
-                          <BarChart3 className="h-4 w-4 mr-2 text-amber-600" />
-                          {isEnglish ? 'Rate This Department' : 'इस विभाग को रेट करें'}
-                        </h4>
-                        
-                        {dept.survey_score && dept.survey_score.length > 0 ? (
-                          <div className="space-y-4">
-                            {dept.survey_score.map((survey: any, surveyIndex: number) => (
-                              <div key={surveyIndex} className="bg-slate-50 rounded-lg p-4">
-                                <p className="text-slate-700 font-medium mb-3">{survey.question}</p>
-                                
-                                {/* Rating System */}
-                                <div className="flex items-center justify-between mb-3">
-                                  <span className="text-sm text-slate-600">
-                                    {isEnglish ? 'Select your rating:' : 'अपनी रेटिंग चुनें:'}
-                                  </span>
-                                  <span className="text-sm text-slate-500">
-                                    {isEnglish ? 'Current Score' : 'वर्तमान स्कोर'}: {survey.score}
-                                  </span>
-                                </div>
-                                
-                                <div className="flex items-center justify-center space-x-2">
-                                  {[1, 2, 3, 4, 5].map((rating) => (
-                                    <button
-                                      key={rating}
-                                      onClick={() => {
-                                        // Here you would typically send this rating to your backend
-                                        console.log(`Rating for ${dept.dept_name}: ${rating}`);
-                                        alert(`${isEnglish ? 'Thank you for your rating!' : 'आपकी रेटिंग के लिए धन्यवाद!'} ${rating}/5`);
-                                      }}
-                                      className="w-12 h-12 rounded-lg border-2 border-slate-300 hover:border-sky-400 hover:bg-sky-50 transition-all duration-200 flex items-center justify-center text-lg font-semibold text-slate-600 hover:text-sky-600"
-                                    >
-                                      {rating}
-                                    </button>
-                                  ))}
-                                </div>
-                                
-                                <div className="flex items-center justify-center mt-3 text-xs text-slate-500">
-                                  <span className="mr-4">1 = {isEnglish ? 'Poor' : 'खराब'}</span>
-                                  <span className="mr-4">3 = {isEnglish ? 'Average' : 'औसत'}</span>
-                                  <span>5 = {isEnglish ? 'Excellent' : 'उत्कृष्ट'}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-6 text-slate-500">
-                            <BarChart3 className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                            <p>{isEnglish ? 'No survey questions available for this department' : 'इस विभाग के लिए कोई सर्वेक्षण प्रश्न उपलब्ध नहीं'}</p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Historical Ratings Display */}
-                      {dept.survey_score && dept.survey_score.length > 0 && (
-                        <div>
-                          <h4 className="font-semibold text-slate-700 mb-3 flex items-center">
-                            <TrendingUp className="h-4 w-4 mr-2 text-purple-600" />
-                            {isEnglish ? 'Public Ratings Distribution' : 'जनता रेटिंग वितरण'}
-                          </h4>
-                          <div className="grid grid-cols-5 gap-2">
-                            {[1, 2, 3, 4, 5].map((rating) => {
-                              const ratingCount = dept.survey_score[0]?.ratings?.[rating.toString()] || 0;
-                              const ratings = dept.survey_score[0]?.ratings || {};
-                              const totalRatings = Object.values(ratings).reduce((sum: number, value: any) => sum + (typeof value === 'number' ? value : 0), 0);
-                              const percentage = totalRatings > 0 ? (ratingCount / totalRatings) * 100 : 0;
-                              
-                              return (
-                                <div key={rating} className="text-center">
-                                  <div className="text-lg font-bold text-slate-700">{rating}</div>
-                                  <div className="w-full bg-slate-200 rounded-full h-20 mb-2 relative">
-                                    <div 
-                                      className="bg-sky-500 rounded-t-full absolute bottom-0 w-full transition-all duration-500"
-                                      style={{ height: `${percentage}%` }}
-                                    ></div>
-                                  </div>
-                                  <div className="text-xs text-slate-500">{ratingCount}</div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
                   </div>
                 ))}
               </div>
-            )}
-
-            {/* Candidates Tab */}
-            {activeTab === 'candidates' && (
-              <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                  {isEnglish ? 'All Candidates' : 'सभी उम्मीदवार'}
-                </h3>
-                {other_candidates && other_candidates.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {other_candidates.map((candidate: any, index: number) => (
-                      <div key={index} className="bg-slate-50 rounded-lg p-4">
-                        <div className="flex items-center space-x-3">
-                          {candidate.candidate_image_url ? (
-                            <img 
-                              src={candidate.candidate_image_url} 
-                              alt={candidate.candidate_name}
-                              className="w-12 h-12 rounded-full object-cover"
-                            />
-                          ) : (
-                            <PlaceholderImages type="profile" size="sm" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-slate-800 truncate">
-                              {isEnglish ? 
-                                (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.other_candidates?.[index]?.candidate_name : candidate.candidate_name) :
-                                candidate.candidate_name
-                              }
-                            </h4>
-                            <p className="text-sm text-slate-600 truncate">
-                              {isEnglish ? 
-                                (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.other_candidates?.[index]?.candidate_party : candidate.candidate_party) :
-                                candidate.candidate_party
-                              }
-                            </p>
-                            <div className="flex items-center space-x-1 mt-1">
-                              <TrendingUp className="h-3 w-3 text-emerald-500" />
-                              <span className="text-xs text-slate-500">
-                                {candidate.vote_share}% votes
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-slate-500">
-                    <Users className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                    <p>{isEnglish ? 'No other candidates information available' : 'अन्य उम्मीदवारों की जानकारी उपलब्ध नहीं'}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* News Tab */}
-            {activeTab === 'news' && (
-              <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                  {isEnglish ? 'Latest News' : 'ताजा समाचार'}
-                </h3>
-                {latest_news && latest_news.length > 0 && latest_news[0].title ? (
-                  <div className="space-y-4">
-                    {latest_news.map((news: any, index: number) => (
-                      <div key={index} className="bg-slate-50 rounded-lg p-4">
-                        <div className="flex items-start space-x-3">
-                          <FileText className="h-5 w-5 text-sky-600 mt-1 flex-shrink-0" />
-                          <div>
-                            <p className="text-slate-700 font-medium">
-                              {isEnglish ? 
-                                (constituencyData ? englishData.find((_, index) => index === parseInt(constituencyId || '0'))?.latest_news?.[index]?.title : news.title) :
-                                news.title
-                              }
-                            </p>
-                            <p className="text-sm text-slate-500 mt-1">
-                              {isEnglish ? 'Recent news from this constituency' : 'इस निर्वाचन क्षेत्र से ताजा समाचार'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-slate-500">
-                    <FileText className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                    <p>{isEnglish ? 'No recent news available' : 'कोई ताजा समाचार उपलब्ध नहीं'}</p>
-                  </div>
-                )}
-              </div>
-            )}
+            </div>
           </div>
+        )}
+
+        {/* Charcha Manch Button */}
+        {constituencyData && (
+          <div className="text-center mt-4 sm:mt-6 mb-3 sm:mb-4">
+            <button 
+              className="px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-medium transition-all duration-200 shadow-lg text-base sm:text-lg flex items-center justify-center space-x-2 sm:space-x-3 mx-auto bg-gray-700 text-white hover:bg-[#014e5c]/80 hover:shadow-xl transform hover:-translate-y-1"
+              onClick={() => navigate(`/discussion?constituency=${constituencyData.area_name}&name=${encodeURIComponent(constituencyData.area_name)}`)}
+            >
+              <MessageCircle className="w-4 h-4 lg:w-6 lg:h-6" />
+              <span className="text-sm lg:text-base">                  
+                {isEnglish ? 'Go to this area\'s Charcha Manch' : 'इस क्षेत्र के चर्चा मंच पर जाएं'}
+              </span>
+            </button>
+          </div>
+        )}
+      </div>
+      
+      {/* Bottom Navigation - Mobile */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20 shadow-lg">
+        <div className="flex items-center justify-around py-2 sm:py-3 px-2">
+          <button
+            onClick={() => navigate('/')}
+            className="flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-gray-400"
+          >
+            <House className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-xs font-medium">{isEnglish ? 'Home' : 'होम'}</span>
+          </button>
+          <button
+            onClick={() => navigate('/discussion')}
+            className="flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-gray-400"
+          >
+            <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-xs font-medium">{isEnglish ? 'Discussion Forum' : 'चर्चा मंच'}</span>
+          </button>
+          <button
+            onClick={() => navigate('/aapka-kshetra')}
+            className="flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-gray-400"
+          >
+            <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-xs font-medium">{isEnglish ? 'Your Area' : 'आपका क्षेत्र'}</span>
+          </button>
         </div>
       </div>
     </div>

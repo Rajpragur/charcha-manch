@@ -622,6 +622,224 @@ export class FirebaseService {
     }
   }
 
+  static async getAllUsers(): Promise<any[]> {
+    try {
+      const usersRef = collection(db, 'users');
+      const snapshot = await getDocs(usersRef);
+      
+      if (snapshot.empty) {
+        console.log('No users found in users collection');
+        return [];
+      }
+      
+      const usersData = snapshot.docs.map(doc => ({
+        uid: doc.id,
+        ...doc.data()
+      }));
+      
+      console.log(`✅ Successfully fetched ${usersData.length} users`);
+      return usersData;
+    } catch (error: any) {
+      if (error.code === 'permission-denied') {
+        console.warn('Permission denied accessing users collection - admin access required');
+        throw new Error('Admin access required to view users');
+      }
+      console.error('Error fetching users:', error);
+      throw error;
+    }
+  }
+
+  // Alternative: Get users from user_profiles collection (more likely to have data)
+  static async getAllUserProfiles(): Promise<any[]> {
+    try {
+      const profilesRef = collection(db, 'user_profiles');
+      const snapshot = await getDocs(profilesRef);
+      
+      if (snapshot.empty) {
+        console.log('No user profiles found in user_profiles collection');
+        return [];
+      }
+      
+      const profilesData = snapshot.docs.map(doc => ({
+        uid: doc.id,
+        ...doc.data()
+      }));
+      
+      console.log(`✅ Successfully fetched ${profilesData.length} user profiles`);
+      return profilesData;
+    } catch (error: any) {
+      if (error.code === 'permission-denied') {
+        console.warn('Permission denied accessing user_profiles collection');
+        throw new Error('Cannot access user profiles');
+      }
+      console.error('Error fetching user profiles:', error);
+      throw error;
+    }
+  }
+
+  // Get news by constituency or candidate
+  static async getNewsByConstituency(constituencyName: string): Promise<any[]> {
+    try {
+      const newsRef = collection(db, 'constituency_news');
+      const q = query(
+        newsRef,
+        where('constituencyName', '==', constituencyName),
+        where('status', '==', 'published')
+      );
+      const snapshot = await getDocs(q);
+      
+      if (snapshot.empty) {
+        return [];
+      }
+      
+      const newsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+      
+      // Sort by priority (high first) and then by creation date (newest first)
+      return newsData.sort((a: any, b: any) => {
+        const priorityOrder: { [key: string]: number } = { high: 3, medium: 2, low: 1 };
+        const aPriority = priorityOrder[a.priority] || 1;
+        const bPriority = priorityOrder[b.priority] || 1;
+        
+        if (aPriority !== bPriority) {
+          return bPriority - aPriority;
+        }
+        
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    } catch (error: any) {
+      console.error('Error fetching news by constituency:', error);
+      return [];
+    }
+  }
+
+  // Get news by candidate
+  static async getNewsByCandidate(candidateName: string): Promise<any[]> {
+    try {
+      const newsRef = collection(db, 'constituency_news');
+      const q = query(
+        newsRef,
+        where('candidateName', '==', candidateName),
+        where('status', '==', 'published')
+      );
+      const snapshot = await getDocs(q);
+      
+      if (snapshot.empty) {
+        return [];
+      }
+      
+      const newsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+      
+      // Sort by priority and creation date
+      return newsData.sort((a: any, b: any) => {
+        const priorityOrder: { [key: string]: number } = { high: 3, medium: 2, low: 1 };
+        const aPriority = priorityOrder[a.priority] || 1;
+        const bPriority = priorityOrder[b.priority] || 1;
+        
+        if (aPriority !== bPriority) {
+          return bPriority - aPriority;
+        }
+        
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    } catch (error: any) {
+      console.error('Error fetching news by candidate:', error);
+      return [];
+    }
+  }
+
+  // Get all published news
+  static async getAllPublishedNews(): Promise<any[]> {
+    try {
+      const newsRef = collection(db, 'constituency_news');
+      const q = query(
+        newsRef,
+        where('status', '==', 'published')
+      );
+      const snapshot = await getDocs(q);
+      
+      if (snapshot.empty) {
+        return [];
+      }
+      
+      const newsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+      
+      // Sort by priority and creation date
+      return newsData.sort((a: any, b: any) => {
+        const priorityOrder: { [key: string]: number } = { high: 3, medium: 2, low: 1 };
+        const aPriority = priorityOrder[a.priority] || 1;
+        const bPriority = priorityOrder[b.priority] || 1;
+        
+        if (aPriority !== bPriority) {
+          return bPriority - aPriority;
+        }
+        
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    } catch (error: any) {
+      console.error('Error fetching all published news:', error);
+      return [];
+    }
+  }
+
+  // Get constituency data from database (replaces static JSON files)
+  static async getConstituencyData(language: 'hindi' | 'english' = 'english'): Promise<any[]> {
+    try {
+      const collectionName = language === 'hindi' ? 'constituency_data_hindi' : 'constituency_data_english';
+      const dataRef = collection(db, collectionName);
+      
+      // Try to get data from database first
+      const snapshot = await getDocs(dataRef);
+      
+      if (!snapshot.empty) {
+        // Data exists in database, return it
+        const data = snapshot.docs
+          .map(doc => doc.data())
+          .sort((a, b) => (a.order || 0) - (b.order || 0));
+        
+        console.log(`✅ Fetched ${data.length} constituencies from database (${language})`);
+        return data;
+      } else {
+        // No data in database, fallback to static files
+        console.log(`⚠️ No data in database, falling back to static files (${language})`);
+        return [];
+      }
+    } catch (error: any) {
+      console.error(`Error fetching constituency data (${language}):`, error);
+      // Fallback to static files on error
+      return [];
+    }
+  }
+
+  // Get constituency data by name from database
+  static async getConstituencyByName(constituencyName: string, language: 'hindi' | 'english' = 'english'): Promise<any | null> {
+    try {
+      const collectionName = language === 'hindi' ? 'constituency_data_hindi' : 'constituency_data_english';
+      const dataRef = collection(db, collectionName);
+      
+      // Query by area_name
+      const q = query(dataRef, where('area_name', '==', constituencyName));
+      const snapshot = await getDocs(q);
+      
+      if (!snapshot.empty) {
+        return snapshot.docs[0].data();
+      }
+      
+      return null;
+    } catch (error: any) {
+      console.error(`Error fetching constituency by name (${language}):`, error);
+      return null;
+    }
+  }
+
   // Manifesto score aggregation
   static async recalcAndUpdateManifestoAverageScore(constituencyId: number): Promise<FirebaseManifestoAverageScore | null> {
     try {

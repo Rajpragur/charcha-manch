@@ -343,14 +343,14 @@ const BlogCreate: React.FC = () => {
 
   if (adminLoading || isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-[#014e5c]/5 flex items-center justify-center">
         <div className="text-center bg-white rounded-2xl p-8 shadow-xl">
           <div className="relative">
-            <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-6" />
-            <div className="absolute inset-0 bg-blue-600 rounded-full opacity-20 animate-ping"></div>
+            <Loader className="animate-spin h-12 w-12 text-[#014e5c] mx-auto mb-6" />
+            <div className="absolute inset-0 bg-[#014e5c] rounded-full opacity-20 animate-ping"></div>
           </div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Loading your workspace...</h2>
-          <p className="text-gray-600">Setting up everything you need to create amazing content</p>
+          <h2 className="text-xl font-semibold text-[#014e5c] mb-2">Loading your workspace...</h2>
+          <p className="text-[#014e5c]/70">Setting up everything you need to create amazing content</p>
         </div>
       </div>
     );
@@ -358,14 +358,14 @@ const BlogCreate: React.FC = () => {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 flex items-center justify-center">
+      <div className="min-h-screen bg-[#014e5c]/5 flex items-center justify-center">
         <div className="text-center bg-white rounded-2xl p-8 shadow-xl max-w-md">
-          <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
-          <p className="text-gray-600 mb-6">You don't have permission to access this page.</p>
+          <AlertCircle className="h-16 w-16 text-[#014e5c] mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-[#014e5c] mb-4">Access Denied</h1>
+          <p className="text-[#014e5c]/70 mb-6">You don't have permission to access this page.</p>
           <button
             onClick={() => navigate('/')}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-6 py-3 bg-[#014e5c] text-white rounded-lg hover:bg-[#014e5c]/90 transition-colors"
           >
             Go Home
           </button>
@@ -375,11 +375,11 @@ const BlogCreate: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+    <div className="min-h-screen bg-[#014e5c]/5">
       {/* Success Toast */}
       {showSuccess && (
         <div className="fixed top-4 right-4 z-50 animate-slide-in">
-          <div className="bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3">
+          <div className="bg-[#014e5c] text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3">
             <CheckCircle className="h-5 w-5" />
             <span className="font-medium">Blog saved successfully!</span>
           </div>
@@ -428,49 +428,49 @@ const BlogCreate: React.FC = () => {
       )}
 
       {/* Header */}
-      <div className="bg-white shadow-lg border-b border-gray-200">
+      <div className="bg-white shadow-lg border-b border-[#014e5c]/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center py-6 gap-4">
             <div className="flex items-center">
               <button
                 onClick={() => navigate('/admin?tab=blogs')}
-                className="mr-4 p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all duration-200"
+                className="mr-4 p-3 text-[#014e5c]/70 hover:text-[#014e5c] hover:bg-[#014e5c]/10 rounded-xl transition-all duration-200"
                 title="Back to blogs"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                <h1 className="text-2xl lg:text-3xl font-bold text-[#014e5c]">
                   {isEditing ? 'Edit Blog' : 'Create New Blog'}
                 </h1>
-                <p className="text-gray-500 flex items-center mt-1">
-                  <Sparkles className="h-4 w-4 mr-2 text-yellow-500" />
+                <p className="text-[#014e5c]/70 flex items-center mt-1">
+                  <Sparkles className="h-4 w-4 mr-2 text-[#014e5c]" />
                   {isEditing ? 'Update your blog post' : 'Write a new blog post for your audience'}
                 </p>
               </div>
             </div>
             
-            <div className="flex space-x-3">
+            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
               {/* Auto-save toggle */}
-              <div className="flex items-center space-x-2 mr-4">
+              <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
                   id="autoSave"
                   checked={autoSave}
                   onChange={(e) => setAutoSave(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-[#014e5c] rounded focus:ring-[#014e5c]/50"
                 />
-                <label htmlFor="autoSave" className="text-sm text-gray-600">
+                <label htmlFor="autoSave" className="text-sm text-[#014e5c]/70">
                   Auto-save
                 </label>
               </div>
 
               <button
                 onClick={() => setPreviewMode(!previewMode)}
-                className={`px-6 py-3 border-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                className={`px-4 py-2 border-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                   previewMode 
-                    ? 'bg-blue-50 border-blue-200 text-blue-700' 
-                    : 'bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:text-blue-700'
+                    ? 'bg-[#014e5c]/10 border-[#014e5c]/30 text-[#014e5c]' 
+                    : 'bg-white border-[#014e5c]/30 text-[#014e5c] hover:border-[#014e5c] hover:bg-[#014e5c]/5'
                 }`}
               >
                 <Eye className="h-4 w-4 inline mr-2" />
@@ -480,7 +480,7 @@ const BlogCreate: React.FC = () => {
               <button
                 onClick={handleSaveDraft}
                 disabled={isSaving}
-                className="px-6 py-3 border-2 border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:border-blue-300 hover:text-blue-700 disabled:opacity-50 transition-all duration-200 flex items-center"
+                className="px-4 py-2 border-2 border-[#014e5c]/30 rounded-lg text-sm font-medium text-[#014e5c] hover:border-[#014e5c] hover:bg-[#014e5c]/5 disabled:opacity-50 transition-all duration-200 flex items-center"
               >
                 {isSaving ? (
                   <Loader className="animate-spin h-4 w-4 mr-2" />
@@ -496,7 +496,7 @@ const BlogCreate: React.FC = () => {
                   handlePublish();
                 }}
                 disabled={isSaving}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl text-sm font-medium hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center"
+                className="px-4 py-2 bg-[#014e5c] text-white rounded-lg text-sm font-medium hover:bg-[#014e5c]/90 disabled:opacity-50 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center"
               >
                 {isSaving ? (
                   <Loader className="animate-spin h-4 w-4 mr-2" />
@@ -511,7 +511,7 @@ const BlogCreate: React.FC = () => {
                 <button
                   onClick={handleDelete}
                   disabled={isSaving}
-                  className="px-6 py-3 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center"
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center"
                 >
                   {isSaving ? (
                     <Loader className="animate-spin h-4 w-4 mr-2" />
@@ -527,22 +527,22 @@ const BlogCreate: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
         {previewMode ? (
           /* Preview Mode */
-          <div className="bg-white shadow-xl rounded-2xl p-8">
+          <div className="bg-white shadow-xl rounded-2xl p-4 lg:p-8">
             <div className="max-w-4xl mx-auto">
               {/* Preview Header */}
-              <div className="border-b border-gray-200 pb-6 mb-8">
-                <h1 className="text-5xl font-bold text-gray-900 mb-4 leading-tight">
+              <div className="border-b border-[#014e5c]/20 pb-4 lg:pb-6 mb-6 lg:mb-8">
+                <h1 className="text-3xl lg:text-5xl font-bold text-[#014e5c] mb-4 leading-tight">
                   {blog.title || 'Untitled Blog'}
                 </h1>
                 
                 {blog.excerpt && (
-                  <p className="text-xl text-gray-600 mb-4 italic leading-relaxed">{blog.excerpt}</p>
+                  <p className="text-lg lg:text-xl text-[#014e5c]/80 mb-4 italic leading-relaxed">{blog.excerpt}</p>
                 )}
                 
-                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                <div className="flex flex-wrap items-center gap-2 lg:gap-4 text-sm text-[#014e5c]/70">
                   <div className="flex items-center">
                     <User className="h-4 w-4 mr-2" />
                     {blog.author || 'Admin'}
@@ -560,20 +560,18 @@ const BlogCreate: React.FC = () => {
                     {wordCount} words
                   </div>
                 </div>
-                
-
               </div>
               
               <div className="prose prose-lg max-w-none">
                 {blog.content ? (
-                  <div className="text-gray-800 leading-relaxed text-lg whitespace-pre-wrap">
+                  <div className="text-[#014e5c] leading-relaxed text-base lg:text-lg whitespace-pre-wrap">
                     {blog.content}
                   </div>
                 ) : (
-                  <div className="text-center py-12">
-                    <BookOpen className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500 text-lg">No content yet...</p>
-                    <p className="text-gray-400">Switch to edit mode to start writing</p>
+                  <div className="text-center py-8 lg:py-12">
+                    <BookOpen className="h-12 w-12 lg:h-16 lg:w-16 text-[#014e5c]/30 mx-auto mb-4" />
+                    <p className="text-[#014e5c]/70 text-base lg:text-lg">No content yet...</p>
+                    <p className="text-[#014e5c]/50">Switch to edit mode to start writing</p>
                   </div>
                 )}
               </div>
@@ -581,18 +579,18 @@ const BlogCreate: React.FC = () => {
           </div>
         ) : (
           /* Edit Mode */
-          <div className="space-y-6">
+          <div className="space-y-4 lg:space-y-6">
             {/* Title Section */}
-            <div className="bg-white shadow-lg rounded-2xl p-8 border border-gray-100">
-              <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center mr-4">
-                  <FileText className="h-5 w-5 text-blue-600" />
+            <div className="bg-white shadow-lg rounded-2xl p-4 lg:p-8 border border-[#014e5c]/20">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center mb-4 gap-3">
+                <div className="w-10 h-10 bg-[#014e5c]/10 rounded-xl flex items-center justify-center mr-4">
+                  <FileText className="h-5 w-5 text-[#014e5c]" />
                 </div>
                 <div>
-                  <label htmlFor="title" className="block text-lg font-semibold text-gray-800">
+                  <label htmlFor="title" className="block text-lg font-semibold text-[#014e5c]">
                     Blog Title *
                   </label>
-                  <p className="text-sm text-gray-500">Make it catchy and descriptive</p>
+                  <p className="text-sm text-[#014e5c]/70">Make it catchy and descriptive</p>
                 </div>
               </div>
               
@@ -601,8 +599,8 @@ const BlogCreate: React.FC = () => {
                 id="title"
                 value={blog.title || ''}
                 onChange={(e) => setBlog(prev => ({ ...prev, title: e.target.value }))}
-                className={`w-full px-4 py-4 text-xl border-2 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-100 transition-all duration-200 ${
-                  errors.title ? 'border-red-300 focus:ring-red-100' : 'border-gray-200 focus:border-blue-400'
+                className={`w-full px-3 lg:px-4 py-3 lg:py-4 text-lg lg:text-xl border-2 rounded-lg focus:outline-none focus:ring-4 focus:ring-[#014e5c]/20 transition-all duration-200 ${
+                  errors.title ? 'border-red-300 focus:ring-red-100' : 'border-[#014e5c]/30 focus:border-[#014e5c]'
                 }`}
                 placeholder="Enter your blog title here..."
               />
@@ -615,26 +613,26 @@ const BlogCreate: React.FC = () => {
               
               {/* Character count */}
               <div className="flex justify-between items-center mt-3">
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-[#014e5c]/70">
                   {blog.title?.length || 0} characters
                 </span>
-                <span className="text-sm text-gray-400">
+                <span className="text-sm text-[#014e5c]/50">
                   Recommended: 50-60 characters
                 </span>
               </div>
             </div>
 
             {/* Excerpt Section */}
-            <div className="bg-white shadow-lg rounded-2xl p-8 border border-gray-100">
-              <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center mr-4">
-                  <Info className="h-5 w-5 text-green-600" />
+            <div className="bg-white shadow-lg rounded-2xl p-4 lg:p-8 border border-[#014e5c]/20">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center mb-4 gap-3">
+                <div className="w-10 h-10 bg-[#014e5c]/10 rounded-xl flex items-center justify-center mr-4">
+                  <Info className="h-5 w-5 text-[#014e5c]" />
                 </div>
                 <div>
-                  <label htmlFor="excerpt" className="block text-lg font-semibold text-gray-800">
+                  <label htmlFor="excerpt" className="block text-lg font-semibold text-[#014e5c]">
                     Blog Excerpt *
                   </label>
-                  <p className="text-sm text-gray-500">A brief summary that appears in previews</p>
+                  <p className="text-sm text-[#014e5c]/70">A brief summary that appears in previews</p>
                 </div>
               </div>
               
@@ -643,8 +641,8 @@ const BlogCreate: React.FC = () => {
                 value={blog.excerpt || ''}
                 onChange={(e) => setBlog(prev => ({ ...prev, excerpt: e.target.value }))}
                 rows={3}
-                className={`w-full px-4 py-4 text-lg border-2 rounded-xl focus:outline-none focus:ring-4 focus:ring-green-100 transition-all duration-200 resize-none ${
-                  errors.excerpt ? 'border-red-300 focus:ring-red-100' : 'border-gray-200 focus:border-green-400'
+                className={`w-full px-3 lg:px-4 py-3 lg:py-4 text-base lg:text-lg border-2 rounded-lg focus:outline-none focus:ring-4 focus:ring-[#014e5c]/20 transition-all duration-200 resize-none ${
+                  errors.excerpt ? 'border-red-300 focus:ring-red-100' : 'border-[#014e5c]/30 focus:border-[#014e5c]'
                 }`}
                 placeholder="Write a compelling summary of your blog post..."
               />
@@ -656,39 +654,39 @@ const BlogCreate: React.FC = () => {
               )}
               
               <div className="flex justify-between items-center mt-3">
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-[#014e5c]/70">
                   {blog.excerpt?.length || 0} characters
                 </span>
-                <span className="text-sm text-gray-400">
+                <span className="text-sm text-[#014e5c]/50">
                   Recommended: 120-160 characters
                 </span>
               </div>
             </div>
 
             {/* Content Section */}
-            <div className="bg-white shadow-lg rounded-2xl p-8 border border-gray-100">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-white shadow-lg rounded-2xl p-4 lg:p-8 border border-[#014e5c]/20">
+              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-4 gap-4">
                 <div className="flex items-center">
-                  <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center mr-4">
-                    <BookOpen className="h-5 w-5 text-purple-600" />
+                  <div className="w-10 h-10 bg-[#014e5c]/10 rounded-xl flex items-center justify-center mr-4">
+                    <BookOpen className="h-5 w-5 text-[#014e5c]" />
                   </div>
                   <div>
-                    <label htmlFor="content" className="block text-lg font-semibold text-gray-800">
+                    <label htmlFor="content" className="block text-lg font-semibold text-[#014e5c]">
                       Blog Content *
                     </label>
-                    <p className="text-sm text-gray-500">Write your main content here</p>
+                    <p className="text-sm text-[#014e5c]/70">Write your main content here</p>
                   </div>
                 </div>
                 
                 {/* Content Stats */}
                 <div className="flex space-x-4 text-sm">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{wordCount}</div>
-                    <div className="text-gray-500">Words</div>
+                    <div className="text-xl lg:text-2xl font-bold text-[#014e5c]">{wordCount}</div>
+                    <div className="text-[#014e5c]/70">Words</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{readingTime}</div>
-                    <div className="text-gray-500">Min read</div>
+                    <div className="text-xl lg:text-2xl font-bold text-[#014e5c]">{readingTime}</div>
+                    <div className="text-[#014e5c]/70">Min read</div>
                   </div>
                 </div>
               </div>
