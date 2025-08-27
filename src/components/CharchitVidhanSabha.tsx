@@ -1,22 +1,10 @@
-import { Link } from 'react-router-dom';
-import { useLanguage } from '../contexts/LanguageContext';
-import PlaceholderImages from './PlaceholderImages';
-import PopupCard from './PopupCard';
+import { useLanguage } from "../contexts/LanguageContext";
+import PopupCard from "./PopupCard";
+import { useNavigate } from "react-router-dom";
 import {
-  TrendingUp, 
-  Share2,
   Loader2,
-  Database,
-  CheckCircle2,
-  XCircle,
-  ChevronDown,
-  BookOpen,
-  Award,
-  MessageSquare,
-  Calendar,
-  Users,
-  BarChart3
-} from 'lucide-react';
+  ArrowRight,
+} from "lucide-react";
 
 interface ConstituencyData {
   id: string;
@@ -42,87 +30,129 @@ interface ConstituencyData {
   rawData: any;
 }
 
+const fetchPartyIcon = (partyName: string) => {
+  const partyIcons: Record<string, string> = {
+    'Bharatiya Janata Party': '/images/party_logo/bjp.png',
+    'Janata Dal (United)': '/images/party_logo/jdu.png',
+    'Rashtriya Janata Dal': '/images/party_logo/rjd.png',
+    'Indian National Congress': '/images/party_logo/inc.png',
+    'Communist Party of India': '/images/party_logo/cpi.png',
+    'Hindustani Awam Front (Secular)': '/images/party_logo/HAM.png',
+    'Communist Party of India (Marxist)': '/images/party_logo/cpim.png',
+    'Communist Party of India (Marxist-Leninist) (Liberation)': '/images/party_logo/cpiml.png',
+    'All India Majlis-e-Itihadul Muslimeen': '/images/party_logo/aimim.png',
+    'Independent': '/images/party_logo/independent.png',
+    'NOTA': '/images/party_logo/nota.png',
+    'भारतीय जनता पार्टी': '/images/party_logo/bjp.png',
+    'जनता दल (यूनाइटेड)': '/images/party_logo/jdu.png',
+    'राष्ट्रिया जनता दल': '/images/party_logo/rjd.png',
+    'भारतीय राष्ट्रीय कांग्रेस': '/images/party_logo/inc.png',
+    'कम्युनिस्ट पार्टी ऑफ इंडिया': '/images/party_logo/cpi.png',
+    'हिंदुस्तानी अवाम मोर्चा': '/images/party_logo/HAM.png',
+    'कम्युनिस्ट पार्टी ऑफ इंडिया (मार्क्सवादी)': '/images/party_logo/cpim.png',
+    'कम्युनिस्ट पार्टी ऑफ इंडिया (मार्क्सवादी-लेनिनवादी) (मुक्ति)': '/images/party_logo/cpiml.png',
+    'हिंदुस्तानी अवाम मोर्चा (धर्मनिरपेक्ष)': '/images/party_logo/HAM.png',
+    'अखिल भारतीय मजलिस-ए-इटिहादुल मुस्लिमीन': '/images/party_logo/aimim.png',
+    'नोटा': '/images/party_logo/nota.png',
+  };
+  return partyIcons[partyName] || '/images/party_logo/independent.png';
+};
+
+const getPartyColor = (partyName: string): string => {
+  const partyColors: Record<string, string> = {
+    "भारतीय जनता पार्टी": "bg-amber-600",
+    "जनता दल (यूनाइटेड)": "bg-emerald-600",
+    "राष्ट्रिया जनता दल": "bg-green-600",
+    "भारतीय राष्ट्रीय कांग्रेस": "bg-sky-600",
+    "कम्युनिस्ट पार्टी ऑफ इंडिया": "bg-red-500",
+    "लोक जनशक्ति पार्टी": "bg-purple-600",
+    "हिंदुस्तानी अवाम मोर्चा": "bg-green-600",
+    "राष्ट्रीय लोक समता पार्टी": "bg-blue-600",
+    "बहूजन समाज पार्टी": "bg-blue-500",
+    "जन अधीकर पार्टी (लोकतांत्रिक)": "bg-orange-600",
+    "कम्युनिस्ट पार्टी ऑफ इंडिया (मार्क्सवादी)": "bg-rose-500",
+    "कम्युनिस्ट पार्टी ऑफ इंडिया (मार्क्सवादी-लेनिनवादी) (मुक्ति)":
+      "bg-red-600",
+    "हिंदुस्तानी अवाम मोर्चा (धर्मनिरपेक्ष)": "bg-zinc-800",
+    "अखिल भारतीय मजलिस-ए-इटिहादुल मुस्लिमीन": "bg-emerald-900",
+    "नोटा": "bg-gray-600",
+    "Bharatiya Janata Party": "bg-amber-600",
+    "Janata Dal (United)": "bg-emerald-600",
+    "Rashtriya Janata Dal": "bg-green-600",
+    "Indian National Congress": "bg-sky-600",
+    "Communist Party of India": "bg-red-500",
+    "Lok Janshakti Party": "bg-purple-600",
+    "Hindustani Awam Front (Secular)": "bg-green-600",
+    "Rashtriya Lok Samta Party": "bg-blue-600",
+    "Bahujan Samaj Party": "bg-blue-500",
+    "Jan Adhikar Party (Democratic)": "bg-orange-600",
+    "Communist Party of India (Marxist)": "bg-rose-500",
+    "Communist Party of India (Marxist-Leninist) (Liberation)": "bg-red-600",
+    "All India Majlis-e-Itihadul Muslimeen": "bg-emerald-900",
+    "Independent": "bg-yellow-600",
+    "NOTA": "bg-gray-600",
+  };
+
+  return partyColors[partyName] || "bg-slate-600";
+};
+
 interface CharchitVidhanSabhaProps {
   constituencies: ConstituencyData[];
   isLoading: boolean;
-  visibleCount: number;
-  hasUserSubmittedSurvey: (constituencyId: string) => boolean;
   submitSatisfactionSurvey: (constituencyId: string, answer: boolean) => void;
-  loadMoreConstituencies: () => void;
-  initializeConstituencyScores: () => void;
   handleShare: (constituency: ConstituencyData) => Promise<void>;
   popup: {
     isOpen: boolean;
     title: string;
     message: string;
-    type: 'success' | 'error' | 'info';
+    type: "success" | "error" | "info";
   };
   closePopup: () => void;
-  refreshConstituencyData: () => Promise<void>;
+  currentUser: any;
+  userSurveys: Set<string>;
 }
 
 export default function CharchitVidhanSabha({
   constituencies,
   isLoading,
-  visibleCount,
-  hasUserSubmittedSurvey,
   submitSatisfactionSurvey,
-  loadMoreConstituencies,
-  initializeConstituencyScores,
   handleShare,
   popup,
-  closePopup
+  closePopup,
+  currentUser,
+  userSurveys,
 }: CharchitVidhanSabhaProps) {
   const { isEnglish } = useLanguage();
-
+  const navigate = useNavigate();
   // Filter and sort constituencies
-  const filteredAndSortedConstituencies = constituencies
-    .sort((a, b) => {
-      // First sort by interaction count (descending)
-      if (b.interactionCount !== a.interactionCount) {
-        return b.interactionCount - a.interactionCount;
-      }
-      // If tied, sort alphabetically by English constituency name
-      return a.constituencyName.en.localeCompare(b.constituencyName.en);
-    });
+  const filteredAndSortedConstituencies = constituencies.sort((a, b) => {
+    // First sort by interaction count (descending)
+    if (b.interactionCount !== a.interactionCount) {
+      return b.interactionCount - a.interactionCount;
+    }
+    // If tied, sort alphabetically by English constituency name
+    return a.constituencyName.en.localeCompare(b.constituencyName.en);
+  });
+
+  // Handle constituency selection from dropdown
+  const handleConstituencySelect = (constituency: ConstituencyData) => {
+    navigate(
+      `/constituency/${constituency.constituencyName.en.toLowerCase().replace(/\s+/g, "-")}-${constituency.id}?id=${constituency.id}`,
+    );
+  };
+  const handleCharchaManch = (area: string) => {
+    navigate(`/discussion?constituency=${area}&name=${encodeURIComponent(area)}`);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+    <div className="min-h-screen bg-[#c5ced4]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header Section */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full mb-6 shadow-lg">
-            <Users className="h-10 w-10 text-white" />
-          </div>
-          
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-green-600 via-emerald-600 to-blue-600 bg-clip-text text-transparent">
-            {isEnglish ? 'Charchit Vidhan Sabha' : 'चर्चित विधान सभा'}
+        <div className="text-center mb-2 lg:mb-5">
+          <h1 className="text-2xl md:text-5xl font-bold mb-4 bg-black bg-clip-text text-transparent">
+            {isEnglish ? "Charchit Vidhansabha" : "चर्चित विधानसभा"}
           </h1>
-          
-          <p className="text-lg md:text-xl text-slate-600 dark:text-slate-300 mb-6 max-w-3xl mx-auto leading-relaxed">
-            {isEnglish ? 'Explore constituencies and their representatives with detailed insights and community feedback' : 'निर्वाचन क्षेत्रों और उनके प्रतिनिधियों का विस्तृत अंतर्दृष्टि और सामुदायिक प्रतिक्रिया के साथ अन्वेषण करें'}
-          </p>
-          
-          {/* Info Badges */}
-          <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
-            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-700 dark:text-blue-300 px-4 py-2.5 rounded-full text-sm font-medium border border-blue-200 dark:border-blue-700/50 shadow-sm">
-              <TrendingUp className="h-4 w-4" />
-              <span>
-                {isEnglish ? 'Sorted by interaction count' : 'बातचीत की संख्या के अनुसार क्रमबद्ध'}
-              </span>
-            </div>
-
-            <button
-              onClick={initializeConstituencyScores}
-              className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/30 dark:to-green-900/30 text-emerald-700 dark:text-emerald-300 px-4 py-2.5 rounded-full text-sm font-medium border border-emerald-200 dark:border-emerald-700/50 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
-            >
-              <Database className="h-4 w-4" />
-              <span>{isEnglish ? 'Initialize Database' : 'डेटाबेस प्रारंभ करें'}</span>
-            </button>
-          </div>
-          
         </div>
-
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-6">
             <div className="relative">
@@ -133,280 +163,273 @@ export default function CharchitVidhanSabha({
             </div>
             <div className="text-center">
               <p className="text-xl text-slate-600 dark:text-slate-300 font-medium mb-2">
-                {isEnglish ? 'Loading constituencies...' : 'निर्वाचन क्षेत्र लोड हो रहे हैं...'}
+                {isEnglish
+                  ? "Loading constituencies..."
+                  : "निर्वाचन क्षेत्र लोड हो रहे हैं..."}
               </p>
               <p className="text-slate-500 dark:text-slate-400">
-                {isEnglish ? 'Please wait while we fetch the latest data' : 'कृपया प्रतीक्षा करें जब तक हम नवीनतम डेटा प्राप्त कर रहे हैं'}
+                {isEnglish
+                  ? "Please wait while we fetch the latest data"
+                  : "कृपया प्रतीक्षा करें जब तक हम नवीनतम डेटा प्राप्त कर रहे हैं"}
               </p>
             </div>
           </div>
         ) : (
           <>
-            {/* Constituencies Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-              {filteredAndSortedConstituencies.slice(0, visibleCount).map((constituency) => (
-                <div key={constituency.id} className="group bg-white dark:bg-slate-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-slate-200 dark:border-slate-700 hover:scale-[1.02] hover:-translate-y-1">
-                  {/* Party Color Header */}
-                  <div className={`${constituency.partyName.color} h-2`}></div>
-                  
-                  <div className="p-6">
-                    {/* Candidate Profile Section */}
-                    <div className="flex items-start gap-4 mb-6">
-                      <div className="relative flex-shrink-0">
-                        {constituency.profileImage ? (
-                          <img 
-                            src={constituency.profileImage} 
-                            alt={isEnglish ? constituency.candidateName.en : constituency.candidateName.hi}
-                            className="w-20 h-20 rounded-full object-cover border-4 border-white dark:border-slate-700 shadow-lg"
-                          />
+            {/* Constituency Grid Section */}
+            <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-2 lg:py-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {filteredAndSortedConstituencies
+                  .slice(0, 2)
+                  .map((constituency) => (
+                    <div
+                      key={constituency.id}
+                      className="bg-white rounded-xl shadow-lg p-6 border border-gray-100"
+                    >
+                      {/* Candidate Profile Header */}
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                            {constituency.profileImage ? (
+                              <img
+                                src={constituency.profileImage}
+                                alt={
+                                  isEnglish
+                                    ? constituency.candidateName.en
+                                    : constituency.candidateName.hi
+                                }
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold text-lg">
+                                {(isEnglish
+                                  ? constituency.candidateName.en
+                                  : constituency.candidateName.hi
+                                ).charAt(0)}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="text-lg font-bold text-gray-900">
+                              {isEnglish
+                                ? constituency.constituencyName.en
+                                : constituency.constituencyName.hi}
+                            </div>
+                            <div className="text-sm font-medium text-gray-700">
+                              {isEnglish
+                                ? constituency.candidateName.en
+                                : constituency.candidateName.hi}
+                            </div>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-medium text-white ${getPartyColor(constituency.partyName.name)}`}
+                              >
+                                {isEnglish
+                                  ? constituency.partyName.name
+                                  : constituency.partyName.nameHi}
+                              </span>
+                              <div className="w-6 h-6 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center">
+                                <img
+                                  src={fetchPartyIcon(
+                                    constituency.partyName.name,
+                                  )}
+                                  alt="Party"
+                                  className="w-6 h-6 object-contain"
+                                  onError={(e) => {
+                                    e.currentTarget.src =
+                                      "/images/party_logo/independent.png";
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleCharchaManch(constituency.constituencyName.en)}
+                          className="bg-yellow-400 text-gray-900 px-3 py-1 rounded-full text-xs font-medium hover:bg-yellow-500 transition-colors"
+                        >
+                          {constituency.activePostCount || 0}+{" "}
+                          {isEnglish ? "Active Discussion" : "सक्रिय चर्चा"}
+                        </button>
+                      </div>
+
+                      {/* Candidate Details */}
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-gray-900">
+                            {constituency.age || "N/A"}
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            {isEnglish ? "Age" : "आयु"}
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm font-medium text-gray-900 leading-tight">
+                            {isEnglish
+                              ? constituency.education.en
+                              : constituency.education.hi}
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            {isEnglish ? "Education" : "शिक्षा"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Public Satisfaction Section */}
+                      <div className="mb-4">
+                        <div className="text-sm text-gray-700 mb-2">
+                          {isEnglish
+                            ? "Are you satisfied with the last five years of tenure?"
+                            : "क्या आप पिछले पाँच साल के कार्यकाल से संतुष्ट है ?"}
+                        </div>
+                        
+                        {/* Show voting buttons only if user hasn't voted */}
+                        {currentUser && !userSurveys.has(`${constituency.id}:true`) && !userSurveys.has(`${constituency.id}:false`) ? (
+                          <div className="flex items-center space-x-2 mb-2">
+                            <button 
+                              onClick={() => submitSatisfactionSurvey(constituency.id, true)}
+                              className="px-3 py-1 text-xs rounded-full transition-colors bg-white text-gray-700 border border-gray-300 hover:bg-green-50 hover:border-green-300"
+                            >
+                              {isEnglish ? "Yes" : "हाँ"}
+                            </button>
+                            <button 
+                              onClick={() => submitSatisfactionSurvey(constituency.id, false)}
+                              className="px-3 py-1 text-xs rounded-full transition-colors bg-white text-gray-700 border border-gray-300 hover:bg-red-50 hover:border-red-300"
+                            >
+                              {isEnglish ? "No" : "ना"}
+                            </button>
+                          </div>
                         ) : (
-                          <div className="w-20 h-20 rounded-full border-4 border-white dark:border-slate-700 shadow-lg overflow-hidden">
-                            <PlaceholderImages type="profile" size="lg" />
+                          /* Show vote counts and user's vote if they have already voted */
+                          <div className="mb-2">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs text-gray-600">
+                                  {isEnglish ? "Your vote:" : "आपका वोट:"}
+                                </span>
+                                {userSurveys.has(`${constituency.id}:true`) ? (
+                                  <span className="px-2 py-1 text-xs rounded-full bg-green-500 text-white">
+                                    {isEnglish ? "Yes" : "हाँ"}
+                                  </span>
+                                ) : userSurveys.has(`${constituency.id}:false`) ? (
+                                  <span className="px-2 py-1 text-xs rounded-full bg-red-500 text-white">
+                                    {isEnglish ? "No" : "ना"}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="text-sm font-bold text-green-600">
+                                {constituency.satisfactionTotal > 0
+                                  ? Math.round(
+                                      (constituency.satisfactionYes /
+                                        constituency.satisfactionTotal) *
+                                        100,
+                                    )
+                                  : 0}
+                                % {isEnglish ? "Satisfied" : "संतुष्ट"}
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-gray-600">
+                              <span>
+                                {isEnglish ? "Yes:" : "हाँ:"} {constituency.satisfactionYes || 0}
+                              </span>
+                              <span>
+                                {isEnglish ? "No:" : "ना:"} {constituency.satisfactionNo || 0}
+                              </span>
+                              <span>
+                                {isEnglish ? "Total:" : "कुल:"} {constituency.satisfactionTotal || 0}
+                              </span>
+                            </div>
                           </div>
                         )}
-                        {/* Age Badge */}
-                        <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center border-2 border-white dark:border-slate-700 shadow-md">
-                          <span className="text-[10px] text-white font-bold">{constituency.age}</span>
-                        </div>
+                        
+                        {/* Show sign in message if not logged in */}
+                        {!currentUser && (
+                          <div className="text-xs text-gray-500 text-center mt-1">
+                            {isEnglish ? 'Sign in to vote' : 'मतदान के लिए साइन इन करें'}
+                          </div>
+                        )}
                       </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-lg text-slate-900 dark:text-white mb-1 truncate">
-                          {isEnglish ? constituency.constituencyName.en : constituency.constituencyName.hi}
-                        </h3>
-                        <p className="text-slate-600 dark:text-slate-300 mb-2 truncate">
-                          {isEnglish ? constituency.candidateName.en : constituency.candidateName.hi}
-                        </p>
-                        <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-white shadow-sm ${constituency.partyName.color}`}>
-                          {isEnglish ? constituency.partyName.name : constituency.partyName.nameHi}
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* Key Details Grid */}
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-                          <BarChart3 className="h-4 w-4" />
-                          <span className="text-xs font-medium uppercase tracking-wide">{isEnglish ? 'Age' : 'उम्र'}</span>
+                      {/* Manifesto Score Section */}
+                      <div className="mb-4">
+                        <div className="text-sm text-gray-700 mb-2">
+                          {isEnglish
+                            ? "Manifesto Promise Score:"
+                            : "घोषणापत्र वादा स्कोर:"} {constituency.manifestoScore || 0}/5
                         </div>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                          {constituency.age}
-                        </p>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-                          <BookOpen className="h-4 w-4" />
-                          <span className="text-xs font-medium uppercase tracking-wide">{isEnglish ? 'Education' : 'शिक्षा'}</span>
-                        </div>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                          {isEnglish ? constituency.education.en : constituency.education.hi}
-                        </p>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-                          <Award className="h-4 w-4" />
-                          <span className="text-xs font-medium uppercase tracking-wide">{isEnglish ? 'Manifesto' : 'घोषणापत्र'}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-2">
-                            <div 
-                              className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-500"
-                              style={{ width: `${constituency.manifestoScore / 5 * 100}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-sm font-bold text-slate-900 dark:text-white">{constituency.manifestoScore} / 5</span>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full"
+                            style={{
+                              width: `${constituency.manifestoScore*20 || 0}%`,
+                            }}
+                          ></div>
                         </div>
                       </div>
-                      
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-                          <MessageSquare className="h-4 w-4" />
-                          <span className="text-xs font-medium uppercase tracking-wide">{isEnglish ? 'Active Posts' : 'सक्रिय पोस्ट'}</span>
-                        </div>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{constituency.activePostCount}</p>
-                      </div>
-                    </div>
 
-                    {/* Satisfaction Survey Section */}
-                    <div className="bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-700/50 dark:to-slate-600/50 rounded-xl p-4 mb-6 border border-slate-200 dark:border-slate-600">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Award className="h-5 w-5 text-amber-500" />
-                        <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                          {isEnglish ? 'Satisfaction Survey' : 'संतुष्टि सर्वेक्षण'}
-                        </h4>
+                      {/* Recent Activity */}
+                      <div className="flex items-center space-x-2 mb-4">
+                        <div className="w-4 h-4 bg-blue-600 rounded-full"></div>
+                        <div className="flex-1">
+                          <div className="text-sm text-gray-700">
+                            {isEnglish
+                              ? constituency.news.title.en
+                              : constituency.news.title.hi}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {constituency.news.date
+                              ? isEnglish
+                                ? "2 days ago"
+                                : "2 दिन पहले"
+                              : isEnglish
+                                ? "Recent"
+                                : "हाल ही में"}
+                          </div>
+                        </div>
                       </div>
-                      
-                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 leading-relaxed">
-                        {isEnglish ? 'Are you satisfied with your tenure of last 5 years?' : 'क्या आप पिछले 5 वर्षों के कार्यकाल से संतुष्ट हैं?'}
-                      </p>
-                      
-                      {/* Satisfaction Progress */}
-                      {constituency.satisfactionTotal > 0 ? (
-                        <div className="space-y-3 mb-4">
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <CheckCircle2 className="h-4 w-4 text-green-500" />
-                              <span className="text-green-600 dark:text-green-400 font-medium">
-                                {isEnglish ? 'Yes' : 'हाँ'}: {constituency.satisfactionYes}
-                              </span>
-                            </div>
-                            <span className="font-bold text-green-600 dark:text-green-400">
-                              {Math.round((constituency.satisfactionYes / constituency.satisfactionTotal) * 100)}%
-                            </span>
-                          </div>
-                          
-                          <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
-                            <div 
-                              className="bg-gradient-to-r from-green-500 to-emerald-500 h-2.5 rounded-full transition-all duration-700 ease-out shadow-sm"
-                              style={{ 
-                                width: `${constituency.satisfactionTotal > 0 ? (constituency.satisfactionYes / constituency.satisfactionTotal) * 100 : 0}%` 
-                              }}
-                            ></div>
-                          </div>
-                          
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <XCircle className="h-4 w-4 text-red-500" />
-                              <span className="text-red-600 dark:text-red-400 font-medium">
-                                {isEnglish ? 'No' : 'नहीं'}: {constituency.satisfactionNo}
-                              </span>
-                            </div>
-                            <span className="font-bold text-red-600 dark:text-red-400">
-                              {Math.round((constituency.satisfactionNo / constituency.satisfactionTotal) * 100)}%
-                            </span>
-                          </div>
-                          
-                          <div className="text-xs text-center text-slate-500 dark:text-slate-400 pt-1 font-medium">
-                            {isEnglish ? 'Total responses' : 'कुल प्रतिक्रियाएं'}: {constituency.satisfactionTotal}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center py-4 bg-white dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600">
-                          <div className="text-sm text-slate-500 dark:text-slate-400 mb-2">
-                            {isEnglish ? 'No responses yet' : 'अभी तक कोई प्रतिक्रिया नहीं'}
-                          </div>
-                          <div className="text-xs text-slate-400 dark:text-slate-500 font-medium">
-                            {isEnglish ? 'Be the first to vote!' : 'पहले वोट करने वाले बनें!'}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Voting Buttons */}
-                      {!hasUserSubmittedSurvey(constituency.id) ? (
-                        <div className="grid grid-cols-2 gap-3">
-                          <button
-                            onClick={() => submitSatisfactionSurvey(constituency.id, true)}
-                            className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-medium text-sm transition-all duration-200 hover:shadow-lg hover:scale-105"
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleConstituencySelect(constituency)}
+                          className="flex-1 bg-gray-800 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                        >
+                          {isEnglish ? "View Details" : "विस्तार से देखे"}
+                        </button>
+                        <button
+                          onClick={() => handleShare(constituency)}
+                          className="w-10 h-10 bg-white text-gray-600 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors flex items-center justify-center"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                           >
-                            <CheckCircle2 className="h-4 w-4" />
-                            <span>{isEnglish ? 'Yes' : 'हाँ'}</span>
-                          </button>
-                          <button
-                            onClick={() => submitSatisfactionSurvey(constituency.id, false)}
-                            className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white font-medium text-sm transition-all duration-200 hover:shadow-lg hover:scale-105"
-                          >
-                            <XCircle className="h-4 w-4" />
-                            <span>{isEnglish ? 'No' : 'नहीं'}</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="bg-white dark:bg-slate-700 rounded-lg p-3 text-center border border-slate-200 dark:border-slate-600">
-                          <div className="text-sm text-slate-600 dark:text-slate-300 mb-3 font-medium">
-                            {isEnglish ? 'You have already voted!' : 'आपने पहले ही वोट कर दिया है!'}
-                          </div>
-                          <div className="grid grid-cols-2 gap-3 text-xs">
-                            <div className="text-center p-2 rounded-md bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-                              <div className="text-green-600 dark:text-green-400 font-bold text-lg">{constituency.satisfactionYes}</div>
-                              <div className="text-green-700 dark:text-green-500 font-medium">{isEnglish ? 'Yes' : 'हाँ'}</div>
-                            </div>
-                            <div className="text-center p-2 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                              <div className="text-red-600 dark:text-red-400 font-bold text-lg">{constituency.satisfactionNo}</div>
-                              <div className="text-red-700 dark:text-red-500 font-medium">{isEnglish ? 'No' : 'नहीं'}</div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Latest News Section */}
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl p-4 mb-6 border border-blue-200 dark:border-blue-800">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></div>
-                        <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">
-                          {isEnglish ? 'Latest News' : 'ताजा समाचार'}
-                        </p>
-                      </div>
-                      <p className="text-sm text-blue-700 dark:text-blue-400 mb-2 leading-relaxed">
-                        {isEnglish ? constituency.news.title.en : constituency.news.title.hi}
-                      </p>
-                      <div className="flex items-center gap-1 text-xs text-blue-600/70 dark:text-blue-500/70">
-                        <Calendar className="h-3 w-3" />
-                        <span>
-                          {constituency.news.date !== 'No date available' ? constituency.news.date : 'Date not available'}
-                        </span>
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"
+                            />
+                          </svg>
+                        </button>
                       </div>
                     </div>
-
-                    {/* Interaction Stats */}
-                    <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400 mb-6">
-                      <span className="flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4 text-blue-500" />
-                        {isEnglish ? 'Total interactions' : 'कुल बातचीत'}: 
-                        <span className="font-bold text-slate-900 dark:text-white">{constituency.interactionCount || 0}</span>
-                      </span>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-3">
-                      <Link
-                        to={`/constituency/${constituency.constituencyName.en.toLowerCase().replace(/\s+/g, '-')}-${constituency.id}?id=${constituency.id}`}
-                        className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-center py-3 px-4 rounded-xl font-semibold transition-all duration-200 hover:shadow-lg hover:scale-105 flex items-center justify-center gap-2"
-                      >
-                        <span>{isEnglish ? 'More Details' : 'अधिक विवरण'}</span>
-                        <ChevronDown className="h-4 w-4 rotate-[-90deg]" />
-                      </Link>
-                      <button
-                        onClick={() => handleShare(constituency)}
-                        className="w-12 h-12 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-all duration-200 hover:shadow-md flex items-center justify-center group"
-                        title={isEnglish ? 'Share constituency' : 'निर्वाचन क्षेत्र शेयर करें'}
-                      >
-                        <Share2 className="h-5 w-5 group-hover:scale-110 transition-transform" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                  ))}
+              </div>
             </div>
-
             {/* Load More Button */}
-            {visibleCount < filteredAndSortedConstituencies.length && (
-              <div className="text-center mb-8">
-                <button
-                  onClick={loadMoreConstituencies}
-                  className="group relative overflow-hidden bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600 hover:from-slate-200 hover:to-slate-300 dark:hover:from-slate-600 dark:hover:to-slate-500 text-slate-700 dark:text-slate-300 px-8 py-4 rounded-2xl font-semibold text-lg transition-all duration-300 hover:shadow-xl hover:scale-105 border border-slate-300 dark:border-slate-600"
-                >
-                  <span className="relative flex items-center gap-3">
-                    {isEnglish ? `Load More Constituencies` : `और निर्वाचन क्षेत्र लोड करें`}
-                    <ChevronDown className="h-5 w-5 text-slate-500 group-hover:translate-y-1 transition-transform" />
-                  </span>
-                </button>
-              </div>
-            )}
-
-            {/* Footer Info */}
-            <div className="text-center space-y-3">
-              <div className="inline-flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <BarChart3 className="h-5 w-5 text-slate-500" />
-                <p className="text-slate-600 dark:text-slate-400 font-medium">
-                  {isEnglish 
-                    ? `Showing ${visibleCount} of ${filteredAndSortedConstituencies.length} constituencies (Total: 243)`
-                    : `${filteredAndSortedConstituencies.length} में से ${visibleCount} निर्वाचन क्षेत्र दिखा रहे हैं (कुल: 243)`
-                  }
-                </p>
-              </div>
+            <div className="flex items-center justify-center mb-2 lg:mb-4">
+              <button
+                className="bg-[#7b8a95] text-white px-4 py-2 rounded-md flex items-center gap-2"
+                onClick={() =>
+                  navigate("/constituency/all-constituencies?showAll=true")
+                }
+              >
+                {isEnglish ? "See All Candidates" : "सभी उम्मीदवार देखे"}{" "}
+                <ArrowRight className="h-4 w-4" />
+              </button>
             </div>
           </>
         )}
@@ -419,7 +442,7 @@ export default function CharchitVidhanSabha({
         title={popup.title}
         message={popup.message}
         type={popup.type}
-        showCloseButton={popup.type !== 'success'}
+        showCloseButton={popup.type !== "success"}
       />
     </div>
   );

@@ -12,7 +12,6 @@ import {
   Users, 
   Calendar,
   MessageCircle,
-  Star,
   Database
 } from 'lucide-react';
 
@@ -130,7 +129,7 @@ const Home: React.FC = () => {
   const [userSurveys, setUserSurveys] = useState<Set<string>>(new Set());
 
 
-  const [visibleCount, setVisibleCount] = useState(3); // Show 3 initially, then load 12 more each time
+
 
   // Ref for dropdown to handle click outside
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -161,14 +160,24 @@ const Home: React.FC = () => {
     type: 'info'
   });
 
+  // Initialize constituency scores on every component mount (including refresh)
+  useEffect(() => {
+    const initializeDatabase = async () => {
+      try {
+        await initializeConstituencyScores();
+      } catch (error) {
+        console.error('Error initializing constituency scores:', error);
+      }
+    };
+
+    initializeDatabase();
+  }, []); // Empty dependency array - runs on every mount
+
   // Load data on component mount - completely automatic database initialization
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        
-        // Initialize constituency scores first to ensure database is ready
-        await initializeConstituencyScores();
         
         // Load other data
         await Promise.all([
@@ -559,14 +568,6 @@ const Home: React.FC = () => {
     }
   };
 
-  // Refresh constituency data to show real-time updates (e.g., after satisfaction votes)
-  const refreshConstituencyData = async () => {
-    try {
-      await loadConstituencyScoresFromDatabase();
-    } catch (error) {
-      console.error('Error refreshing constituency data:', error);
-    }
-  };
 
   // Load user profile
   const loadUserProfile = async () => {
@@ -870,8 +871,8 @@ const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean)
       return c;
     }));
 
-    // Update user surveys tracking
-    setUserSurveys(prev => new Set([...prev, constituencyId]));
+    // Update user surveys tracking with vote answer
+    setUserSurveys(prev => new Set([...prev, `${constituencyId}:${answer}`]));
 
     // Show success message
     showPopup(
@@ -889,12 +890,6 @@ const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean)
     );
   }
 };
-// Helper function to check if user has already submitted survey
-const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
-  // Check if user has already voted for this constituency
-  return userSurveys.has(constituencyId);
-};
-
 
   // Load user votes from Firebase
   const loadUserVotesFromFirebase = async () => {
@@ -923,9 +918,9 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
       const { surveys } = await FirebaseService.loadUserInteractions(currentUser.uid);
       
       
-      // Create a set of constituency IDs where user has voted
+      // Create a set of constituency IDs with their vote answers
       const userVotedConstituencies = new Set(
-        surveys.map(s => (s.constituency_id - 1).toString())
+        surveys.map(s => `${(s.constituency_id - 1).toString()}:${s.answer}`)
       );
       
       
@@ -950,12 +945,6 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
       setUserSurveys(new Set());
     }
   };
-
-  // Load more constituencies
-  const loadMoreConstituencies = () => {
-    setVisibleCount(prev => Math.min(prev + 12, filteredAndSortedConstituencies.length));
-  };
-
   // Get party color
   const getPartyColor = (partyName: string): string => {
     const partyColors: Record<string, string> = {
@@ -1012,9 +1001,9 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 pb-20 lg:pb-0">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 pb-20 md:pb-0">
       {/* Hero Section */}
-      <div className="bg-[#273f4f] text-white py-5 sm:py-16 px-4 w-full">
+      <div className="bg-[#273f4f] text-white py-5 sm:py-10 px-4 w-full">
         <div className="w-full max-w-none mx-auto">
           <div className="text-center">
             <div className="grid grid-cols-2 gap-6 md:gap-20 items-center mb-6 sm:mb-8">
@@ -1147,7 +1136,6 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
         </div>
       </div>
 
-
       {/* Nagrik Yogdan Section - Show Current User's Tier */}
       {currentUser && userProfile && (
         <div className="max-w-full mx-auto bg-[#9ca8b4] px-4 sm:px-6 lg:px-8 py-3 sm:py-8">
@@ -1160,59 +1148,51 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 items-center justify-center gap-6">
               {[
-                { level: 0, name: '0', color: 'from-gray-400 to-gray-500', description: 'New User' },
-                { level: 1, name: '1', color: 'from-blue-500 to-blue-600', description: 'Beginner' },
-                { level: 2, name: '2', color: 'from-green-500 to-green-600', description: 'Active' },
-                { level: 3, name: '3', color: 'from-yellow-500 to-yellow-600', description: 'Engaged' },
-                { level: 4, name: '4', color: 'from-purple-500 to-purple-600', description: 'Leader' }
+                { level: 1, name: '1', color: 'from-blue-500 to-blue-600', description: 'Beginner', descriptionhi: 'शुरुआती' },
+                { level: 2, name: '2', color: 'from-green-500 to-green-600', description: 'Active', descriptionhi: 'सक्रिय' },
+                { level: 3, name: '3', color: 'from-yellow-500 to-yellow-600', description: 'Engaged', descriptionhi: 'जुड़ा' },
+                { level: 4, name: '4', color: 'from-purple-500 to-purple-600', description: 'Leader', descriptionhi: 'नेता' }
               ]
                 .filter((tier) => tier.level === userProfile.tier_level)
                 .map((tier) => (
                   <div
                     key={tier.level}
-                    className="bg-white rounded-xl shadow-lg p-6 text-center"
+                    className="bg-white rounded-xl shadow-lg p-6 text-center items-center justify-center"
                   >
                     <div
-                      className={`w-16 h-16 bg-gradient-to-r ${tier.color} rounded-full flex items-center justify-center mx-auto mb-4`}
+                      className={`w-12 h-12 lg:w-16 lg:h-16 bg-[#014e5c] rounded-full flex items-center justify-center mx-auto mb-4`}
                     >
-                      <Star className="h-8 w-8 text-white" />
+                      <span className="h-8 w-8 font-bold text-white text-center">{tier.name}</span>
                     </div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{tier.name}</h3>
-                    <div className="text-sm text-gray-600 mb-1">{tier.description}</div>
-                    <div className="text-lg font-bold text-green-600">
+                    <div className="text-sm text-gray-600 mb-1">{isEnglish ? tier.description : tier.descriptionhi}</div>
+                    <div className="text-lg font-bold text-[#014e5c]">
                       {isEnglish ? 'Current Tier' : 'वर्तमान टियर'}
                     </div>
                   </div>
                 ))}
             </div>
-
-          
           {/* User's Current Stats */}
-          <div className="mt-8 bg-white rounded-xl shadow-lg p-6">
+          <div className="mt-4 lg:mt-8 bg-white rounded-xl shadow-lg p-2 lg:p-6">
             <div className="text-center">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">
+              <h3 className="text-md lg:text-xl font-semibold text-gray-900 mb-2">
                 {isEnglish ? 'Your Progress' : 'आपकी प्रगति'}
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-2 gap-6">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600 mb-2">{userProfile.participation_score}</div>
-                  <div className="text-sm text-gray-600">{isEnglish ? 'Engagement Score' : 'जुड़ाव स्कोर'}</div>
+                  <div className="text-sm lg:text-3xl font-bold text-blue-600 mb-2">{userProfile.participation_score}</div>
+                  <div className="text-xs lg:text-sm text-gray-600">{isEnglish ? 'Engagement Score' : 'जुड़ाव स्कोर'}</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-green-600 mb-2">{userProfile.tier_level}</div>
-                  <div className="text-sm text-gray-600">{isEnglish ? 'Current Tier' : 'वर्तमान टियर'}</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-purple-600 mb-2">
+                  <div className="text-sm lg:text-3xl font-bold text-purple-600 mb-2">
                     {userProfile.tier_level < 4 ? 
-                      (userProfile.tier_level === 0 ? 1 : 
-                       userProfile.tier_level === 1 ? 20 : 
-                       userProfile.tier_level === 2 ? 50 : 100) - userProfile.participation_score
+                      (userProfile.tier_level === 1 ? 20 : 
+                       userProfile.tier_level === 2 ? 50 :
+                       userProfile.tier_level === 3 ? 100 : 150) - userProfile.participation_score
                       : 0}
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div className="text-xs lg:text-sm text-gray-600">
                     {isEnglish ? 
                       (userProfile.tier_level < 4 ? 'Points to Next Tier' : 'Max Tier Reached') :
                       (userProfile.tier_level < 4 ? 'अगले टियर तक अंक' : 'अधिकतम टियर पहुंचा')
@@ -1222,64 +1202,66 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Achievement Section for Authenticated Users */}
-      {currentUser && userAchievements && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              {isEnglish ? 'Your Achievements' : 'आपकी उपलब्धियां'}
-            </h2>
-            <p className="text-gray-600">
-              {isEnglish ? 'Track your engagement and contributions' : 'अपने जुड़ाव और योगदान को ट्रैक करें'}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { 
-                title: 'Pehla Vote', 
-                value: userProfile?.first_vote_year || 'Not set',
-                icon: Calendar,
-                color: 'from-red-500 to-red-600',
-                description: 'First voting year'
-              },
-              { 
-                title: 'Charchaon me Bhagidari', 
-                value: userAchievements.charchaonBhagidari,
-                icon: MessageCircle,
-                color: 'from-blue-500 to-blue-600',
-                description: 'Engagement in discussions'
-              },
-              { 
-                title: 'Nai Charcha ki Pehel', 
-                value: userAchievements.naiCharchaPehel,
-                icon: TrendingUp,
-                color: 'from-green-500 to-green-600',
-                description: 'New posts initiated'
-              },
-              { 
-                title: 'Nagrik Prerak', 
-                value: userAchievements.nagrikPrerak,
-                icon: Users,
-                color: 'from-purple-500 to-purple-600',
-                description: 'People referred'
-              }
-            ].map((achievement, index) => (
-              <div key={index} className="bg-white rounded-xl shadow-lg p-6 text-center">
-                <div className={`w-16 h-16 bg-gradient-to-r ${achievement.color} rounded-full flex items-center justify-center mx-auto mb-4`}>
-                  <achievement.icon className="h-8 w-8 text-white" />
+          {/* Achievement Section for Authenticated Users */}
+          {currentUser && userAchievements && (
+            <div className="mt-4 lg:mt-8 bg-white rounded-xl shadow-lg p-2 lg:p-6">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 lg:py-8">
+                <div className="text-center mb-4 lg:mb-8">
+                  <h2 className="text-sm lg:text-3xl font-bold text-gray-900 mb-2 lg:mb-4">
+                    {isEnglish ? 'Your Achievements' : 'आपकी उपलब्धियां'}
+                  </h2>
+                  <p className="text-xs lg:text-sm text-gray-600">
+                    {isEnglish ? 'Track your engagement and contributions' : 'अपने जुड़ाव और योगदान को ट्रैक करें'}
+                  </p>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">{achievement.title}</h3>
-                <div className="text-3xl font-bold text-gray-900 mb-1">{achievement.value}</div>
-                <div className="text-sm text-gray-600">{achievement.description}</div>
+
+                <div className="grid grid-cols-2 gap-4 lg:gap-6">
+                  {[
+                    { 
+                      title: isEnglish ? 'Pehla Vote' : 'पहला वोट', 
+                      value: userProfile?.first_vote_year || 'Not set',
+                      icon: Calendar,
+                      color: 'bg-[#014e5c]',
+                      description: isEnglish ? 'First voting year' : 'पहली बार मतदान किया'
+                    },
+                    { 
+                      title: isEnglish ? 'Charchaon me Bhagidari' : 'चर्चा में भागीदारी', 
+                      value: userAchievements.charchaonBhagidari,
+                      icon: MessageCircle,
+                      color: 'bg-[#014e5c]',
+                      description: isEnglish ? 'Engagement in discussions' : userAchievements.charchaonBhagidari > 0 ? userAchievements.charchaonBhagidari + ' बार चर्चा में भागीदारी ली' : 'चर्चा में भागीदारी नहीं ली'
+                    },
+                    { 
+                      title: isEnglish ? 'Nai Charcha ki Pehel' : 'नया चर्चा की पहली', 
+                      value: userAchievements.naiCharchaPehel,
+                      icon: TrendingUp,
+                      color: 'bg-[#014e5c]',
+                      description: isEnglish ? 'New posts initiated' : 'नया पोस्ट शुरू किया'
+                    },
+                    { 
+                      title: isEnglish ? 'Nagrik Prerak' : 'नागरिक प्रेरक', 
+                      value: userAchievements.nagrikPrerak,
+                      icon: Users,
+                      color: 'bg-[#014e5c]',
+                      description: isEnglish ? 'People referred' : 'लोगों को सुझाया'
+                    }
+                  ].map((achievement, index) => (
+                    <div key={index} className="bg-white rounded-xl shadow-lg p-2 lg:p-6 text-center">
+                      <div className={`w-10 h-10 lg:w-16 lg:h-16 bg-gradient-to-r ${achievement.color} rounded-full flex items-center justify-center mx-auto mb-2 lg:mb-4`}>
+                        <achievement.icon className="h-3 w-3 lg:h-8 lg:w-8 text-white" />
+                      </div>
+                      <h3 className="text-xs lg:text-xl font-semibold text-gray-900 mb-1 lg:mb-2">{achievement.title}</h3>
+                      <div className="text-xs lg:text-3xl font-bold text-gray-900 mb-1 lg:mb-2">{achievement.value}</div>
+                      <div className="text-xs lg:text-sm text-gray-600">{achievement.description}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
+          )}
+            </div>
+          )}
+
       
       {/* Loading State for Database Initialization */}
       {isLoading && (
@@ -1295,9 +1277,9 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
               {isEnglish ? 'Setting up constituency data and ensuring everything is ready. This may take a few moments.' : 'निर्वाचन क्षेत्र डेटा सेट कर रहा है और सब कुछ तैयार कर रहा है। इसमें कुछ क्षण लग सकते हैं।'}
             </p>
             <div className="flex items-center justify-center space-x-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full animate-bounce"></div>
-              <div className="w-3 h-3 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-              <div className="w-3 h-3 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              <div className="w-3 h-3 bg-[#014e5c] rounded-full animate-bounce"></div>
+              <div className="w-3 h-3 bg-[#014e5c] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+              <div className="w-3 h-3 bg-[#014e5c] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
             </div>
           </div>
         </div>
@@ -1308,18 +1290,14 @@ const hasUserSubmittedSurvey = (constituencyId: string): boolean => {
         <CharchitVidhanSabha 
           constituencies={filteredAndSortedConstituencies}
           isLoading={isLoading}
-          visibleCount={visibleCount}
-          hasUserSubmittedSurvey={hasUserSubmittedSurvey}
           submitSatisfactionSurvey={submitSatisfactionSurvey}
-          loadMoreConstituencies={loadMoreConstituencies}
-          initializeConstituencyScores={initializeConstituencyScores}
           handleShare={handleShare}
           popup={popup}
           closePopup={closePopup}
-          refreshConstituencyData={refreshConstituencyData}
+          currentUser={currentUser}
+          userSurveys={userSurveys}
         />
       )}
-
       {/* Bottom Navigation - Mobile */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20 shadow-lg">
         <div className="flex items-center justify-around py-3 px-2">
