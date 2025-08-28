@@ -8,9 +8,6 @@ import {
   Search, 
   MapPin,
   House,
-  TrendingUp, 
-  Users, 
-  Calendar,
   MessageCircle,
   Database
 } from 'lucide-react';
@@ -122,8 +119,8 @@ const Home: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isInitializing, setIsInitializing] = useState(false);
 
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [userAchievements, setUserAchievements] = useState<any>(null);
+  const [, setUserProfile] = useState<UserProfile | null>(null);
+  const [, setUserAchievements] = useState<any>(null);
   const [, setEnglishData] = useState<CandidateData[]>([]);
   const [, setHindiData] = useState<CandidateData[]>([]);
   const [userSurveys, setUserSurveys] = useState<Set<string>>(new Set());

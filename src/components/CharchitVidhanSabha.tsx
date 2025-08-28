@@ -63,8 +63,8 @@ const getPartyColor = (partyName: string): string => {
   const partyColors: Record<string, string> = {
     "भारतीय जनता पार्टी": "bg-amber-600",
     "जनता दल (यूनाइटेड)": "bg-emerald-600",
+    'भारतीय राष्ट्रीय कांग्रेस': 'bg-sky-600',
     "राष्ट्रिया जनता दल": "bg-green-600",
-    "भारतीय राष्ट्रीय कांग्रेस": "bg-sky-600",
     "कम्युनिस्ट पार्टी ऑफ इंडिया": "bg-red-500",
     "लोक जनशक्ति पार्टी": "bg-purple-600",
     "हिंदुस्तानी अवाम मोर्चा": "bg-green-600",
@@ -117,7 +117,6 @@ export default function CharchitVidhanSabha({
   constituencies,
   isLoading,
   submitSatisfactionSurvey,
-  handleShare,
   popup,
   closePopup,
   currentUser,
@@ -203,7 +202,7 @@ export default function CharchitVidhanSabha({
                       {/* Active Discussion Badge */}
                       <div 
                         className="absolute top-2 right-2 bg-[#DEAF13] px-4 py-2 rounded-xl cursor-pointer hover:bg-[#C49F11] transition-colors"
-                        style={{ boxShadow: 'rgba(0, 0, 0, 0.5) 0px 4px 4px 0px' }}
+                        onClick={() => handleCharchaManch(isEnglish ? constituency.constituencyName.en : constituency.constituencyName.hi)}
                       >
                         <div className="text-center">
                           <div 
@@ -232,7 +231,9 @@ export default function CharchitVidhanSabha({
                             {isEnglish ? constituency.candidateName.en : constituency.candidateName.hi}
                           </div>
                           <div className="flex items-center space-x-2 mb-2">
-                            <button className="bg-[#008040] text-white px-3 py-2 rounded-lg text-sm font-medium min-w-fit flex-shrink-0 text-center leading-tight">
+                            <button 
+                              className={`${getPartyColor(constituency.partyName.name)} text-white px-3 py-2 rounded-lg text-sm font-medium min-w-fit flex-shrink-0 text-center leading-tight`}
+                            >
                               {isEnglish ? constituency.partyName.name : constituency.partyName.nameHi}
                             </button>
                             <div className="w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center p-2">
