@@ -97,6 +97,43 @@ const getPartyColor = (partyName: string): string => {
   return partyColors[partyName] || "bg-slate-600";
 };
 
+const getPartyAbbreviation = (partyName: string): string => {
+  const partyAbbreviations: Record<string, string> = {
+    "भारतीय जनता पार्टी": "भाजपा",
+    "जनता दल (यूनाइटेड)": "जद(यू)",
+    "भारतीय राष्ट्रीय कांग्रेस": "कांग्रेस",
+    "राष्ट्रिया जनता दल": "राजद",
+    "कम्युनिस्ट पार्टी ऑफ इंडिया": "सीपीआई",
+    "लोक जनशक्ति पार्टी": "लोजपा",
+    "हिंदुस्तानी अवाम मोर्चा": "हाम",
+    "राष्ट्रीय लोक समता पार्टी": "रालोसपा",
+    "बहूजन समाज पार्टी": "बसपा",
+    "जन अधीकर पार्टी (लोकतांत्रिक)": "जाप(लो)",
+    "कम्युनिस्ट पार्टी ऑफ इंडिया (मार्क्सवादी)": "सीपीआई(मा)",
+    "कम्युनिस्ट पार्टी ऑफ इंडिया (मार्क्सवादी-लेनिनवादी) (मुक्ति)": "सीपीआई(एमएल)एल",
+    "हिंदुस्तानी अवाम मोर्चा (धर्मनिरपेक्ष)": "हाम(ध)",
+    "अखिल भारतीय मजलिस-ए-इटिहादुल मुस्लिमीन": "एआईएमआईएम",
+    "नोटा": "नोटा",
+    "Bharatiya Janata Party": "BJP",
+    "Janata Dal (United)": "JD(U)",
+    "Rashtriya Janata Dal": "RJD",
+    "Indian National Congress": "INC",
+    "Communist Party of India": "CPI",
+    "Lok Janshakti Party": "LJP",
+    "Hindustani Awam Front (Secular)": "HAM(S)",
+    "Rashtriya Lok Samta Party": "RLSP",
+    "Bahujan Samaj Party": "BSP",
+    "Jan Adhikar Party (Democratic)": "JAPL",
+    "Communist Party of India (Marxist)": "CPIM",
+    "Communist Party of India (Marxist-Leninist) (Liberation)": "CPI(ML)",
+    "All India Majlis-e-Itihadul Muslimeen": "AIMIM",
+    "Independent": "IND",
+    "NOTA": "NOTA",
+  };
+
+  return partyAbbreviations[partyName] || partyName;
+};
+
 interface CharchitVidhanSabhaProps {
   constituencies: ConstituencyData[];
   isLoading: boolean;
@@ -234,7 +271,7 @@ export default function CharchitVidhanSabha({
                             <button 
                               className={`${getPartyColor(constituency.partyName.name)} text-white px-3 py-2 rounded-lg text-sm font-medium min-w-fit flex-shrink-0 text-center leading-tight`}
                             >
-                              {isEnglish ? constituency.partyName.name : constituency.partyName.nameHi}
+                              {getPartyAbbreviation(isEnglish ? constituency.partyName.name : constituency.partyName.nameHi)}
                             </button>
                             <div className="w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center p-2">
                               <img 

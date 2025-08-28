@@ -990,10 +990,20 @@ const AapkaKshetra: React.FC = () => {
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-2">
-                        <p className="text-gray-500 text-sm">
-                          {isEnglish ? 'Please log in to rate' : 'रेटिंग के लिए कृपया लॉगिन करें'}
-                        </p>
+                      <div className="flex items-center justify-center space-x-1 mb-3">
+                        {[1, 2, 3, 4, 5].map((rating) => (
+                          <button
+                            key={rating}
+                            onClick={() => setShowSignInPopup(true)}
+                            className={`w-8 h-8 rounded-full border-2 transition-all duration-200 flex items-center justify-center text-sm font-semibold ${
+                              departmentRatings[dept.dept_name] === rating
+                                ? 'border-yellow-500 bg-yellow-100 text-yellow-600'
+                                : 'border-gray-300 hover:border-yellow-400 hover:bg-yellow-50 text-gray-600 hover:text-yellow-600'
+                            }`}
+                          >
+                            {rating}
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
