@@ -227,7 +227,7 @@ const Profile: React.FC = () => {
 
   const handleSaveField = async (field: string) => {
     try {
-      let updateData: any = {};
+      const updateData: any = {};
       
       switch (field) {
         case 'phone':

@@ -1,6 +1,7 @@
 import { useLanguage } from "../contexts/LanguageContext";
 import PopupCard from "./PopupCard";
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 import {
   Loader2,
   ArrowRight,
@@ -124,6 +125,7 @@ export default function CharchitVidhanSabha({
 }: CharchitVidhanSabhaProps) {
   const { isEnglish } = useLanguage();
   const navigate = useNavigate();
+  const [visibleCount, setVisibleCount] = useState(2);
   // Filter and sort constituencies
   const filteredAndSortedConstituencies = constituencies.sort((a, b) => {
     // First sort by interaction count (descending)
@@ -144,8 +146,20 @@ export default function CharchitVidhanSabha({
     navigate(`/discussion?constituency=${area}&name=${encodeURIComponent(area)}`);
   };
 
+  const handleShowMore = () => {
+    setVisibleCount(prev => prev + 12);
+  };
+
   return (
-    <div className="min-h-screen bg-[#c5ced4]">
+    <div 
+      className="min-h-screen bg-[#c5ced4]"
+      style={{
+        fontFamily: 'Noto Sans Devanagari',
+        letterSpacing: '0',
+        textAlign: 'center',
+        verticalAlign: 'middle'
+      }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-8">
         {/* Header Section */}
         <div className="text-center mb-2 lg:mb-5">
@@ -180,164 +194,129 @@ export default function CharchitVidhanSabha({
             <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-3 lg:py-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {filteredAndSortedConstituencies
-                  .slice(0, 2)
+                  .slice(0, visibleCount)
                   .map((constituency) => (
                     <div
                       key={constituency.id}
-                      className="bg-white rounded-xl shadow-lg p-3 border border-gray-100"
+                      className="bg-white rounded-lg p-4 px-6 shadow-sm border border-gray-200 relative"
                     >
-                      {/* Candidate Profile Header */}
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex max-[450px]:w-60 items-center space-x-1 lg:space-x-3">
-                          <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                            {constituency.profileImage ? (
-                              <img
-                                src={constituency.profileImage}
-                                alt={
-                                  isEnglish
-                                    ? constituency.candidateName.en
-                                    : constituency.candidateName.hi
-                                }
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold text-lg">
-                                {(isEnglish
-                                  ? constituency.candidateName.en
-                                  : constituency.candidateName.hi
-                                ).charAt(0)}
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <div className="text-lg max-[450px]:w-40 font-bold text-gray-900">
-                              {isEnglish
-                                ? constituency.constituencyName.en
-                                : constituency.constituencyName.hi}
-                            </div>
-                            <div className="text-sm max-[450px]:w-40 font-medium text-gray-700">
-                              {isEnglish
-                                ? constituency.candidateName.en
-                                : constituency.candidateName.hi}
-                            </div>
-                            <div className="flex items-center space-x-2 mt-1">
-                              <span
-                                className={`max-[450px]:w-35 px-3 py-1 text-center rounded-full text-xs font-medium text-white ${getPartyColor(constituency.partyName.name)}`}
-                              >
-                                {isEnglish
-                                  ? constituency.partyName.name
-                                  : constituency.partyName.nameHi}
-                              </span>
-                              <div className="w-6 h-6 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center">
-                                <img
-                                  src={fetchPartyIcon(
-                                    constituency.partyName.name,
-                                  )}
-                                  alt="Party"
-                                  className="w-6 h-6 object-contain"
-                                  onError={(e) => {
-                                    e.currentTarget.src =
-                                      "/images/party_logo/independent.png";
-                                  }}
-                                />
-                              </div>
-                            </div>
+                      {/* Active Discussion Badge */}
+                      <div 
+                        className="absolute top-2 right-2 bg-[#DEAF13] px-4 py-2 rounded-xl cursor-pointer hover:bg-[#C49F11] transition-colors"
+                        style={{ boxShadow: 'rgba(0, 0, 0, 0.5) 0px 4px 4px 0px' }}
+                      >
+                        <div className="text-center">
+                          <div 
+                            className="candidate-profile-sakriya-charcha-text"
+                            style={{ fontSize: '12px', lineHeight: '16px' }}
+                          >
+                            {isEnglish ? "Active Discussion" : "सक्रिय चर्चा"}
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleCharchaManch(constituency.constituencyName.en)}
-                          className="bg-yellow-400 text-gray-900 px-3 py-1 rounded-full text-xs font-medium hover:bg-yellow-500 transition-colors"
-                        >
-                          {constituency.activePostCount || 0}+{" "}
-                          {isEnglish ? "Active Discussion" : "सक्रिय चर्चा"}
-                        </button>
                       </div>
 
-                      {/* Candidate Details */}
-                      <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="text-center">
-                          <div className="text-lg font-bold text-gray-900">
-                            {constituency.age || "N/A"}
+                      {/* Candidate Profile Header */}
+                      <div className="mb-4 flex items-start space-x-3 pr-20">
+                        <div className="flex-shrink-0">
+                          <img 
+                            alt={isEnglish ? constituency.candidateName.en : constituency.candidateName.hi}
+                            className="w-16 h-16 rounded-full border-2 border-gray-300 object-cover"
+                            src={constituency.profileImage || "https://via.placeholder.com/64x64"}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="mb-1 candidate-profile-heading text-left">
+                            {isEnglish ? constituency.constituencyName.en : constituency.constituencyName.hi}
                           </div>
-                          <div className="text-xs text-gray-600">
-                            {isEnglish ? "Age" : "आयु"}
+                          <div className="text-xl font-bold candidate-profile-subheading mb-2 text-left">
+                            {isEnglish ? constituency.candidateName.en : constituency.candidateName.hi}
+                          </div>
+                          <div className="flex items-center space-x-2 mb-2">
+                            <button className="bg-[#008040] text-white px-3 py-2 rounded-lg text-sm font-medium min-w-fit flex-shrink-0 text-center leading-tight">
+                              {isEnglish ? constituency.partyName.name : constituency.partyName.nameHi}
+                            </button>
+                            <div className="w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center p-2">
+                              <img 
+                                alt={isEnglish ? constituency.partyName.name : constituency.partyName.nameHi}
+                                className="w-full h-full rounded-full object-contain"
+                                src={fetchPartyIcon(constituency.partyName.name)}
+                                onError={(e) => {
+                                  e.currentTarget.src = "/images/party_logo/independent.png";
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Candidate Info */}
+                      <div className="flex space-x-6 mb-4 justify-between mx-auto">
+                        <div className="text-center">
+                          <div className="vidhayak-info-text">
+                            {constituency.experience?.en || "1"}
+                          </div>
+                          <div className="text-sm text-gray-600 vidhayak-info-text-subheading">
+                            {isEnglish ? "" : ""}
                           </div>
                         </div>
                         <div className="text-center">
-                          <div className="text-sm font-medium text-gray-900 leading-tight">
-                            {isEnglish
-                              ? constituency.education.en
-                              : constituency.education.hi}
+                          <div className="vidhayak-info-text">
+                            {isEnglish ? constituency.education?.en : constituency.education?.hi || "स्नातक"}
                           </div>
-                          <div className="text-xs text-gray-600">
+                          <div className="text-sm text-gray-600">
                             {isEnglish ? "Education" : "शिक्षा"}
                           </div>
                         </div>
                       </div>
 
-                      {/* Public Satisfaction Section */}
+                      {/* Satisfaction Survey */}
                       <div className="mb-4">
-                        <div className="text-sm text-gray-700 mb-2">
-                          {isEnglish
+                        <div className="text-sm text-gray-600 mb-3 text-center mx-auto">
+                          {isEnglish 
                             ? "Are you satisfied with the last five years of tenure?"
-                            : "क्या आप पिछले पाँच साल के कार्यकाल से संतुष्ट है ?"}
+                            : "क्या आप पिछले पांच साल के कार्यकाल से खुश हैं?"
+                          }
                         </div>
                         
                         {/* Show voting buttons only if user hasn't voted */}
                         {currentUser && !userSurveys.has(`${constituency.id}:true`) && !userSurveys.has(`${constituency.id}:false`) ? (
-                          <div className="flex items-center space-x-2 mb-2">
-                            <button 
-                              onClick={() => submitSatisfactionSurvey(constituency.id, true)}
-                              className="px-3 py-1 text-xs rounded-full transition-colors bg-white text-gray-700 border border-gray-300 hover:bg-green-50 hover:border-green-300"
+                          <div className="flex items-center justify-center">
+                            <div 
+                              className="flex bg-[#f6f6f6] w-[90px] h-[40px] pt-[3px] pb-[10px] pr-[6px] pl-[3px] rounded-full gap-0"
+                              style={{ boxShadow: 'rgba(0, 0, 0, 0.15) 0px 4px 8px 0px, rgba(0, 0, 0, 0.1) 0px 2px 4px 0px' }}
                             >
-                              {isEnglish ? "Yes" : "हाँ"}
-                            </button>
-                            <button 
-                              onClick={() => submitSatisfactionSurvey(constituency.id, false)}
-                              className="px-3 py-1 text-xs rounded-full transition-colors bg-white text-gray-700 border border-gray-300 hover:bg-red-50 hover:border-red-300"
-                            >
-                              {isEnglish ? "No" : "ना"}
-                            </button>
+                              <button 
+                                onClick={() => submitSatisfactionSurvey(constituency.id, true)}
+                                className="text-center w-[40px] h-[34px] pl-[10px] pr-[10px] rounded-full text-base font-medium mx-auto transition-colors bg-[#f6f6f6] text-[#026A00]"
+                              >
+                                {isEnglish ? "Yes" : "हाँ"}
+                              </button>
+                              <button 
+                                onClick={() => submitSatisfactionSurvey(constituency.id, false)}
+                                className="text-center w-[40px] h-[34px] rounded-full text-base pr-[9px] pl-[3px] font-medium transition-colors bg-[#f6f6f6] text-[#026A00]"
+                              >
+                                {isEnglish ? "No" : "ना"}
+                              </button>
+                            </div>
                           </div>
                         ) : (
-                          /* Show vote counts and user's vote if they have already voted */
-                          <div className="mb-2">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center space-x-2">
-                                <span className="text-xs text-gray-600">
-                                  {isEnglish ? "Your vote:" : "आपका वोट:"}
-                                </span>
-                                {userSurveys.has(`${constituency.id}:true`) ? (
-                                  <span className="px-2 py-1 text-xs rounded-full bg-green-500 text-white">
-                                    {isEnglish ? "Yes" : "हाँ"}
-                                  </span>
-                                ) : userSurveys.has(`${constituency.id}:false`) ? (
-                                  <span className="px-2 py-1 text-xs rounded-full bg-red-500 text-white">
-                                    {isEnglish ? "No" : "ना"}
-                                  </span>
-                                ) : null}
+                          /* Show vote counts when user has already voted */
+                          <div className="flex items-center justify-center space-x-6">
+                            <div className="text-center">
+                              <div className="text-lg font-bold text-green-600">
+                                {constituency.satisfactionYes || 0}
                               </div>
-                              <div className="text-sm font-bold text-green-600">
-                                {constituency.satisfactionTotal > 0
-                                  ? Math.round(
-                                      (constituency.satisfactionYes /
-                                        constituency.satisfactionTotal) *
-                                        100,
-                                    )
-                                  : 0}
-                                % {isEnglish ? "Satisfied" : "संतुष्ट"}
+                              <div className="text-xs text-gray-600">
+                                {isEnglish ? "Yes" : "हाँ"}
                               </div>
                             </div>
-                            <div className="flex items-center justify-between text-xs text-gray-600">
-                              <span>
-                                {isEnglish ? "Yes:" : "हाँ:"} {constituency.satisfactionYes || 0}
-                              </span>
-                              <span>
-                                {isEnglish ? "No:" : "ना:"} {constituency.satisfactionNo || 0}
-                              </span>
-                              <span>
-                                {isEnglish ? "Total:" : "कुल:"} {constituency.satisfactionTotal || 0}
-                              </span>
+                            <div className="text-center">
+                              <div className="text-lg font-bold text-red-600">
+                                {constituency.satisfactionNo || 0}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                {isEnglish ? "No" : "ना"}
+                              </div>
                             </div>
                           </div>
                         )}
@@ -350,87 +329,61 @@ export default function CharchitVidhanSabha({
                         )}
                       </div>
 
-                      {/* Manifesto Score Section */}
+                      {/* Manifesto Score */}
                       <div className="mb-4">
-                        <div className="text-sm text-gray-700 mb-2">
-                          {isEnglish
-                            ? "Manifesto Promise Score:"
-                            : "घोषणापत्र वादा स्कोर:"} {constituency.manifestoScore || 0}/5
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-sm text-gray-600 manifesto-score-text">
+                            {isEnglish 
+                              ? `Manifesto Promise Score: ${constituency.manifestoScore || 53}%`
+                              : `घोषणापत्र वादा स्कोर: ${constituency.manifestoScore || 53}%`
+                            }
+                          </span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-600 h-2 rounded-full"
-                            style={{
-                              width: `${constituency.manifestoScore*20 || 0}%`,
-                            }}
+                          <div 
+                            className="bg-[#273F4F] h-2 rounded-full"
+                            style={{ width: `${constituency.manifestoScore*20 || 53}%` }}
                           ></div>
                         </div>
                       </div>
 
-                      {/* Recent Activity */}
+                      {/* News Icon */}
                       <div className="flex items-center space-x-2 mb-4">
-                        <div className="w-4 h-4 bg-blue-600 rounded-full"></div>
-                        <div className="flex-1">
-                          <div className="text-sm text-gray-700">
-                            {isEnglish
-                              ? constituency.news.title.en
-                              : constituency.news.title.hi}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {constituency.news.date
-                              ? isEnglish
-                                ? "2 days ago"
-                                : "2 दिन पहले"
-                              : isEnglish
-                                ? "Recent"
-                                : "हाल ही में"}
-                          </div>
+                        <div className="w-5 h-5 rounded flex items-center justify-center">
+                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12.8332 7H11.3865C11.1316 6.99946 10.8835 7.08243 10.6802 7.23623C10.4768 7.39003 10.3295 7.6062 10.2607 7.85167L8.88984 12.7283C8.881 12.7586 8.86258 12.7852 8.83734 12.8042C8.81209 12.8231 8.78139 12.8333 8.74984 12.8333C8.71828 12.8333 8.68758 12.8231 8.66234 12.8042C8.63709 12.7852 8.61867 12.7586 8.60984 12.7283L5.38984 1.27167C5.381 1.24138 5.36258 1.21477 5.33734 1.19583C5.31209 1.1769 5.28139 1.16667 5.24984 1.16667C5.21828 1.16667 5.18758 1.1769 5.16234 1.19583C5.13709 1.21477 5.11867 1.24138 5.10984 1.27167L3.739 6.14833C3.67044 6.39284 3.52398 6.6083 3.32184 6.76201C3.11971 6.91572 2.87294 6.99927 2.619 7H1.1665" stroke="#191970" strokeWidth="1.16667" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm text-gray-600"></span>
                         </div>
                       </div>
 
-                      {/* Action Buttons */}
-                      <div className="flex items-center space-x-2">
-                        <button
+                      {/* Action Button */}
+                      <div className="flex items-center space-x-3">
+                        <button 
                           onClick={() => handleConstituencySelect(constituency)}
-                          className="flex-1 bg-gray-800 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                          className="flex-1 bg-[#273F4F] text-white py-3 px-4 rounded-lg text-sm font-medium"
                         >
                           {isEnglish ? "View Details" : "विस्तार से देखे"}
-                        </button>
-                        <button
-                          onClick={() => handleShare(constituency)}
-                          className="w-10 h-10 bg-white text-gray-600 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors flex items-center justify-center"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"
-                            />
-                          </svg>
                         </button>
                       </div>
                     </div>
                   ))}
               </div>
             </div>
-            {/* Load More Button */}
-            <div className="flex items-center justify-center mb-2 lg:mb-4">
-              <button
-                className="bg-[#7b8a95] text-white px-4 py-2 rounded-md flex items-center gap-2"
-                onClick={() =>
-                  navigate("/constituency/all-constituencies?showAll=true")
-                }
-              >
-                {isEnglish ? "See All Candidates" : "सभी उम्मीदवार देखे"}{" "}
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </div>
+            {/* Show More Button */}
+            {visibleCount < filteredAndSortedConstituencies.length && (
+              <div className="flex items-center justify-center mb-2 lg:mb-4">
+                <button
+                  className="bg-[#7b8a95] text-white px-4 py-2 rounded-md flex items-center gap-2 hover:bg-[#6a7984] transition-colors"
+                  onClick={handleShowMore}
+                >
+                  {isEnglish ? `Show More Constituencies` : `और क्षेत्र दिखाएं`}{" "}
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>

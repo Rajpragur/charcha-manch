@@ -21,8 +21,7 @@ import {
   Share2,
   Award,
   Heart,
-  Home,
-  MessageCircle as ChatBubble,
+
   Trash2,
   MoreVertical,
   ThumbsDown,
@@ -88,7 +87,7 @@ const DiscussionForum: React.FC = () => {
   const [editingPost, setEditingPost] = useState<DiscussionPost | null>(null);
 
 
-  const [activeTab, setActiveTab] = useState<'home' | 'discussion' | 'area'>('discussion');
+
 
   const [showComments, setShowComments] = useState<{ [postId: string]: boolean }>({});
   const [userReactions, setUserReactions] = useState<{ [postId: string]: { liked: boolean; disliked: boolean } }>({});
@@ -1310,38 +1309,7 @@ const DiscussionForum: React.FC = () => {
         </motion.button>
       </div>
 
-      {/* Bottom Navigation - Mobile */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20 shadow-lg">
-        <div className="flex items-center justify-around py-2 px-1">
-          <button
-            onClick={() => navigate('/')}
-            className={`flex flex-col items-center space-y-0.5 p-1.5 rounded-md transition-colors ${
-              activeTab === 'home' ? 'text-[#014e5c] bg-[#014e5c]/10' : 'text-gray-500'
-            }`}
-          >
-            <Home className="w-4 h-4" />
-            <span className="text-xs font-medium">{content.home}</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('discussion')}
-            className={`flex flex-col items-center space-y-0.5 p-1.5 rounded-md transition-colors ${
-              activeTab === 'discussion' ? 'text-[#014e5c] bg-[#014e5c]/10' : 'text-gray-500'
-            }`}
-          >
-            <ChatBubble className="w-4 h-4" />
-            <span className="text-xs font-medium">{content.discussion}</span>
-          </button>
-          <button
-            onClick={() => navigate('/aapka-kshetra')}
-            className={`flex flex-col items-center space-y-0.5 p-1.5 rounded-md transition-colors ${
-              activeTab === 'area' ? 'text-[#014e5c] bg-[#014e5c]/10' : 'text-gray-500'
-            }`}
-          >
-            <MapPin className="w-4 h-4" />
-            <span className="text-xs font-medium">{content.area}</span>
-          </button>
-        </div>
-      </div>
+
 
       {/* Create Post Modal */}
       <CreatePost

@@ -31,7 +31,7 @@ const AdminAccessSetup: React.FC = () => {
     setMessage('');
 
     try {
-      let uid = uidOrEmail.trim();
+      const uid = uidOrEmail.trim();
       
       // If it looks like an email, we'll use it as is for now
       // In a real app, you'd want to verify the user exists first

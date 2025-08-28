@@ -1002,8 +1002,32 @@ const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean)
 
   return (
     <div className="min-h-screen bg-[#c5ced4] mb-0">
-      {/* Hero Section */}
-      <div className="bg-[#273f4f] text-white py-5 sm:py-10 px-4 w-full">
+        {/* Hero Section */}
+       <div className="bg-gradient-to-r from-[#273F4F] to-[#1a2b36] px-4 py-10 pb-30 text-white relative overflow-visible">
+         {/* Top Left Image */}
+         <img 
+           className='h-16 w-auto absolute top-10 left-5 lg:h-35 lg:w-auto lg:top-10 lg:left-30 z-10 opacity-80' 
+           src="/images/IMG_5509.PNG" 
+           alt="Decorative Asset"
+         />
+         {/* Top Right Image */}
+         <img 
+           className='h-16 w-auto absolute top-10 right-10 lg:h-35 lg:w-auto lg:top-10 lg:right-50 z-10 opacity-80' 
+           src="/images/IMG_5509.PNG" 
+           alt="Decorative Asset"
+         />
+         {/* Bottom Left Image */}
+         <img 
+           className='h-16 w-auto absolute bottom-10 left-10 lg:h-35 lg:w-auto lg:bottom-10 lg:left-50 z-10 opacity-80' 
+           src="/images/IMG_5509.PNG" 
+           alt="Decorative Asset"
+         />
+         {/* Bottom Right Image */}
+         <img 
+           className='h-40 w-auto absolute bottom-5 right-5 lg:h-80 lg:w-auto lg:bottom-10 lg:right-20 z-10 opacity-80' 
+           src="/images/IMG_5510.PNG" 
+           alt="Decorative Asset"
+         />
         <div className="w-full max-w-none mx-auto">
           <div className="text-center">
             <div className="grid grid-cols-2 gap-6 md:gap-20 items-center mb-6 sm:mb-8">
@@ -1135,9 +1159,9 @@ const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean)
           </div>
         </div>
       </div>
-
+      
       {/* Nagrik Yogdan Section - Show Current User's Tier */}
-      {currentUser && userProfile && (
+      {/*{currentUser && userProfile && (
         <div className="max-w-full mx-auto bg-[#9ca8b4] px-4 sm:px-6 lg:px-8 py-3 sm:py-8">
           <div className="text-center mb-5 sm:mb-8">
             <h2 className="text-xl sm:text-3xl font-bold text-gray-900 mb-4">
@@ -1174,7 +1198,7 @@ const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean)
                 ))}
             </div>
           {/* User's Current Stats */}
-          <div className="mt-4 lg:mt-8 bg-white rounded-xl shadow-lg p-2 lg:p-6">
+          {/*<div className="mt-4 lg:mt-8 bg-white rounded-xl shadow-lg p-2 lg:p-6">
             <div className="text-center">
               <h3 className="text-md lg:text-xl font-semibold text-gray-900 mb-2">
                 {isEnglish ? 'Your Progress' : 'आपकी प्रगति'}
@@ -1203,7 +1227,7 @@ const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean)
             </div>
           </div>
           {/* Achievement Section for Authenticated Users */}
-          {currentUser && userAchievements && (
+          {/*{currentUser && userAchievements && (
             <div className="mt-4 lg:mt-8 bg-white rounded-xl shadow-lg p-2 lg:p-6">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 lg:py-8">
                 <div className="text-center mb-4 lg:mb-8">
@@ -1259,9 +1283,10 @@ const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean)
               </div>
             </div>
           )}
-            </div>
-          )}
-
+        </div>
+      )} 
+      
+      
       
       {/* Loading State for Database Initialization */}
       {isLoading && (

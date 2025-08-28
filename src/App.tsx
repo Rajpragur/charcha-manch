@@ -36,7 +36,7 @@ const App: React.FC = () => {
           <Router>
             <div className="App min-h-screen flex flex-col">
               <Navbar />
-              <main className="flex-grow pb-20 md:pb-0">
+              <main className="flex-grow pb-20 lg:pb-24">
                 <Routes>
                   {/* Public routes - no constituency check needed */}
                   <Route path="/signup" element={<Signup />} />

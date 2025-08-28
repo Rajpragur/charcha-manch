@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, User, ToggleRight, ToggleLeft, LogOut, Settings, LogIn, UserPlus, Shield, CircleUserRound } from "lucide-react";
+import { Menu, X, User, ToggleRight, ToggleLeft, LogOut, Settings, LogIn, UserPlus, Shield, UserRound, UserRoundCheck } from "lucide-react";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
 import { useAdmin } from "../contexts/AdminContext";
+import BottomBar from "./BottomBar";
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -62,41 +63,54 @@ const Navbar: React.FC = () => {
     <nav className="bg-white shadow-md sticky top-0 z-50 w-full overflow-x-clip">
       <div className="w-full px-2 sm:px-4 lg:px-6">
         <div className="flex justify-between items-center h-12 lg:h-16 relative">
-          {/* Language Toggle */}
-          <div className="flex items-center gap- lg:gap-4 justify-start">
-            <button
-              onClick={toggleLanguage}
-              className="flex items-center gap-2 px-1.5 sm:px-3 py-1 rounded-lg hover:text-[#014e5c] shrink-0"
-            >
-              {isEnglish ? (
-                <ToggleLeft className="h-4 w-4 max-[340px]:h-3 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-              ) : (
-                <ToggleRight className="h-4 w-4 max-[340px]:h-3 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-              )}
-              <span className="hidden sm:inline text-xs font-medium">
-                {isEnglish ? "EN" : "HI"}
-              </span>
-            </button>
+          {/* Left Side - Logo */}
+          <div className="flex items-center z-10">
             <img
               src="/images/logo.png"
-              className="h-5 w-5 lg:h-9 lg:w-9 object-contain"
+              className="h-8 w-8 lg:h-10 lg:w-10 object-contain"
               alt="Logo"
             />
           </div>
 
-          {/* Logo fixed left */}
-          <Link to="/" className="absolute left-1/2 -translate-x-1/2 flex items-center min-w-0">
-            <img src='/images/charchagram.png' className='w-30 h-auto lg:w-40 lg:h-auto lg:shrink-0 mx-1' />
-          </Link>
+          {/* Center - Charchagram */}
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center z-0">
+            <img 
+              src='/images/charchagram.png' 
+              className='w-24 h-auto lg:w-32 lg:h-auto object-contain' 
+              alt="Charchagram"
+            />
+          </div>
           
-          {/* Right section (profile + menu) */}
-          <div className="flex items-center space-x-2 sm:space-x-4 shrink-0">
+          {/* Right Side - Language Toggle + Profile */}
+          <div className="flex items-center space-x-1 sm:space-x-4 z-10">
+            {/* Language Toggle */}
+            <button
+              onClick={toggleLanguage}
+              className="flex items-center gap-1 lg:gap-2 px-0 py-2 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium text-gray-700"
+            >
+              <span>{isEnglish ? "Hi" : "En"}</span>
+              {isEnglish ? (
+                <ToggleLeft className="h-4 w-4 text-black" />
+              ) : (
+                <ToggleRight className="h-4 w-4 text-black" />
+              )}
+            </button>
+
+            {/* Profile Button */}
             <div className="relative" ref={profileRef}>
               <button
                 onClick={() => setShowProfile((prev) => !prev)}
-                className="p-1.5 sm:p-2 rounded-full hover:text-blue-600 transition-colors"
+                className={`p-1 rounded-full transition-all duration-200 ${
+                  currentUser 
+                    ? "text-white hover:bg-[#014e5c]/90 shadow-md" 
+                    : "text-black hover:bg-gray-100"
+                }`}
               >
-              <CircleUserRound className="h-6 w-6 max-[340px]:h-3 sm:h-6 sm:w-6 text-gray-700" />
+                {currentUser ? (
+                  <UserRoundCheck className="h-5 w-5 text-black" />
+                ) : (
+                  <UserRound className="h-5 w-5 text-gray-700" />
+                )}
               </button>
               {showProfile && (
                 <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-xl py-1 z-50 backdrop-blur-sm bg-white/95">
@@ -200,14 +214,16 @@ const Navbar: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Mobile Menu Button */}
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="md:hidden inline-flex items-center justify-center p-1.5 sm:p-2 rounded-md hover:text-blue-600"
+              className="md:hidden inline-flex items-center justify-center p-1 rounded-md hover:text-blue-600"
             >
               {isOpen ? (
-                <X className="h-4 w-4 max-[340px]:h-3 sm:h-6 sm:w-6" />
+                <X className="h-6 w-6" />
               ) : (
-                <Menu className="h-4 w-4 max-[340px]:h-3 sm:h-6 sm:w-6" />
+                <Menu className="h-6 w-6" />
               )}
             </button>
           </div>
@@ -256,6 +272,9 @@ const Navbar: React.FC = () => {
           </div>
         </div>
       )}
+      
+      {/* Bottom Bar - Always visible */}
+      <BottomBar />
     </nav>
   );
 };

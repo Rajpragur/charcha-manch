@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import FirebaseService from '../services/firebaseService';
-import { Calendar, GraduationCap, House, MapPin, MessageCircle,Scale, CircleQuestionMark, IndianRupee,BanknoteArrowUp,Hospital } from 'lucide-react';
+import { Calendar, GraduationCap, MessageCircle,Scale, CircleQuestionMark, IndianRupee,BanknoteArrowUp,Hospital } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../configs/firebase';
+import SignInPopup from '../components/SignInPopup';
 
 interface CandidateData {
   area_name: string;
@@ -79,6 +80,7 @@ const AapkaKshetra: React.FC = () => {
   }>>([]);
   const checkedConstituencies = useRef<Set<string>>(new Set());
   const [initialLoadComplete, setInitialLoadComplete] = useState<boolean>(false);
+  const [showSignInPopup, setShowSignInPopup] = useState(false);
 
   useEffect(() => {
     const initializeComponent = async () => {
@@ -762,17 +764,29 @@ const AapkaKshetra: React.FC = () => {
               {isEnglish ? 'Are you satisfied with the last five years of tenure?' : 'क्या आप पिछले पांच साल के कार्यकाल से संतुष्ट हैं?'}
             </h3>
             
-            {/* Show voting buttons only if user hasn't voted */}
-            {currentUser && !hasSubmittedQuestionnaire ? (
+            {/* Show voting buttons - always visible but handle authentication */}
+            {!hasSubmittedQuestionnaire ? (
               <div className="flex items-center space-x-2 mb-2">
                 <button 
-                  onClick={() => handleSatisfactionVote('yes')}
+                  onClick={() => {
+                    if (!currentUser) {
+                      setShowSignInPopup(true);
+                    } else {
+                      handleSatisfactionVote('yes');
+                    }
+                  }}
                   className="px-3 py-1 text-xs rounded-full transition-colors bg-white text-gray-700 border border-gray-300 hover:bg-green-50 hover:border-green-300"
                 >
                   {isEnglish ? "Yes" : "हाँ"}
                 </button>
                 <button 
-                  onClick={() => handleSatisfactionVote('no')}
+                  onClick={() => {
+                    if (!currentUser) {
+                      setShowSignInPopup(true);
+                    } else {
+                      handleSatisfactionVote('no');
+                    }
+                  }}
                   className="px-3 py-1 text-xs rounded-full transition-colors bg-white text-gray-700 border border-gray-300 hover:bg-red-50 hover:border-red-300"
                 >
                   {isEnglish ? "No" : "ना"}
@@ -826,12 +840,7 @@ const AapkaKshetra: React.FC = () => {
               </div>
             ) : null}
             
-            {/* Show sign in message if not logged in */}
-            {!currentUser && (
-              <div className="text-xs text-gray-500 text-center mt-1">
-                {isEnglish ? 'Sign in to vote' : 'मतदान के लिए साइन इन करें'}
-              </div>
-            )}
+
           </div>
         )}
 
@@ -1165,33 +1174,14 @@ const AapkaKshetra: React.FC = () => {
         )}
       </div>
       
-      {/* Bottom Navigation - Mobile */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20 shadow-lg">
-        <div className="flex items-center justify-around py-2 sm:py-3 px-2">
-          <button
-            onClick={() => navigate('/')}
-            className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-gray-400`}
-          >
-            <House className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span className="text-xs font-medium">{isEnglish ? 'Home' : 'होम'}</span>
-          </button>
-          <button
-            onClick={() => navigate('/discussion')}
-            className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-gray-400`}
-          >
-            <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span className="text-xs font-medium">{isEnglish ? 'Discussion Forum' : 'चर्चा मंच'}</span>
-          </button>
-          <button
-            onClick={() => navigate('/aapka-kshetra')}
-            className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors text-[#014e5c] bg-[#014e5c]/10`}
-          >
-            <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span className="text-xs font-medium">{isEnglish ? 'Your Area' : 'आपका क्षेत्र'}</span>
-          </button>
-        </div>
-      </div>
-
+      {/* Sign In Popup */}
+      {showSignInPopup && (
+        <SignInPopup 
+          isOpen={showSignInPopup} 
+          onClose={() => setShowSignInPopup(false)}
+          customMessage={isEnglish ? 'You need to be signed in to vote on satisfaction surveys. Please sign in or create an account to continue.' : 'संतुष्टि सर्वेक्षणों पर वोट करने के लिए आपको साइन इन करना होगा। कृपया जारी रखने के लिए साइन इन करें या खाता बनाएं।'}
+        />
+      )}
     </div>
   );
 };
