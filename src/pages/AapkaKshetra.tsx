@@ -8,6 +8,8 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../configs/firebase';
 import SignInPopup from '../components/SignInPopup';
 
+
+
 interface CandidateData {
   area_name: string;
   vidhayak_info: {
@@ -64,8 +66,8 @@ const AapkaKshetra: React.FC = () => {
   const [englishConstituencyName, setEnglishConstituencyName] = useState<string>('');
   const [candidateData, setCandidateData] = useState<CandidateData | null>(null);
   const [satisfactionVote, setSatisfactionVote] = useState<'yes' | 'no' | null>(null);
-  const [showConstituencySelector, setShowConstituencySelector] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
+
+
   const [constituencyId, setConstituencyId] = useState<number | null>(null);
   const [currentSatisfactionYes, setCurrentSatisfactionYes] = useState<number>(0);
   const [currentSatisfactionNo, setCurrentSatisfactionNo] = useState<number>(0);
@@ -81,6 +83,21 @@ const AapkaKshetra: React.FC = () => {
   const checkedConstituencies = useRef<Set<string>>(new Set());
   const [initialLoadComplete, setInitialLoadComplete] = useState<boolean>(false);
   const [showSignInPopup, setShowSignInPopup] = useState(false);
+  const [manifestoScore, setManifestoScore] = useState<number>(0);
+
+  // Add Devanagari font import
+  useEffect(() => {
+    const link = document.createElement('link');
+    link.href = 'https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@100;200;300;400;500;600;700;800;900&display=swap';
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+    
+    return () => {
+      if (document.head.contains(link)) {
+        document.head.removeChild(link);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const initializeComponent = async () => {
@@ -209,7 +226,6 @@ const AapkaKshetra: React.FC = () => {
           if (constituency) {
             setSelectedConstituency(constituency);
             setConstituencyId(constituencyId);
-            setShowConstituencySelector(false);
             
             // Also set the English constituency name
             try {
@@ -238,7 +254,6 @@ const AapkaKshetra: React.FC = () => {
           const decodedName = decodeURIComponent(constituencyNameParam);
           if (constituencies.includes(decodedName)) {
             setSelectedConstituency(decodedName);
-            setShowConstituencySelector(false);
             
             // Get the constituency ID and set it properly
             try {
@@ -281,9 +296,26 @@ const AapkaKshetra: React.FC = () => {
       
       if (currentUser && uniqueConstituencies.length > 0) {
         setSelectedConstituency(uniqueConstituencies[0]);
+        // Fetch manifesto score for the first constituency
+        setTimeout(() => {
+          fetchManifestoScore(1);
+        }, 100);
       }
     } catch (error) {
       console.error('Error fetching constituencies:', error);
+    }
+  };
+
+  const fetchManifestoScore = async (constituencyId: number) => {
+    try {
+      const constituencyData = await FirebaseService.getConstituencyDataWithSatisfaction();
+      const constituencyScore = constituencyData.find(data => data.constituency_id === constituencyId);
+      if (constituencyScore) {
+        setManifestoScore(constituencyScore.manifesto_average || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching manifesto score:', error);
+      setManifestoScore(0);
     }
   };
 
@@ -293,7 +325,7 @@ const AapkaKshetra: React.FC = () => {
     try {
       const userProfile = await FirebaseService.getUserProfile(currentUser.uid);
       if (userProfile?.constituency_id) {
-        setShowConstituencySelector(false);
+
         
         const dataFile = isEnglish ? '/data/candidates_en.json' : '/data/candidates.json';
         const response = await fetch(dataFile);
@@ -413,7 +445,11 @@ const AapkaKshetra: React.FC = () => {
         setCandidateData(candidate);
         const idx = data.findIndex((item: CandidateData) => item.area_name === constituency);
         if (idx !== -1) {
-          setConstituencyId(idx + 1);
+          const newConstituencyId = idx + 1;
+          setConstituencyId(newConstituencyId);
+          
+          // Fetch manifesto score from database
+          await fetchManifestoScore(newConstituencyId);
           
           // Also fetch the English constituency name for navigation purposes
           try {
@@ -456,6 +492,11 @@ const AapkaKshetra: React.FC = () => {
         // Check if user has already voted on satisfaction survey for this constituency
         if (currentUser && constituencyId) {
           await checkSatisfactionVoteStatus();
+        }
+        
+        // Fetch manifesto score from database
+        if (constituencyId) {
+          await fetchManifestoScore(constituencyId);
         }
       }
     } catch (error) {
@@ -648,63 +689,31 @@ const AapkaKshetra: React.FC = () => {
     }
   };
 
-  const handleConstituencyConfirm = async () => {
-    if (!currentUser || !selectedConstituency) return;
-    
-    setIsLoading(true);
-    try {
-      const dataFile = isEnglish ? '/data/candidates_en.json' : '/data/candidates.json';
-      const response = await fetch(dataFile);
-      const data: CandidateData[] = await response.json();
-      const constituencyIndex = data.findIndex((item: CandidateData) => item.area_name === selectedConstituency);
-      
-      if (constituencyIndex !== -1) {
-        const constituencyId = constituencyIndex + 1;
-        
-        // Also set the English constituency name for navigation purposes
-        try {
-          const englishResponse = await fetch('/data/candidates_en.json');
-          const englishData: CandidateData[] = await englishResponse.json();
-          const englishConstituency = englishData[constituencyIndex];
-          if (englishConstituency) {
-            setEnglishConstituencyName(englishConstituency.area_name);
-          }
-        } catch (error) {
-          console.error('Error fetching English constituency name:', error);
-          setEnglishConstituencyName(selectedConstituency);
-        }
-        
-        await FirebaseService.updateUserProfile(currentUser.uid, {
-          constituency_id: constituencyId
-        });
-        
-        // Check if user has already voted on satisfaction survey for this constituency
-        await checkSatisfactionVoteStatus();
-        
-        setShowConstituencySelector(false);
-        alert(isEnglish ? 'Constituency confirmed! This cannot be changed.' : 'क्षेत्र की पुष्टि हो गई! इसे नहीं बदला जा सकता।');
-      }
-    } catch (error) {
-      console.error('Error confirming constituency:', error);
-      alert('Failed to confirm constituency. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  
 
   return (
-    <div className="min-h-screen bg-[#9ca8b4]">
-      <div className="px-4 py-3">
-        {/* Constituency Information Card */}
-        <div className="bg-white rounded-lg p-1 mb-4 shadow-sm text-center">
-          <h1 className="lg:text-2xl text-xl font-bold text-black mb-1">
-            {candidateData ? candidateData.area_name + ' ' + 'विधानसभा क्षेत्र' : (isEnglish ? 'Your Constituency' : 'आपका क्षेत्र')}
-          </h1>
-          <p className="text-gray-600 text-sm">
-            {isEnglish ? 'Information about your area' : 'आपके क्षेत्र की जानकारी'}
+    <div className="min-h-screen bg-[#c1cbd1] py-2">
+      {/* Header Section with Flyer */}
+      <div className="bg-[#273F4F] shadow-sm border-b border-gray-200 text-center relative overflow-hidden px-4">
+        <div className="relative z-10 pt-8 px-2 pb-12">
+        {candidateData ? 
+        <h1 className="lg:text-4xl text-2xl font-bold text-white mt-1 mb-1">
+              {candidateData.area_name}
+        </h1>
+        :
+        <h1 className="lg:text-2xl text-xl font-bold text-black mt-1 mb-1">
+              {isEnglish ? '' : ''}
+        </h1>
+        }
+          <p className="aapke-kshetra-ki" style={{fontWeight: 600, fontSize: '1.5rem', letterSpacing: 0}}>
+            <span style={{color: '#a4abb6ff'}}>{isEnglish ? 'Information about' : 'आपके क्षेत्र की'}</span>
+            <span style={{color: '#DC3C22'}}>{isEnglish ? ' Your Area' : ' जानकारी'}</span>
           </p>
         </div>
+      </div>
 
+      <div className="px-4 py-3">
+ 
         {/* MLA Profile Card */}
         {candidateData && (
           <div className="bg-white rounded-lg p-3 lg:p-5 mb-2 shadow-sm">
@@ -792,7 +801,7 @@ const AapkaKshetra: React.FC = () => {
                   {isEnglish ? "No" : "ना"}
                 </button>
               </div>
-            ) : currentUser && hasSubmittedQuestionnaire ? (
+            ) : hasSubmittedQuestionnaire ? (
               /* Show vote counts and user's vote if they have already voted */
               <div className="mb-2">
                 <div className="flex items-center justify-between mb-2">
@@ -826,7 +835,7 @@ const AapkaKshetra: React.FC = () => {
                     {initialLoadComplete && scoresLoaded && (isEnglish ? "Satisfied" : "संतुष्ट")}
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-xs text-gray-600">
+                {/*<div className="flex items-center justify-between text-xs text-gray-600">
                   <span>
                     {isEnglish ? "Yes:" : "हाँ:"} {!initialLoadComplete || !scoresLoaded ? "..." : currentSatisfactionYes || 0}
                   </span>
@@ -837,6 +846,7 @@ const AapkaKshetra: React.FC = () => {
                     {isEnglish ? "Total:" : "कुल:"} {!initialLoadComplete || !scoresLoaded ? "..." : currentSatisfactionYes + currentSatisfactionNo || 0}
                   </span>
                 </div>
+                */}
               </div>
             ) : null}
             
@@ -846,80 +856,80 @@ const AapkaKshetra: React.FC = () => {
 
         {/* Key Metrics Grid */}
         {candidateData && (
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-2 gap-3 mb-4 bg-white px-2 py-2">
             {/* Education */}
-            <div className="bg-white rounded-lg p-2 lg:p-3 shadow-sm flex items-center">
-              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                <GraduationCap className="w-4 h-4 lg:w-6 lg:h-6 text-blue-600" />
+            <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm flex items-center min-h-[80px] lg:min-h-[100px]">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+                <GraduationCap className="w-5 h-5 lg:w-7 lg:h-7 text-blue-600" />
               </div>
               <div>
-                <p className="text-xs lg:text-sm text-black mb-0.5">{isEnglish ? 'Education level' : 'शिक्षा स्तर'}</p>
-                <p className="text-blue-600 font-semibold text-xs lg:text-sm">
+                <p className="text-sm lg:text-base text-black mb-1">{isEnglish ? 'Education level' : 'शिक्षा स्तर'}</p>
+                <p className="text-blue-600 font-semibold text-sm lg:text-base">
                   {candidateData.vidhayak_info.metadata.education}
                 </p>
               </div>
             </div>
 
             {/* Net Worth */}
-            <div className="bg-white rounded-lg p-2 lg:p-3 shadow-sm flex items-center">
-              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                <IndianRupee className="w-4 h-4 lg:w-6 lg:h-6 text-blue-600" />
+            <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm flex items-center min-h-[80px] lg:min-h-[100px]">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+                <IndianRupee className="w-5 h-5 lg:w-7 lg:h-7 text-blue-600" />
               </div>
-              <div>
-                <p className="text-xs lg:text-sm text-black mb-0.5">{isEnglish ? 'Education level' : 'शिक्षा स्तर'}</p>
-                <p className="text-blue-600 font-semibold text-xs lg:text-sm">
+              <div className="flex-1 items-center">
+                <p className="text-sm lg:text-base text-black mb-1">{isEnglish ? 'Net Worth' : 'संपत्ति'}</p>
+                <p className="text-blue-600 font-semibold text-sm lg:text-base">
                   {formatCurrency(candidateData.vidhayak_info.metadata.net_worth, isEnglish)}
                 </p>
               </div>
             </div>
 
             {/* Criminal Cases */}
-            <div className="bg-white rounded-lg p-2 lg:p-3 shadow-sm flex items-center">
-              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
-                <Scale className="w-5 h-5 lg:w-6 lg:h-6 text-red-600" />
+            <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm flex items-center min-h-[80px] lg:min-h-[100px]">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
+                <Scale className="w-5 h-5 lg:w-7 lg:h-7 text-red-600" />
               </div>
               <div>
-                <p className="text-xs lg:text-sm text-black mb-0.5">{isEnglish ? 'Criminal cases' : 'आपराधिक मामले'}</p>
-                <p className="text-blue-600 font-semibold text-xs lg:text-sm">
+                <p className="text-sm lg:text-base text-black mb-1">{isEnglish ? 'Criminal cases' : 'आपराधिक मामले'}</p>
+                <p className="text-blue-600 font-semibold text-sm lg:text-base">
                   {candidateData.vidhayak_info.metadata.criminal_cases}
                 </p>
               </div>
             </div>
 
             {/* Assembly Attendance */}
-            <div className="bg-white rounded-lg p-2 lg:p-3 shadow-sm flex items-center">
-              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-purple-100 rounded-full flex items-center justify-center mr-3">
-                <Calendar className="w-5 h-5 lg:w-6 lg:h-6 text-purple-600" />
+            <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm flex items-center min-h-[80px] lg:min-h-[100px]">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-purple-100 rounded-full flex items-center justify-center mr-4">
+                <Calendar className="w-5 h-5 lg:w-7 lg:h-7 text-purple-600" />
               </div>
               <div>
-                <p className="text-xs lg:text-sm text-black mb-0.5">{isEnglish ? 'Assembly attendance' : 'विधानसभा उपस्थिति'}</p>
-                <p className="text-blue-600 font-semibold text-xs lg:text-sm">
+                <p className="text-sm lg:text-base text-black mb-1">{isEnglish ? 'Assembly attendance' : 'विधानसभा उपस्थिति'}</p>
+                <p className="text-blue-600 font-semibold text-sm lg:text-base">
                   {candidateData.vidhayak_info.metadata.attendance || '0%'}
                 </p>
               </div>
             </div>
 
             {/* Questions Asked */}
-            <div className="bg-white rounded-lg p-2 lg:p-3 shadow-sm flex items-center">
-              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-orange-100 rounded-full flex items-center justify-center mr-3">
-                <CircleQuestionMark className="w-5 h-5 lg:w-6 lg:h-6 text-orange-600" />
+            <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm flex items-center min-h-[80px] lg:min-h-[100px]">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-orange-100 rounded-full flex items-center justify-center mr-4">
+                <CircleQuestionMark className="w-5 h-5 lg:w-7 lg:h-7 text-orange-600" />
               </div>
               <div>
-                <p className="text-xs lg:text-sm text-black mb-0.5">{isEnglish ? 'Questions asked' : 'सवाल पूछे'}</p>
-                <p className="text-blue-600 font-semibold text-xs lg:text-sm">
+                <p className="text-sm lg:text-base text-black mb-1">{isEnglish ? 'Questions asked' : 'सवाल पूछे'}</p>
+                <p className="text-blue-600 font-semibold text-sm lg:text-base">
                   {candidateData.vidhayak_info.metadata.questions_asked || '0'}
                 </p>
               </div>
             </div>
 
             {/* Fund Utilization */}
-            <div className="bg-white rounded-lg p-2 lg:p-3 shadow-sm flex items-center">
-              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-teal-100 rounded-full flex items-center justify-center mr-3">
-                <BanknoteArrowUp className="text-teal-600 text-base lg:text-xl" />
+            <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm flex items-center min-h-[80px] lg:min-h-[100px]">
+            <div className="w-10 h-10 lg:w-12 lg:h-12 bg-orange-100 rounded-full flex items-center justify-center mr-4">
+            <BanknoteArrowUp className="w-5 h-5 lg:w-7 lg:h-7 text-orange-60" />
               </div>
               <div>
-                <p className="text-xs lg:text-sm text-black mb-0.5">{isEnglish ? 'Fund utilization' : 'निधि उपयोग'}</p>
-                <p className="text-blue-600 font-semibold text-xs lg:text-sm">
+                <p className="text-sm lg:text-base text-black mb-1">{isEnglish ? 'Fund utilization' : 'निधि उपयोग'}</p>
+                <p className="text-blue-600 font-semibold text-sm lg:text-base">
                   {candidateData.vidhayak_info.metadata.funds_utilisation || '0%'}
                 </p>
               </div>
@@ -945,8 +955,35 @@ const AapkaKshetra: React.FC = () => {
           </div>
         )}
 
+        {/* Manifesto Score Display */}
+        {candidateData && (
+          <div className="bg-white rounded-lg p-4 mb-2 shadow-sm">
+            <h3 className="text-lg font-medium text-black mb-4 text-center">
+              {isEnglish ? 'Manifesto Promise Score' : 'घोषणापत्र वादा स्कोर'}
+            </h3>
+            
+            <div className="text-center">
+              <div className="text-3xl font-bold text-[#273F4F] mb-2">
+                {manifestoScore.toFixed(1)}
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
+                <div 
+                  className="bg-[#273F4F] h-3 rounded-full transition-all duration-300"
+                  style={{ width: `${manifestoScore*20}%` }}
+                ></div>
+              </div>
+              <p className="text-sm text-gray-600">
+                {isEnglish 
+                  ? 'Based on public feedback and performance metrics' 
+                  : 'जनता की प्रतिक्रिया और प्रदर्शन मापदंडों के आधार पर'
+                }
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Department Quiz Section */}
-        {candidateData && !hasSubmittedQuestionnaire && (
+        {candidateData && (
           <div className="bg-white rounded-lg p-4 mb-2 shadow-sm">
             <h3 className="text-lg font-medium text-black mb-4 text-center">
               {isEnglish ? 'Rate Government Performance by Department' : 'विभाग के अनुसार सरकार के प्रदर्शन को रेट करें'}
@@ -973,39 +1010,27 @@ const AapkaKshetra: React.FC = () => {
                       {isEnglish ? 'How satisfied are you with the government\'s work on this subject?' : 'इस विषय पर सरकार के कार्य से आप कितने संतुष्ट हैं ?'}
                     </p>
                     
-                    {currentUser ? (
-                      <div className="flex items-center justify-center space-x-1 mb-3">
-                        {[1, 2, 3, 4, 5].map((rating) => (
-                          <button
-                            key={rating}
-                            onClick={() => handleDepartmentRating(dept.dept_name, rating)}
-                            className={`w-8 h-8 rounded-full border-2 transition-all duration-200 flex items-center justify-center text-sm font-semibold ${
-                              departmentRatings[dept.dept_name] === rating
-                                ? 'border-yellow-500 bg-yellow-100 text-yellow-600'
-                                : 'border-gray-300 hover:border-yellow-400 hover:bg-yellow-50 text-gray-600 hover:text-yellow-600'
-                            }`}
-                          >
-                            {rating}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center space-x-1 mb-3">
-                        {[1, 2, 3, 4, 5].map((rating) => (
-                          <button
-                            key={rating}
-                            onClick={() => setShowSignInPopup(true)}
-                            className={`w-8 h-8 rounded-full border-2 transition-all duration-200 flex items-center justify-center text-sm font-semibold ${
-                              departmentRatings[dept.dept_name] === rating
-                                ? 'border-yellow-500 bg-yellow-100 text-yellow-600'
-                                : 'border-gray-300 hover:border-yellow-400 hover:bg-yellow-50 text-gray-600 hover:text-yellow-600'
-                            }`}
-                          >
-                            {rating}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    <div className="flex items-center justify-center space-x-1 mb-3">
+                      {[1, 2, 3, 4, 5].map((rating) => (
+                        <button
+                          key={rating}
+                          onClick={() => {
+                            if (!currentUser) {
+                              setShowSignInPopup(true);
+                            } else {
+                              handleDepartmentRating(dept.dept_name, rating);
+                            }
+                          }}
+                          className={`w-8 h-8 rounded-full border-2 transition-all duration-200 flex items-center justify-center text-sm font-semibold ${
+                            departmentRatings[dept.dept_name] === rating
+                              ? 'border-yellow-500 bg-yellow-100 text-yellow-600'
+                              : 'border-gray-300 hover:border-yellow-400 hover:bg-yellow-50 text-gray-600 hover:text-yellow-600'
+                          }`}
+                        >
+                          {rating}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   
                   <div className="flex items-center justify-between text-sm">
@@ -1036,17 +1061,21 @@ const AapkaKshetra: React.FC = () => {
               ))}
               
               {/* Submit Button */}
-              {currentUser && (
-                <div className="text-center pt-4">
-                  <button
-                    onClick={handleQuestionnaireSubmit}
-                    disabled={!canSubmitQuestionnaire()}
-                    className="bg-[#014e5c] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#014e5c]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isEnglish ? 'Submit Ratings' : 'रेटिंग सबमिट करें'}
-                  </button>
-                </div>
-              )}
+              <div className="text-center pt-4">
+                <button
+                  onClick={() => {
+                    if (!currentUser) {
+                      setShowSignInPopup(true);
+                    } else {
+                      handleQuestionnaireSubmit();
+                    }
+                  }}
+                  disabled={!currentUser && !canSubmitQuestionnaire()}
+                  className="bg-[#014e5c] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#014e5c]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isEnglish ? 'Submit Ratings' : 'रेटिंग सबमिट करें'}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1113,51 +1142,37 @@ const AapkaKshetra: React.FC = () => {
         )}
 
         {/* Constituency Selection */}
-        {showConstituencySelector && (
-          <div className="bg-white rounded-lg p-6 mb-4 shadow-sm">
-            <div className="text-center mb-4">
-              <h2 className="text-lg font-semibold text-black mb-2">
-                {isEnglish ? 'Select your constituency (this cannot be changed later)' : 'अपना क्षेत्र चुनें (इसे बाद में नहीं बदला जा सकता)'}
-              </h2>
-            </div>
-            <div className="space-y-4">
-              <select
-                value={selectedConstituency}
-                onChange={(e) => setSelectedConstituency(e.target.value)}
-                disabled={isLoading}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:opacity-60 disabled:cursor-not-allowed text-base"
-              >
-                <option value="">{isEnglish ? 'Select Your Constituency' : 'अपना क्षेत्र चुनें'}</option>
-                {constituencies.map((constituency) => (
-                  <option key={constituency} value={constituency}>
-                    {constituency}
-                  </option>
-                ))}
-              </select>
-              
-              {selectedConstituency && currentUser && (
-                <div className="text-center pt-4">
-                  <button
-                    className="bg-[#014e5c] text-white px-8 py-3 rounded-lg font-medium hover:[#014e5c]/80 transition-colors disabled:opacity-60 text-base"
-                    onClick={handleConstituencyConfirm}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? 'Processing...' : (isEnglish ? 'Confirm Selection' : 'चयन की पुष्टि करें')}
-                  </button>
+        <div className="flex flex-col items-center justify-center px-4 py-6">
+          <div className="mb-6 max-w-md mx-auto w-full">
+            <div className="text-gray-800">
+              <div className="relative">
+                <div className="flex items-center justify-between min-h-[48px] outline-0 transition-all duration-100 bg-[#e5e7eb] border border-gray-300 rounded-lg hover:border-gray-400 focus-within:border-[#273F4F] focus-within:ring-2 focus-within:ring-[#273F4F]/20">
+                  <div className="flex-1 px-3 py-2">
+                    <select
+                      value={selectedConstituency}
+                      onChange={(e) => setSelectedConstituency(e.target.value)}
+                      className="w-full bg-transparent border-none outline-none text-gray-800 placeholder-gray-500 text-base"
+                    >
+                      <option value="">{isEnglish ? 'Search your constituency...' : 'अपना निर्वाचन क्षेत्र खोजें...'}</option>
+                      {constituencies.map((constituency) => (
+                        <option key={constituency} value={constituency}>
+                          {constituency}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center pr-3">
+                    <svg height="20" width="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false" className="text-gray-400">
+                      <path d="M4.516 7.548c0.436-0.446 1.043-0.481 1.576 0l3.908 3.747 3.908-3.747c0.533-0.481 1.141-0.446 1.574 0 0.436 0.445 0.408 1.197 0 1.615-0.406 0.418-4.695 4.502-4.695 4.502-0.217 0.223-0.502 0.335-0.787 0.335s-0.57-0.112-0.789-0.335c0 0-4.287-4.084-4.695-4.502s-0.436-1.17 0-1.615z"></path>
+                    </svg>
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Not Logged In Warning */}
-        {!currentUser && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4 text-center">
-            <p className="text-amber-700 text-sm">
-              {isEnglish ? 'Please log in to rate and vote' : 'रेटिंग और वोटिंग के लिए कृपया लॉगिन करें'}
-            </p>
-          </div>
-        )}
+
         {/* Charcha Manch Button */}
         {candidateData && constituencyId && (
           <div className="text-center mt-4 sm:mt-6 mb-3 sm:mb-4">
@@ -1184,6 +1199,58 @@ const AapkaKshetra: React.FC = () => {
         )}
       </div>
       
+      {/* Footer */}
+      <footer className="bg-[#273F4F] text-white py-8 mt-auto">
+        <div className="max-w-3xl mx-auto px-4">
+          <div className="grid md:grid-cols-3 gap-8 mb-8">
+            <div>
+              <h3 className="text-lg font-semibold mb-4">{isEnglish ? 'Links' : 'लिंक'}</h3>
+              <ul className="space-y-2">
+                <li>
+                  <a href="/about" className="hover:text-gray-300 transition-colors">
+                    {isEnglish ? 'Our Vision' : 'हमारा नज़रिया'}
+                  </a>
+                </li>
+                <li>
+                  <a href="/contact" className="hover:text-gray-300 transition-colors">
+                    {isEnglish ? 'Contact' : 'संपर्क'}
+                  </a>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold mb-4">{isEnglish ? 'Connect with us' : 'हमसे जुड़ें'}</h3>
+              <div className="flex gap-3">
+                <a href="https://www.facebook.com/charchagram/" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"></path>
+                  </svg>
+                </a>
+                <a href="https://x.com/Charchagram_" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"></path>
+                  </svg>
+                </a>
+                <a href="https://www.instagram.com/charchagram.collective/" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"></path>
+                  </svg>
+                </a>
+                <a href="https://www.youtube.co/@CharchagramCollective" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"></path>
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </div>
+          <div className="pt-8 border-t border-gray-600 text-sm">
+            <p className="text-center mb-2">© 2025 {isEnglish ? 'CharchaGram' : 'चर्चाग्राम'} - {isEnglish ? 'All rights reserved' : 'सभी अधिकार सुरक्षित'}</p>
+            <p className="text-center text-gray-400">{isEnglish ? 'Powered by Charcha Foundation' : 'चर्चा फाउंडेशन द्वारा संचालित'}</p>
+          </div>
+        </div>
+      </footer>
+
       {/* Sign In Popup */}
       {showSignInPopup && (
         <SignInPopup 

@@ -36,6 +36,9 @@ export interface FirebaseUserProfile {
   tier_level: number;
   engagement_score: number;
   constituency_id?: number;
+  gender?: string;
+  age_group?: string;
+  area?: string;
   created_at: Timestamp;
   updated_at: Timestamp;
 }

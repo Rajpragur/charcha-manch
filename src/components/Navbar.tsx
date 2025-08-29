@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, User, ToggleRight, ToggleLeft, LogOut, Settings, LogIn, UserPlus, Shield, UserRound, UserRoundCheck } from "lucide-react";
+import { Menu, X, User, ToggleRight, ToggleLeft, LogOut, Settings, LogIn, UserPlus, Shield, UserRound } from "lucide-react";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
 import { useAdmin } from "../contexts/AdminContext";
@@ -17,22 +17,14 @@ const Navbar: React.FC = () => {
   
   const navItems = isEnglish
     ? [
-        { name: "Home", href: "/" },
-        { name: "Constituencies", href: "/constituency/all-constituencies?showAll=true" },
-        { name: "Aapka Kshetra", href: "/aapka-kshetra" },
-        { name: "Charcha Manch", href: "/discussion" },
         { name: "Blog", href: "/blog" },
-        { name: "Contact", href: "/contact" },
         { name: "About", href: "/about" },
+        { name: "Contact", href: "/contact"},
       ]
     : [
-        { name: "होम", href: "/" },
-        { name: "निर्वाचन क्षेत्र", href: "/constituency/all-constituencies?showAll=true" },
-        { name: "आपका क्षेत्र", href: "/aapka-kshetra" },
-        { name: "चर्चा मंच", href: "/discussion" },
-        { name: "ब्लॉग", href: "/blog" },
-        { name: "संपर्क", href: "/contact" },
-        { name: "परिचय", href: "/about" },
+        { name: "नागरिक नज़रिया", href: "/blog" },
+        { name: "हमारी कहानी", href: "/about" },
+        { name: "संपर्क", href: "/contact"},
       ];
 
   useEffect(() => {
@@ -74,11 +66,13 @@ const Navbar: React.FC = () => {
 
           {/* Center - Charchagram */}
           <div className="absolute left-1/2 -translate-x-1/2 flex items-center z-0">
-            <img 
-              src='/images/charchagram.png' 
-              className='w-24 h-auto lg:w-32 lg:h-auto object-contain' 
-              alt="Charchagram"
-            />
+            <Link to="/">
+              <img 
+                src='/images/charchagram.png' 
+                className='w-24 h-auto lg:w-32 lg:h-auto object-contain cursor-pointer hover:opacity-80 transition-opacity' 
+                alt="Charchagram"
+              />
+            </Link>
           </div>
           
           {/* Right Side - Language Toggle + Profile */}
@@ -98,21 +92,24 @@ const Navbar: React.FC = () => {
 
             {/* Profile Button */}
             <div className="relative" ref={profileRef}>
-              <button
-                onClick={() => setShowProfile((prev) => !prev)}
-                className={`p-1 rounded-full transition-all duration-200 ${
-                  currentUser 
-                    ? "text-white hover:bg-[#014e5c]/90 shadow-md" 
-                    : "text-black hover:bg-gray-100"
-                }`}
-              >
-                {currentUser ? (
-                  <UserRoundCheck className="h-5 w-5 text-black" />
-                ) : (
+              {currentUser ? (
+                <button
+                  onClick={() => setShowProfile((prev) => !prev)}
+                  className="p-1 rounded-full transition-all duration-200 text-white hover:bg-[#014e5c]/90 shadow-md"
+                >
+                  <div className="w-5 h-5 bg-[#014e5c] rounded-full flex items-center justify-center text-white text-xs font-semibold">
+                    {currentUser.displayName?.charAt(0).toUpperCase() || currentUser.email?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                </button>
+              ) : (
+                <Link
+                  to="/signin"
+                  className="p-1 rounded-full transition-all duration-200 text-black hover:bg-gray-100"
+                >
                   <UserRound className="h-5 w-5 text-gray-700" />
-                )}
-              </button>
-              {showProfile && (
+                </Link>
+              )}
+              {showProfile && currentUser && (
                 <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-xl py-1 z-50 backdrop-blur-sm bg-white/95">
                   {currentUser ? (
                     <>
@@ -215,10 +212,10 @@ const Navbar: React.FC = () => {
               )}
             </div>
 
-            {/* Mobile Menu Button */}
+            {/* Hamburger Menu Button - Visible on both mobile and desktop */}
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="md:hidden inline-flex items-center justify-center p-1 rounded-md hover:text-blue-600"
+              className="inline-flex items-center justify-center p-1 rounded-md hover:text-blue-600"
             >
               {isOpen ? (
                 <X className="h-6 w-6" />
@@ -230,37 +227,18 @@ const Navbar: React.FC = () => {
         </div>
       </div>
 
-      {/* Desktop nav */}
-      <div className="bg-gray-50 w-full">
-        <div className="w-full px-4 sm:px-6 lg:px-8">
-          <div className="hidden md:flex justify-center space-x-6 py-2">
-            {navItems.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition ${
-                  location.pathname === item.href
-                    ? "text-white bg-[#014e5c]"
-                    : "text-gray-700 hover:text-blue-600 hover:bg-gray-100"
-                }`}
-              >
-                {item.name}
-              </Link>
-            ))}
-          </div>
-        </div>
-      </div>
 
-      {/* Mobile nav */}
+
+      {/* Navigation Menu - Visible on both mobile and desktop */}
       {isOpen && (
-        <div className="md:hidden bg-gray-50 border-t w-full">
+        <div className="bg-gray-50 border-t w-full md:w-1/3 md:absolute md:right-0 md:top-full md:shadow-lg md:rounded-bl-lg md:border-l md:border-b">
           <div className="px-4 pt-2 pb-4 space-y-2">
             {navItems.map((item) => (
               <Link
                 key={item.name}
                 to={item.href}
                 onClick={() => setIsOpen(false)}
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
+                className={`block px-3 py-2 rounded-md text-base font-medium flex items-center gap-3 ${
                   location.pathname === item.href
                     ? "text-white bg-[#014e5c]"
                     : "text-gray-700 hover:text-blue-600 hover:bg-gray-100"

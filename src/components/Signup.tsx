@@ -3,24 +3,19 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { RecaptchaVerifier } from 'firebase/auth';
 import { auth } from '../configs/firebase';
-import { Mail, Lock, Phone, Eye, EyeOff, ArrowRight, Smartphone, X } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, X } from 'lucide-react';
 
 const Signup: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'email' | 'phone'>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [verificationId, setVerificationId] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const [codeSent, setCodeSent] = useState(false);
   
-  const { signup, signInWithGoogle, signInWithPhone, verifyPhoneCode } = useAuth();
+  const { signup, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
   const recaptchaRef = useRef<HTMLDivElement>(null);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
@@ -38,6 +33,12 @@ const Signup: React.FC = () => {
 
   const handleEmailSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if email is Gmail
+    if (!email.endsWith('@gmail.com')) {
+      setError('Please use a Gmail address');
+      return;
+    }
     
     if (password !== confirmPassword) {
       return setError('Passwords do not match');
@@ -76,67 +77,6 @@ const Signup: React.FC = () => {
     }
   };
 
-  const handlePhoneSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!phoneNumber || phoneNumber.length < 10) {
-      return setError('Please enter a valid phone number');
-    }
-
-    try {
-      setError('');
-      setSuccess('');
-      setLoading(true);
-      
-      if (!recaptchaVerifierRef.current) {
-        throw new Error('reCAPTCHA not initialized');
-      }
-
-      const confirmationResult = await signInWithPhone(phoneNumber, recaptchaVerifierRef.current);
-      setVerificationId(confirmationResult.verificationId);
-      setCodeSent(true);
-      setSuccess('Verification code sent to your phone!');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!verificationCode || verificationCode.length !== 6) {
-      return setError('Please enter the 6-digit verification code');
-    }
-
-    try {
-      setError('');
-      setSuccess('');
-      setLoading(true);
-      await verifyPhoneCode(verificationId, verificationCode);
-      setSuccess('Phone number verified successfully! Redirecting...');
-      setTimeout(() => navigate('/'), 2000);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resetForm = () => {
-    setEmail('');
-    setPassword('');
-    setConfirmPassword('');
-    setPhoneNumber('');
-    setVerificationCode('');
-    setVerificationId('');
-    setError('');
-    setSuccess('');
-    setCodeSent(false);
-    setActiveTab('email');
-  };
-
   return (
     <div className="min-h-screen bg-[#c1cad1] flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden relative">
@@ -163,32 +103,6 @@ const Signup: React.FC = () => {
           <p className="text-gray-600 text-sm">लोकतंत्र में भागीदारी का नया तरीका</p>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b border-gray-200 mx-8">
-          <button
-            onClick={() => setActiveTab('email')}
-            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-              activeTab === 'email'
-                ? 'text-gray-800 border-b-2 border-gray-700'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Mail className="h-4 w-4 inline mr-2" />
-            ईमेल
-          </button>
-          <button
-            onClick={() => setActiveTab('phone')}
-            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-              activeTab === 'phone'
-                ? 'text-gray-800 border-b-2 border-gray-700'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Phone className="h-4 w-4 inline mr-2" />
-            फोन
-          </button>
-        </div>
-
         <div className="p-8">
           {/* Error/Success Messages */}
           {error && (
@@ -205,7 +119,7 @@ const Signup: React.FC = () => {
             </div>
           )}
 
-          {/* Google Sign Up Button */}
+          {/* Google Sign Up Button - At Top */}
           <button
             onClick={handleGoogleSignup}
             disabled={loading}
@@ -230,147 +144,86 @@ const Signup: React.FC = () => {
           </div>
 
           {/* Email Signup Form */}
-          {activeTab === 'email' && (
-            <form onSubmit={handleEmailSignup} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">ईमेल पता</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
-                    placeholder="अपना ईमेल दर्ज करें"
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">पासवर्ड</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-12 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
-                    placeholder="अपना पासवर्ड दर्ज करें"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">पासवर्ड की पुष्टि करें</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full pl-10 pr-12 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
-                    placeholder="अपना पासवर्ड फिर से दर्ज करें"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-              
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-gray-700 text-white py-3 px-4 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-all duration-200 font-medium flex items-center justify-center"
-              >
-                {loading ? 'खाता बन रहा है...' : 'खाता बनाएं'}
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </button>
-            </form>
-          )}
-
-          {/* Phone Signup Form */}
-          {activeTab === 'phone' && (
+          <form onSubmit={handleEmailSignup} className="space-y-4 mb-6">
             <div>
-              {!codeSent ? (
-                <form onSubmit={handlePhoneSignup} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">मोबाइल नंबर</label>
-                    <div className="relative">
-                      <Smartphone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <input
-                        type="tel"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
-                        placeholder="+91 98765 43210"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-gray-700 text-white py-3 px-4 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-all duration-200 font-medium flex items-center justify-center"
-                  >
-                    {loading ? 'कोड भेज रहा है...' : 'सत्यापन कोड भेजें'}
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </button>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyCode} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">सत्यापन कोड</label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={verificationCode}
-                        onChange={(e) => setVerificationCode(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
-                        placeholder="6 अंकों का कोड दर्ज करें"
-                        maxLength={6}
-                        required
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">हमने {phoneNumber} पर 6 अंकों का कोड भेजा है</p>
-                  </div>
-                  
-                  <div className="flex space-x-3">
-                    <button
-                      type="button"
-                      onClick={resetForm}
-                      className="flex-1 bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-                    >
-                      वापस
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="flex-1 bg-gray-700 text-white py-3 px-4 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-all duration-200 font-medium flex items-center justify-center"
-                    >
-                      {loading ? 'सत्यापित हो रहा है...' : 'कोड सत्यापित करें'}
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </button>
-                  </div>
-                </form>
-              )}
+              <label className="block text-sm font-medium text-gray-700 mb-2">ईमेल पता (Gmail only)</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+                  placeholder="अपना Gmail दर्ज करें"
+                  required
+                />
+              </div>
             </div>
-          )}
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">पासवर्ड</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-12 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+                  placeholder="अपना पासवर्ड दर्ज करें"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">पासवर्ड की पुष्टि करें</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full pl-10 pr-12 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+                  placeholder="अपना पासवर्ड फिर से दर्ज करें"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gray-700 text-white py-3 px-4 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-all duration-200 font-medium flex items-center justify-center"
+            >
+              {loading ? 'खाता बन रहा है...' : 'खाता बनाएं'}
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </button>
+          </form>
+
+          {/* Phone Number Section - At Bottom (Commented out for now) */}
+          {/*<div className="border-t border-gray-200 pt-6">
+            <div className="text-center">
+              <p className="text-sm text-gray-500 mb-3">फोन नंबर से साइन अप (अभी उपलब्ध नहीं)</p>
+              <div className="flex items-center justify-center space-x-2 text-gray-400">
+                <Phone className="h-4 w-4" />
+                <span className="text-xs">Coming Soon</span>
+              </div>
+            </div>
+          </div>*/}
 
           {/* reCAPTCHA */}
           <div ref={recaptchaRef} className="mt-4"></div>

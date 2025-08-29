@@ -124,6 +124,7 @@ const Home: React.FC = () => {
   const [, setEnglishData] = useState<CandidateData[]>([]);
   const [, setHindiData] = useState<CandidateData[]>([]);
   const [userSurveys, setUserSurveys] = useState<Set<string>>(new Set());
+  const [userVotesLoading, setUserVotesLoading] = useState(true);
 
 
 
@@ -187,6 +188,8 @@ const Home: React.FC = () => {
         // Load user votes from Firebase if user is authenticated
         if (currentUser) {
           await loadUserVotesFromFirebase();
+        } else {
+          setUserVotesLoading(false);
         }
         
       } catch (error) {
@@ -392,7 +395,8 @@ const Home: React.FC = () => {
       });
 
       setConstituencies(transformedData);
-      setIsLoading(false);
+      
+      // Don't set loading to false here - wait for the main useEffect to complete
     } catch (error) {
       console.error('Error loading constituency data:', error);
       setIsLoading(false);
@@ -890,7 +894,10 @@ const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean)
 
   // Load user votes from Firebase
   const loadUserVotesFromFirebase = async () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      setUserVotesLoading(false);
+      return;
+    }
     
     // Check cache first to prevent repeated Firebase calls
     const cacheKey = `userVotes_${currentUser.uid}`;
@@ -940,6 +947,8 @@ const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean)
       console.error('❌ Error loading user votes from Firebase:', err);
       // Initialize with empty set on error
       setUserSurveys(new Set());
+    } finally {
+      setUserVotesLoading(false);
     }
   };
   // Get party color
@@ -1318,6 +1327,7 @@ const submitSatisfactionSurvey = async (constituencyId: string, answer: boolean)
           closePopup={closePopup}
           currentUser={currentUser}
           userSurveys={userSurveys}
+          userVotesLoading={userVotesLoading}
         />
       )}
       {/* Bottom Navigation - Mobile */}

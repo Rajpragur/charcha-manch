@@ -681,7 +681,7 @@ const Constituency: React.FC = () => {
                     <div className="flex items-start space-x-3">
                       <div className="relative">
                                                  <img 
-                           src={candidate.candidate_party.toUpperCase() == 'NOTA' || candidate.candidate_party == 'नोटा' ? '/images/party_logo/nota.png' : (candidate.candidate_image_url || '/images/party_logo/independent.png')} 
+                           src={(candidate.candidate_party && candidate.candidate_party.toUpperCase() == 'NOTA') || candidate.candidate_party == 'नोटा' ? '/images/party_logo/nota.png' : (candidate.candidate_image_url || '/images/party_logo/independent.png')} 
                            alt={candidate.candidate_name}
                            className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
                            onError={(e) => {
@@ -694,14 +694,14 @@ const Constituency: React.FC = () => {
                           {candidate.candidate_name}
                         </h4>
                         <div className="flex items-center space-x-2 mb-2">
-                          <span className={`px-3 py-1 rounded-full text-white text-xs font-medium ${getPartyColor(candidate.candidate_party)}`}>
-                            {candidate.candidate_party}
+                          <span className={`px-3 py-1 rounded-full text-white text-xs font-medium ${getPartyColor(candidate.candidate_party || 'Independent')}`}>
+                            {candidate.candidate_party || 'Independent'}
                           </span>
                           <div className="w-8 h-8 rounded-full flex items-center justify-center border border-gray-200">
                             <img 
                               className="w-6 h-6 object-contain" 
-                              src={fetchPartyIcon(candidate.candidate_party)} 
-                              alt={`${candidate.candidate_party} logo`}
+                              src={fetchPartyIcon(candidate.candidate_party || 'Independent')} 
+                              alt={`${candidate.candidate_party || 'Independent'} logo`}
                               onError={(e) => {
                                 e.currentTarget.src = '/images/party_logo/independent.png';
                               }}

@@ -4,14 +4,9 @@ import { useAuth } from '../contexts/AuthContext';
 import FirebaseService from '../services/firebaseService';
 import { 
   MapPin, 
-  Calendar, 
   User, 
-  CheckCircle, 
-  ArrowRight,
   Loader2,
-  Gift,
-  Copy,
-  Check
+  ArrowRight
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -27,19 +22,15 @@ const Onboarding: React.FC = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   
-  const [step, setStep] = useState(1);
   const [constituencies, setConstituencies] = useState<Constituency[]>([]);
   const [selectedConstituency, setSelectedConstituency] = useState<number | null>(null);
-  const [firstVoteYear, setFirstVoteYear] = useState<number | null>(null);
-  const [displayName, setDisplayName] = useState('');
-  const [bio, setBio] = useState('');
-  const [referralCode, setReferralCode] = useState<string>('');
+  const [gender, setGender] = useState<string>('');
+  const [ageGroup, setAgeGroup] = useState<string>('');
+  const [area, setArea] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
-  const [copied, setCopied] = useState(false);
-  const [generatedReferralCode, setGeneratedReferralCode] = useState<string>('');
 
   // Load constituencies on component mount and check if user already has constituency
   useEffect(() => {
@@ -63,32 +54,6 @@ const Onboarding: React.FC = () => {
     
     checkExistingConstituency();
   }, [currentUser, navigate]);
-
-  // Generate referral code when component mounts
-  useEffect(() => {
-    if (currentUser) {
-      generateReferralCode();
-    }
-  }, [currentUser]);
-
-  // Generate a unique referral code
-  const generateReferralCode = () => {
-    const timestamp = Date.now().toString(36);
-    const randomStr = Math.random().toString(36).substring(2, 8);
-    const code = `${currentUser?.email?.split('@')[0] || 'USER'}_${timestamp}_${randomStr}`.toUpperCase();
-    setGeneratedReferralCode(code);
-  };
-
-  // Copy referral code to clipboard
-  const copyReferralCode = async () => {
-    try {
-      await navigator.clipboard.writeText(generatedReferralCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy referral code:', err);
-    }
-  };
 
   // Load constituencies from JSON (derived from candidates data)
   const loadConstituencies = async () => {
@@ -117,45 +82,33 @@ const Onboarding: React.FC = () => {
     setSelectedConstituency(constituencyId);
   };
 
-  // Handle first vote year input
-  const handleFirstVoteYearChange = (year: string) => {
-    const numYear = parseInt(year);
-    if (numYear >= 1950 && numYear <= new Date().getFullYear()) {
-      setFirstVoteYear(numYear);
-    }
-  };
-
-  // Generate current year options for first vote
-  const generateYearOptions = () => {
-    const currentYear = new Date().getFullYear();
-    const years = [];
-    for (let year = currentYear; year >= 1950; year--) {
-      years.push(year);
-    }
-    return years;
-  };
-
   // Save onboarding data
   const saveOnboardingData = async () => {
-    if (!currentUser || !selectedConstituency) return;
+    if (!currentUser || !selectedConstituency || !gender || !ageGroup || !area) {
+      setError('Please fill in all required fields');
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
 
     try {
+      // Get display name from Google account
+      const displayName = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
+      
       await FirebaseService.createUserProfile(currentUser.uid, {
-        display_name: displayName || currentUser.displayName || currentUser.email?.split('@')[0],
-        bio: bio,
-        first_vote_year: firstVoteYear || undefined,
+        display_name: displayName,
         constituency_id: selectedConstituency,
         tier_level: 1,
         engagement_score: 0,
-        referral_code: generatedReferralCode,
-        referred_by: referralCode || undefined
+        // Add new fields
+        gender: gender,
+        age_group: ageGroup,
+        area: area
       });
 
       // Show success message before redirecting
-      setMessage('✅ Constituency set successfully! Redirecting to portal...');
+      setMessage('✅ Profile created successfully! Redirecting to portal...');
       setMessageType('success');
       
       // Redirect to home page after a short delay
@@ -170,45 +123,9 @@ const Onboarding: React.FC = () => {
     }
   };
 
-  // Update constituency user count (not needed in Firebase for now)
-
-  // Next step validation
-  const canProceedToNext = () => {
-    switch (step) {
-      case 1:
-        return selectedConstituency !== null;
-      case 2:
-        return firstVoteYear !== null;
-      case 3:
-        return true; // Profile info is optional
-      case 4:
-        return true; // Referral code is optional
-      default:
-        return false;
-    }
-  };
-
-  // Next step handler
-  const handleNext = () => {
-    if (canProceedToNext()) {
-      if (step === 4) {
-        saveOnboardingData();
-      } else {
-        setStep(step + 1);
-      }
-    }
-  };
-
-  // Previous step handler
-  const handlePrevious = () => {
-    if (step > 1) {
-      setStep(step - 1);
-    }
-  };
-
-  // Skip profile step
-  const handleSkipProfile = () => {
-    setStep(4); // Go to referral code step instead of saving directly
+  // Check if all required fields are filled
+  const canProceed = () => {
+    return selectedConstituency !== null && gender !== '' && ageGroup !== '' && area !== '';
   };
 
   if (!currentUser) {
@@ -217,12 +134,12 @@ const Onboarding: React.FC = () => {
   }
 
   // If user already has constituency, redirect to home
-  if (isLoading) {
+  if (isLoading && !message) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-green-600" />
-          <p className="text-gray-600">
+          <Loader2 className="h-6 w-6 animate-spin mx-auto mb-3 text-green-600" />
+          <p className="text-gray-600 text-sm">
             {isEnglish ? 'Checking your setup...' : 'आपकी सेटअप की जांच कर रहे हैं...'}
           </p>
         </div>
@@ -232,309 +149,187 @@ const Onboarding: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#9ca8b4] flex items-center justify-center p-2 lg:p-4">
-      <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-4 lg:p-8">
+      <div className="max-w-xl w-full bg-white rounded-xl shadow-xl p-4 lg:p-6">
         {/* Header */}
-        <div className="text-center mb-4 lg:mb-8">
-          <div className="w-8 h-8 lg:w-16 lg:h-16 bg-[#014e5c] rounded-full flex items-center justify-center mx-auto mb-4">
-            <User className="h-4 w-4 lg:h-8 lg:w-8 text-white" />
+        <div className="text-center mb-4 lg:mb-6">
+          <div className="w-12 h-12 lg:w-14 lg:h-14 bg-[#014e5c] rounded-full flex items-center justify-center mx-auto mb-3">
+            <User className="h-6 w-6 lg:h-7 lg:w-7 text-white" />
           </div>
-          <h1 className="text-lg lg:text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-lg lg:text-2xl font-bold text-gray-900 mb-2">
             {isEnglish ? 'Welcome to Charcha Manch!' : 'चर्चा मंच में आपका स्वागत है!'}
           </h1>
           <p className="text-gray-600 text-xs lg:text-sm">
             {isEnglish ? 'Let\'s get to know you better' : 'आइए आपको बेहतर तरीके से जानें'}
           </p>
-          <div className="mt-3 p-2 lg:p-3 bg-[#d3dae0] border border-blue-200 rounded-lg">
-            <p className="text-xs lg:text-base text-black">
-              {isEnglish ? 'Setting your constituency is required to access the portal' : 'पोर्टल का उपयोग करने के लिए अपना क्षेत्र सेट करना आवश्यक है'}
+          <div className="mt-2 p-2 lg:p-3 bg-[#d3dae0] border border-blue-200 rounded-lg">
+            <p className="text-xs lg:text-sm text-black">
+              {isEnglish ? 'Setting your constituency helps personalize your experience (optional)' : 'अपना क्षेत्र सेट करने से आपका अनुभव व्यक्तिगत हो जाता है (वैकल्पिक)'}
             </p>
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="mb-4 lg:mb-8">
-          <div className="flex items-center justify-between mb-2">
-            {[1, 2, 3, 4].map((stepNumber) => (
-              <div
-                key={stepNumber}
-                className={`w-6 h-6 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-xs lg:text-sm font-medium ${
-                  step >= stepNumber
-                    ? 'bg-[#014e5c] text-white'
-                    : 'bg-gray-200 text-gray-600'
-                }`}
-              >
-                {step > stepNumber ? <CheckCircle className="h-4 w-4 lg:h-5 lg:w-5" /> : stepNumber}
-              </div>
-            ))}
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div
-              className="bg-[#014e5c] h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(step / 4) * 100}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Step Content */}
-        <div className="mb-4 lg:mb-8">
-          {step === 1 && (
-            <div className="space-y-6">
-              <div className="text-center">
-                <MapPin className="h-7 w-7 lg:h-12 lg:w-12 text-[#014e5c] mx-auto mb-4" />
-                <h2 className="text-sm lg:text-2xl font-semibold text-gray-900 mb-2">
-                  {isEnglish ? 'Select Your Constituency' : 'अपना निर्वाचन क्षेत्र चुनें'}
-                </h2>
-                <p className="text-gray-600 text-xs lg:text-base">
-                  {isEnglish ? 'Choose the constituency where you vote' : 'वह निर्वाचन क्षेत्र चुनें जहां आप वोट करते हैं'}
-                </p>
-              </div>
-              <div className="max-h-60 lg:max-h-150 overflow-y-auto">
-                <div className="grid grid-cols-1 gap-2 lg:gap-3">
-                  {constituencies.map((constituency) => (
-                    <button
-                      key={constituency.id}
-                      onClick={() => handleConstituencySelect(constituency.id)}
-                      className={`p-2 lg:p-4 text-left rounded-lg border-2 transition-all duration-200 ${
-                        selectedConstituency === constituency.id
-                          ? 'border-[#014e5c]/50 bg-[#014e5c]/90'
-                          : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className={`font-medium text-xs lg:text-base ${selectedConstituency === constituency.id ?'text-white' : 'text-black'}`}>
-                        {constituency.area_name}
-                      </div>
-                      <div className={`text-xs lg:text-sm ${selectedConstituency === constituency.id ?'text-white' : 'text-black'}`}>
-                        {constituency.district} • Bihar
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
+        {/* Single Form Screen */}
+        <div className="space-y-4">
+          {/* Constituency Selection */}
+          <div className="space-y-3">
+            <div className="text-center">
+              <MapPin className="h-6 w-6 lg:h-8 lg:w-8 text-[#014e5c] mx-auto mb-2" />
+              <h2 className="text-sm lg:text-lg font-semibold text-gray-900 mb-1">
+                {isEnglish ? 'Select Your Constituency (Optional)' : 'अपना निर्वाचन क्षेत्र चुनें (वैकल्पिक)'}
+              </h2>
+              <p className="text-gray-600 text-xs lg:text-sm">
+                {isEnglish ? 'Choose the constituency where you vote (you can change this later)' : 'वह निर्वाचन क्षेत्र चुनें जहां आप वोट करते हैं (आप इसे बाद में बदल सकते हैं)'}
+              </p>
             </div>
-          )}
-
-          {step === 2 && (
-            <div className="space-y-6">
-              <div className="text-center">
-                <Calendar className="h-7 w-7 lg:h-12 lg:w-12 text-[#014e5c] mx-auto mb-4" />
-                <h2 className="text-sm lg:text-2xl font-semibold text-gray-900 mb-2">
-                  {isEnglish ? 'When Did You First Vote?' : 'आपने पहली बार कब वोट किया?'}
-                </h2>
-                <p className="text-gray-600 text-xs lg:text-base">
-                  {isEnglish ? 'This helps us understand your voting experience' : 'यह हमें आपके मतदान अनुभव को समझने में मदद करता है'}
-                </p>
-              </div>
-              <div className="max-w-md mx-auto">
-                <select
-                  value={firstVoteYear || ''}
-                  onChange={(e) => handleFirstVoteYearChange(e.target.value)}
-                  className="w-full p-2 lg:p-4 border-2 border-gray-200 rounded-lg focus:outline-none text-sm lg:text-base"
-                >
-                  <option value="">
-                    {isEnglish ? 'Select year...' : 'वर्ष चुनें...'}
-                  </option>
-                  {generateYearOptions().map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {firstVoteYear && (
-                <div className="text-center p-2 lg:p-4 bg-[#014e5c] rounded-lg">
-                  <p className="text-white font-medium text-xs lg:text-base">
-                    {isEnglish 
-                      ? `You first voted in ${firstVoteYear}`
-                      : `आपने पहली बार ${firstVoteYear} में वोट किया`
-                    }
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="space-y-6">
-              <div className="text-center">
-                <User className="h-7 w-7 lg:h-12 lg:w-12 text-[#014e5c] mx-auto mb-4" />
-                <h2 className="text-sm lg:text-2xl font-semibold text-gray-900 mb-2">
-                  {isEnglish ? 'Tell Us About Yourself' : 'हमें अपने बारे में बताएं'}
-                </h2>
-                <p className="text-gray-600 text-xs lg:text-base">
-                  {isEnglish ? 'This information is optional but helps personalize your experience' : 'यह जानकारी वैकल्पिक है लेकिन आपके अनुभव को व्यक्तिगत बनाने में मदद करती है'}
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1 lg:mb-2">
-                    {isEnglish ? 'Display Name' : 'प्रदर्शन नाम'}
-                  </label>
-                  <input
-                    type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder={isEnglish ? 'Enter your display name' : 'अपना प्रदर्शन नाम दर्ज करें'}
-                    className="w-full p-2 lg:p-3 border-2 border-gray-200 rounded-3xl focus:border-[#014e5c] focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1 lg:mb-2">
-                    {isEnglish ? 'Bio' : 'जीवनी'}
-                  </label>
-                  <textarea
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                    placeholder={isEnglish ? 'Tell us about yourself...' : 'हमें अपने बारे में बताएं...'}
-                    rows={3}
-                    className="w-full p-2 lg:p-3 border-2 border-gray-200 rounded-3xl focus:border-[#014e5c] focus:outline-none resize-none"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {step === 4 && (
-            <div className="space-y-6">
-              <div className="text-center">
-                <Gift className="h-7 w-7 lg:h-12 lg:w-12 text-[#014e5c] mx-auto mb-4" />
-                <h2 className="text-sm lg:text-2xl font-semibold text-gray-900 mb-2">
-                  {isEnglish ? 'Referral & Rewards' : 'रेफरल और पुरस्कार'}
-                </h2>
-                <p className="text-gray-600 text-xs lg:text-base">
-                  {isEnglish ? 'Get your referral code and enter one if you were referred' : 'अपना रेफरल कोड प्राप्त करें और यदि आपको रेफर किया गया था तो एक दर्ज करें'}
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                {/* Your Referral Code */}
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
-                  <h3 className="text-sm lg:text-base font-semibold text-green-800 mb-2">
-                    {isEnglish ? 'Your Referral Code' : 'आपका रेफरल कोड'}
-                  </h3>
-                  <div className="flex items-center space-x-2">
-                    <div className="flex-1 font-mono text-lg lg:text-xl font-bold text-green-800 bg-white px-3 py-2 rounded-lg border-2 border-green-300">
-                      {generatedReferralCode}
+            
+            {/* Enhanced Scrollable Constituency List */}
+            <div className="max-h-48 lg:max-h-56 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-gray-50">
+              <div className="space-y-1">
+                {constituencies.map((constituency) => (
+                  <button
+                    key={constituency.id}
+                    onClick={() => handleConstituencySelect(constituency.id)}
+                    className={`w-full p-2 lg:p-3 text-left rounded-md border transition-all duration-200 text-sm ${
+                      selectedConstituency === constituency.id
+                        ? 'border-[#014e5c] bg-[#014e5c] text-white shadow-md'
+                        : 'border-gray-200 hover:border-[#014e5c]/30 hover:bg-white'
+                    }`}
+                  >
+                    <div className={`font-medium ${selectedConstituency === constituency.id ? 'text-white' : 'text-gray-900'}`}>
+                      {isEnglish ? constituency.area_name : constituency.area_name_hi}
                     </div>
-                    <button
-                      onClick={copyReferralCode}
-                      className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                      title={isEnglish ? 'Copy code' : 'कोड कॉपी करें'}
-                    >
-                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  <p className="text-xs lg:text-sm text-green-600 mt-2">
-                    {isEnglish 
-                      ? 'Share this code with friends to earn rewards!'
-                      : 'पुरस्कार कमाने के लिए इस कोड को दोस्तों के साथ साझा करें!'
-                    }
-                  </p>
-                </div>
-
-                {/* Enter Referral Code */}
-                <div>
-                  <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1 lg:mb-2">
-                    {isEnglish ? 'Were you referred? (Optional)' : 'क्या आपको रेफर किया गया था? (वैकल्पिक)'}
-                  </label>
-                  <input
-                    type="text"
-                    value={referralCode}
-                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                    placeholder={isEnglish ? 'Enter referral code if you have one' : 'यदि आपके पास रेफरल कोड है तो दर्ज करें'}
-                    className="w-full p-2 lg:p-3 border-2 border-gray-200 rounded-3xl focus:border-[#014e5c] focus:outline-none"
-                  />
-                  {referralCode && (
-                    <p className="text-xs text-green-600 mt-1">
-                      {isEnglish ? '✅ Referral code entered' : '✅ रेफरल कोड दर्ज किया गया'}
-                    </p>
-                  )}
-                </div>
-
-                {/* Benefits Info */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <h4 className="text-xs lg:text-sm font-semibold text-blue-800 mb-1">
-                    {isEnglish ? 'How Referrals Work' : 'रेफरल कैसे काम करते हैं'}
-                  </h4>
-                  <ul className="text-xs lg:text-sm text-blue-700 space-y-1">
-                    <li>• {isEnglish ? 'Share your code with friends' : 'अपना कोड दोस्तों के साथ साझा करें'}</li>
-                    <li>• {isEnglish ? 'Both you and your friend get benefits' : 'आप और आपके दोस्त दोनों को लाभ मिलता है'}</li>
-                    <li>• {isEnglish ? 'Earn engagement points and rewards' : 'एंगेजमेंट पॉइंट्स और पुरस्कार कमाएं'}</li>
-                  </ul>
-                </div>
+                  </button>
+                ))}
               </div>
             </div>
-          )}
+          </div>
+
+          {/* Personal Information */}
+          <div className="space-y-3">
+            <h3 className="text-sm lg:text-base font-semibold text-gray-900 text-center">
+              {isEnglish ? 'Personal Information (Optional)' : 'व्यक्तिगत जानकारी (वैकल्पिक)'}
+            </h3>
+            
+            {/* Gender Selection */}
+            <div>
+              <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-2">
+                {isEnglish ? 'Gender' : 'लिंग'} <span className="text-gray-400">({isEnglish ? 'Optional' : 'वैकल्पिक'})</span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'male', label: isEnglish ? 'Male' : 'पुरुष' },
+                  { value: 'female', label: isEnglish ? 'Female' : 'महिला' },
+                  { value: 'other', label: isEnglish ? 'Other' : 'अन्य' }
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setGender(option.value)}
+                    className={`p-2 rounded-md border transition-all duration-200 text-xs ${
+                      gender === option.value
+                        ? 'border-[#014e5c] bg-[#014e5c] text-white'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Age Group Selection */}
+            <div>
+              <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-2">
+                {isEnglish ? 'Age Group' : 'आयु समूह'} <span className="text-gray-400">({isEnglish ? 'Optional' : 'वैकल्पिक'})</span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: '18-25', label: '18-25' },
+                  { value: '26-35', label: '26-35' },
+                  { value: '36-45', label: '36-45' },
+                  { value: '46-55', label: '46-55' },
+                  { value: '56-65', label: '56-65' },
+                  { value: '65+', label: '65+' }
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setAgeGroup(option.value)}
+                    className={`p-2 rounded-md border transition-all duration-200 text-xs ${
+                      ageGroup === option.value
+                        ? 'border-[#014e5c] bg-[#014e5c] text-white'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Area Selection */}
+            <div>
+              <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-2">
+                {isEnglish ? 'Area Type' : 'क्षेत्र का प्रकार'} <span className="text-gray-400">({isEnglish ? 'Optional' : 'वैकल्पिक'})</span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'urban', label: isEnglish ? 'Urban' : 'शहरी' },
+                  { value: 'rural', label: isEnglish ? 'Rural' : 'ग्रामीण' },
+                  { value: 'semi-urban', label: isEnglish ? 'Semi-Urban' : 'अर्ध-शहरी' }
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setArea(option.value)}
+                    className={`p-2 rounded-md border transition-all duration-200 text-xs ${
+                      area === option.value
+                        ? 'border-[#014e5c] bg-[#014e5c] text-white'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 p-2 lg:p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-800 text-xs lg:text-sm">{error}</p>
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-800 text-xs">{error}</p>
           </div>
         )}
 
         {/* Success Message */}
         {message && (
-          <div className={`mb-6 p-2 lg:p-4 rounded-lg border ${
+          <div className={`mt-4 p-3 rounded-lg border ${
             messageType === 'success' 
               ? 'bg-[#014e5c] text-white border-[#014e5c]' 
               : 'bg-blue-50 text-blue-800 border-blue-200'
           }`}>
-            <p className="text-sm">{message}</p>
+            <p className="text-xs">{message}</p>
           </div>
         )}
 
-        {/* Navigation Buttons */}
-        <div className="flex items-center justify-between">
+        {/* Complete Button */}
+        <div className="mt-6 flex justify-center">
           <button
-            onClick={handlePrevious}
-            disabled={step === 1}
-            className={`px-6 py-3 rounded-lg font-medium transition-colors text-xs lg:text-base ${
-              step === 1
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
+            onClick={saveOnboardingData}
+            disabled={!canProceed() || isLoading}
+            className="px-6 py-3 bg-[#014e5c] text-white rounded-lg font-medium hover:bg-[#014e5c]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 text-sm"
           >
-            {isEnglish ? 'Previous' : 'पिछला'}
-          </button>
-
-          <div className="flex space-x-3">
-            {step === 3 && (
-              <button
-                onClick={handleSkipProfile}
-                disabled={isLoading}
-                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors text-xs lg:text-base"
-              >
-                {isEnglish ? 'Skip' : 'छोड़ें'}
-              </button>
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{isEnglish ? 'Saving...' : 'सहेज रहे हैं...'}</span>
+              </>
+            ) : (
+              <>
+                <span>{isEnglish ? 'Complete Setup' : 'सेटअप पूरा करें'}</span>
+                <ArrowRight className="h-4 w-4" />
+              </>
             )}
-
-            <button
-              onClick={handleNext}
-              disabled={!canProceedToNext() || isLoading}
-              className="px-6 py-3 bg-[#014e5c] text-white rounded-lg font-medium hover:bg-[#014e5c]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>{isEnglish ? 'Saving...' : 'सहेज रहे हैं...'}</span>
-                </>
-              ) : (
-                <>
-                  <span className="text-xs lg:text-base">
-                    {step === 4 
-                      ? (isEnglish ? 'Complete' : 'पूरा करें')
-                      : (isEnglish ? 'Next' : 'अगला')
-                    }
-                  </span>
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </button>
-          </div>
+          </button>
         </div>
       </div>
     </div>

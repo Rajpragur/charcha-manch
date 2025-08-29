@@ -25,7 +25,6 @@ import AdminPanel from './pages/AdminPanel';
 import AdminSetup from './pages/AdminSetup';
 import BlogCreate from './pages/BlogCreate';
 import PostDetail from './pages/PostDetail';
-import ConstituencyCheck from './components/ConstituencyCheck';
 import './App.css';
 
 const App: React.FC = () => {
@@ -46,71 +45,21 @@ const App: React.FC = () => {
                   <Route path="/admin-setup" element={<AdminSetup />} />
                   <Route path="/admin/blog/create" element={<BlogCreate />} />
                   <Route path="/admin/blog/edit/:blogId" element={<BlogCreate />} />
-                  <Route path="/" element={
-                    <ConstituencyCheck>
-                      <Home />
-                    </ConstituencyCheck>
-                  } />
-                  <Route path="/about" element={
-                    <ConstituencyCheck>
-                      <About />
-                    </ConstituencyCheck>
-                  } />
-                  <Route path="/contact" element={
-                    <ConstituencyCheck>
-                      <Contact />
-                    </ConstituencyCheck>
-                  } />
-                  <Route path="/blog" element={
-                    <ConstituencyCheck>
-                      <BlogPost />
-                    </ConstituencyCheck>
-                  } />
-                  <Route path="/blog/:blogId" element={
-                    <ConstituencyCheck>
-                      <BlogDetail />
-                    </ConstituencyCheck>
-                  } />
-                  <Route path="/discussion" element={
-                    <ConstituencyCheck>
-                      <DiscussionForum />
-                    </ConstituencyCheck>
-                  } />
-                  <Route path="/post/:postId" element={
-                    <ConstituencyCheck>
-                      <PostDetail />
-                    </ConstituencyCheck>
-                  } />
-                  <Route path="/constituency/:constituencySlug" element={
-                    <ConstituencyCheck>
-                      <Constituency />
-                    </ConstituencyCheck>
-                  } />
-                  <Route path="/constituency/:constituencyId" element={
-                    <ConstituencyCheck>
-                      <ConstituencyDetails />
-                    </ConstituencyCheck>
-                  } />
-                  <Route path="/aapka-kshetra" element={
-                    <ConstituencyCheck>
-                      <AapkaKshetra />
-                    </ConstituencyCheck>
-                  } />
-                  <Route path="/dashboard" element={
-                    <ConstituencyCheck>
-                      <Dashboard />
-                    </ConstituencyCheck>
-                  } />
-                  <Route path="/profile" element={
-                    <ConstituencyCheck>
-                      <Profile />
-                    </ConstituencyCheck>
-                  } />
-                  <Route path="/settings" element={
-                    <ConstituencyCheck>
-                      <Settings />
-                    </ConstituencyCheck>
-                  } />
+                  
+                  {/* Main routes - no constituency restrictions */}
+                  <Route path="/" element={<Home />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/blog" element={<BlogPost />} />
+                  <Route path="/blog/:blogId" element={<BlogDetail />} />
+                  <Route path="/discussion" element={<DiscussionForum />} />
+                  <Route path="/post/:postId" element={<PostDetail />} />
+                  <Route path="/constituency/:constituencySlug" element={<Constituency />} />
+                  <Route path="/constituency/:constituencyId" element={<ConstituencyDetails />} />
+                  <Route path="/aapka-kshetra" element={<AapkaKshetra />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/settings" element={<Settings />} />
                 </Routes>
               </main>
               <Toaster 

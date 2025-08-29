@@ -1,5 +1,6 @@
 import { useLanguage } from "../contexts/LanguageContext";
 import PopupCard from "./PopupCard";
+import SignInPopup from "./SignInPopup";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import {
@@ -148,6 +149,7 @@ interface CharchitVidhanSabhaProps {
   closePopup: () => void;
   currentUser: any;
   userSurveys: Set<string>;
+  userVotesLoading: boolean;
 }
 
 export default function CharchitVidhanSabha({
@@ -158,10 +160,12 @@ export default function CharchitVidhanSabha({
   closePopup,
   currentUser,
   userSurveys,
+  userVotesLoading,
 }: CharchitVidhanSabhaProps) {
   const { isEnglish } = useLanguage();
   const navigate = useNavigate();
   const [visibleCount, setVisibleCount] = useState(2);
+  const [showSignInPopup, setShowSignInPopup] = useState(false);
   // Filter and sort constituencies
   const filteredAndSortedConstituencies = constituencies.sort((a, b) => {
     // First sort by interaction count (descending)
@@ -316,53 +320,71 @@ export default function CharchitVidhanSabha({
                           }
                         </div>
                         
-                        {/* Show voting buttons only if user hasn't voted */}
-                        {currentUser && !userSurveys.has(`${constituency.id}:true`) && !userSurveys.has(`${constituency.id}:false`) ? (
+                        {/* Show voting buttons if user hasn't voted (for logged in users) or for non-logged in users */}
+                        {(!currentUser || (!userVotesLoading && !Array.from(userSurveys).some(survey => survey.startsWith(`${constituency.id}:`)))) ? (
                           <div className="flex items-center justify-center">
                             <div 
                               className="flex bg-[#f6f6f6] w-[90px] h-[40px] pt-[3px] pb-[10px] pr-[6px] pl-[3px] rounded-full gap-0"
                               style={{ boxShadow: 'rgba(0, 0, 0, 0.15) 0px 4px 8px 0px, rgba(0, 0, 0, 0.1) 0px 2px 4px 0px' }}
                             >
                               <button 
-                                onClick={() => submitSatisfactionSurvey(constituency.id, true)}
+                                onClick={() => {
+                                  if (!currentUser) {
+                                    setShowSignInPopup(true);
+                                  } else {
+                                    submitSatisfactionSurvey(constituency.id, true);
+                                  }
+                                }}
                                 className="text-center w-[40px] h-[34px] pl-[10px] pr-[10px] rounded-full text-base font-medium mx-auto transition-colors bg-[#f6f6f6] text-[#026A00]"
                               >
                                 {isEnglish ? "Yes" : "हाँ"}
                               </button>
                               <button 
-                                onClick={() => submitSatisfactionSurvey(constituency.id, false)}
+                                onClick={() => {
+                                  if (!currentUser) {
+                                    setShowSignInPopup(true);
+                                  } else {
+                                    submitSatisfactionSurvey(constituency.id, false);
+                                  }
+                                }}
                                 className="text-center w-[40px] h-[34px] rounded-full text-base pr-[9px] pl-[3px] font-medium transition-colors bg-[#f6f6f6] text-[#026A00]"
                               >
                                 {isEnglish ? "No" : "ना"}
                               </button>
                             </div>
                           </div>
-                        ) : (
-                          /* Show vote counts when user has already voted */
-                          <div className="flex items-center justify-center space-x-6">
+                        ) : userVotesLoading ? (
+                          /* Show loading state while user votes are being fetched */
+                          <div className="flex items-center justify-center">
                             <div className="text-center">
-                              <div className="text-lg font-bold text-green-600">
-                                {constituency.satisfactionYes || 0}
+                              <div className="text-lg font-bold text-gray-400">
+                                Loading...
                               </div>
-                              <div className="text-xs text-gray-600">
-                                {isEnglish ? "Yes" : "हाँ"}
-                              </div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-lg font-bold text-red-600">
-                                {constituency.satisfactionNo || 0}
-                              </div>
-                              <div className="text-xs text-gray-600">
-                                {isEnglish ? "No" : "ना"}
+                              <div className="text-xs text-gray-400">
+                                {isEnglish ? "Checking your vote" : "आपका वोट चेक कर रहा है"}
                               </div>
                             </div>
                           </div>
-                        )}
-                        
-                        {/* Show sign in message if not logged in */}
-                        {!currentUser && (
-                          <div className="text-xs text-gray-500 text-center mt-1">
-                            {isEnglish ? 'Sign in to vote' : 'मतदान के लिए साइन इन करें'}
+                        ) : (
+                          /* Show vote counts when user has already voted */
+                          <div className="flex items-center justify-center">
+                            <div className="text-center">
+                              <div className="text-lg font-bold text-green-600">
+                                {constituency.satisfactionYes + constituency.satisfactionNo > 0 ? (
+                                  Math.round(
+                                    (constituency.satisfactionYes /
+                                      (constituency.satisfactionYes + constituency.satisfactionNo)) *
+                                      100
+                                  )
+                                ) : (
+                                  80
+                                )}
+                                %
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                {isEnglish ? "Satisfied" : "संतुष्ट"}
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -372,15 +394,15 @@ export default function CharchitVidhanSabha({
                         <div className="flex justify-between items-center mb-2">
                           <span className="text-sm text-gray-600 manifesto-score-text">
                             {isEnglish 
-                              ? `Manifesto Promise Score: ${constituency.manifestoScore || 53}%`
-                              : `घोषणापत्र वादा स्कोर: ${constituency.manifestoScore || 53}%`
+                              ? `Manifesto Promise Score: ${constituency.manifestoScore || 4}/5`
+                              : `घोषणापत्र वादा स्कोर: ${constituency.manifestoScore || 4}/5`
                             }
                           </span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div 
                             className="bg-[#273F4F] h-2 rounded-full"
-                            style={{ width: `${constituency.manifestoScore*20 || 53}%` }}
+                            style={{ width: `${(constituency.manifestoScore || 0) * 20}%` }}
                           ></div>
                         </div>
                       </div>
@@ -435,6 +457,15 @@ export default function CharchitVidhanSabha({
         type={popup.type}
         showCloseButton={popup.type !== "success"}
       />
+
+      {/* Sign In Popup */}
+      {showSignInPopup && (
+        <SignInPopup
+          isOpen={showSignInPopup}
+          onClose={() => setShowSignInPopup(false)}
+          customMessage={isEnglish ? "Please sign in to submit your satisfaction survey" : "कृपया अपनी संतुष्टि सर्वेक्षण जमा करने के लिए साइन इन करें"}
+        />
+      )}
     </div>
   );
 }
