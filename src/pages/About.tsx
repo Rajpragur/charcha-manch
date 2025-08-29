@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Users, Target, Award, Shield, Heart, Zap, MapPin, Phone, Mail, Clock, Building2, TrendingUp, CheckCircle, MessageSquare } from 'lucide-react';
+import { Users, Target, Award, Shield, Heart, Zap, CheckCircle } from 'lucide-react';
 import PhotoPlaceholder from '../components/PhotoPlaceholder';
 
 const About: React.FC = () => {
@@ -77,25 +77,11 @@ const About: React.FC = () => {
     projects: isEnglish ? 'Projects Tracked' : 'ट्रैक की गई परियोजनाएं'
   };
 
-  const stats = [
-    { label: content.constituencies, value: '243', icon: <MapPin className="h-6 w-6" />, color: 'text-sky-600' },
-    { label: content.activeUsers, value: '2,780+', icon: <Users className="h-6 w-6" />, color: 'text-emerald-600' },
-    { label: content.discussions, value: '1,245+', icon: <MessageSquare className="h-6 w-6" />, color: 'text-amber-600' },
-    { label: content.projects, value: '890+', icon: <Building2 className="h-6 w-6" />, color: 'text-rose-600' }
-  ];
-
   const values = [
     { title: content.transparency, description: content.transparencyDesc, icon: <Shield className="h-8 w-8" />, color: 'text-sky-600' },
     { title: content.accountability, description: content.accountabilityDesc, icon: <CheckCircle className="h-8 w-8" />, color: 'text-emerald-600' },
     { title: content.inclusivity, description: content.inclusivityDesc, icon: <Heart className="h-8 w-8" />, color: 'text-rose-600' },
     { title: content.innovation, description: content.innovationDesc, icon: <Zap className="h-8 w-8" />, color: 'text-amber-600' }
-  ];
-
-  const services = [
-    { title: content.constituencyTracking, description: content.constituencyTrackingDesc, icon: <MapPin className="h-8 w-8" />, color: 'text-sky-600' },
-    { title: content.citizenForum, description: content.citizenForumDesc, icon: <Users className="h-8 w-8" />, color: 'text-emerald-600' },
-    { title: content.representativeConnect, description: content.representativeConnectDesc, icon: <Phone className="h-8 w-8" />, color: 'text-amber-600' },
-    { title: content.developmentMonitoring, description: content.developmentMonitoringDesc, icon: <TrendingUp className="h-8 w-8" />, color: 'text-rose-600' }
   ];
 
   return (
@@ -118,7 +104,7 @@ const About: React.FC = () => {
       </div>
 
       {/* Stats Section */}
-      <div className="w-full bg-white border-b border-slate-200">
+      {/*<div className="w-full bg-white border-b border-slate-200">
         <div className="w-full max-w-none mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 text-slate-800">
             {content.statsTitle}
@@ -139,7 +125,7 @@ const About: React.FC = () => {
             ))}
           </div>
         </div>
-      </div>
+      </div>*/}
 
       <div className="w-full max-w-none mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
@@ -194,6 +180,7 @@ const About: React.FC = () => {
 
             {/* What We Do */}
             <section>
+              {/*
               <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 text-slate-800">
                 {content.whatWeDoTitle}
               </h2>
@@ -212,12 +199,14 @@ const About: React.FC = () => {
                   </div>
                 ))}
               </div>
+              */}
             </section>
           </div>
 
           {/* Right Sidebar */}
           <div className="xl:col-span-1 space-y-6">
             {/* Contact Information */}
+            {/*
             <div className="bg-white rounded-lg shadow-md p-6 border border-slate-100">
               <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
                 <Mail className="h-5 w-5 mr-2 text-sky-600" />
@@ -261,6 +250,7 @@ const About: React.FC = () => {
                 </div>
               </div>
             </div>
+            */}
 
             {/* Team Info */}
             <div className="bg-white rounded-lg shadow-md p-6 border border-slate-100">

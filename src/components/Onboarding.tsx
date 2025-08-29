@@ -31,49 +31,61 @@ const Onboarding: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
+  const [constituenciesLoading, setConstituenciesLoading] = useState(false);
 
-  // Load constituencies on component mount and check if user already has constituency
+  // Load constituencies on component mount
   useEffect(() => {
     loadConstituencies();
-    
-    // Check if user already has constituency set
-    const checkExistingConstituency = async () => {
-      if (currentUser) {
-        try {
-          const userProfile = await FirebaseService.getUserProfile(currentUser.uid);
-          if (userProfile && userProfile.constituency_id) {
-            // User already has constituency, redirect to home
-            navigate('/');
-            return;
-          }
-        } catch (err) {
-          console.error('Error checking existing constituency:', err);
-        }
-      }
-    };
-    
-    checkExistingConstituency();
-  }, [currentUser, navigate]);
+  }, []);
 
   // Load constituencies from JSON (derived from candidates data)
   const loadConstituencies = async () => {
     try {
+      setConstituenciesLoading(true);
+      setError(null);
+      
+      console.log('Starting to load constituencies...');
+      
       const [enRes, hiRes] = await Promise.all([
         fetch('/data/candidates_en.json'),
         fetch('/data/candidates.json')
       ]);
+      
+      console.log('Fetch responses:', { enRes: enRes.status, hiRes: hiRes.status });
+      
+      if (!enRes.ok || !hiRes.ok) {
+        throw new Error(`Failed to fetch constituency data: en=${enRes.status}, hi=${hiRes.status}`);
+      }
+      
       const enData: any[] = await enRes.json();
       const hiData: any[] = await hiRes.json();
+      
+      console.log('Data loaded:', { enCount: enData.length, hiCount: hiData.length });
+      
+      // Create constituencies with proper ID mapping
       const list: Constituency[] = enData.map((c, idx) => ({
         id: idx + 1,
-        area_name: c.area_name,
-        area_name_hi: hiData[idx]?.area_name || c.area_name,
+        area_name: c.area_name || `Constituency ${idx + 1}`,
+        area_name_hi: hiData[idx]?.area_name || c.area_name || `निर्वाचन क्षेत्र ${idx + 1}`,
         district: null
       }));
+      
       setConstituencies(list);
+      console.log(`Successfully loaded ${list.length} constituencies`);
     } catch (err) {
       console.error('Error loading constituencies:', err);
-      setError('Failed to load constituencies');
+      setError(`Failed to load constituencies: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      
+      // Fallback to a simple list for testing
+      console.log('Using fallback constituency list');
+      const fallbackList: Constituency[] = [
+        { id: 1, area_name: 'Test Constituency 1', area_name_hi: 'टेस्ट क्षेत्र 1', district: null },
+        { id: 2, area_name: 'Test Constituency 2', area_name_hi: 'टेस्ट क्षेत्र 2', district: null },
+        { id: 3, area_name: 'Test Constituency 3', area_name_hi: 'टेस्ट क्षेत्र 3', district: null }
+      ];
+      setConstituencies(fallbackList);
+    } finally {
+      setConstituenciesLoading(false);
     }
   };
 
@@ -133,20 +145,6 @@ const Onboarding: React.FC = () => {
     return null;
   }
 
-  // If user already has constituency, redirect to home
-  if (isLoading && !message) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-6 w-6 animate-spin mx-auto mb-3 text-green-600" />
-          <p className="text-gray-600 text-sm">
-            {isEnglish ? 'Checking your setup...' : 'आपकी सेटअप की जांच कर रहे हैं...'}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#9ca8b4] flex items-center justify-center p-2 lg:p-4">
       <div className="max-w-xl w-full bg-white rounded-xl shadow-xl p-4 lg:p-6">
@@ -184,23 +182,38 @@ const Onboarding: React.FC = () => {
             
             {/* Enhanced Scrollable Constituency List */}
             <div className="max-h-48 lg:max-h-56 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-gray-50">
-              <div className="space-y-1">
-                {constituencies.map((constituency) => (
-                  <button
-                    key={constituency.id}
-                    onClick={() => handleConstituencySelect(constituency.id)}
-                    className={`w-full p-2 lg:p-3 text-left rounded-md border transition-all duration-200 text-sm ${
-                      selectedConstituency === constituency.id
-                        ? 'border-[#014e5c] bg-[#014e5c] text-white shadow-md'
-                        : 'border-gray-200 hover:border-[#014e5c]/30 hover:bg-white'
-                    }`}
-                  >
-                    <div className={`font-medium ${selectedConstituency === constituency.id ? 'text-white' : 'text-gray-900'}`}>
-                      {isEnglish ? constituency.area_name : constituency.area_name_hi}
-                    </div>
-                  </button>
-                ))}
-              </div>
+              {constituenciesLoading ? (
+                <div className="text-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-gray-500 mx-auto" />
+                  <p className="text-gray-600 text-sm mt-2">
+                    {isEnglish ? 'Loading constituencies...' : 'क्षेत्रों को लोड कर रहे हैं...'}
+                  </p>
+                </div>
+              ) : constituencies.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-600 text-sm">
+                    {isEnglish ? 'No constituencies found. Please try again later.' : 'कोई क्षेत्र नहीं मिला। कृपया बाद में पुनः प्रयास करें।'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {constituencies.map((constituency) => (
+                    <button
+                      key={constituency.id}
+                      onClick={() => handleConstituencySelect(constituency.id)}
+                      className={`w-full p-2 lg:p-3 text-left rounded-md border transition-all duration-200 text-sm ${
+                        selectedConstituency === constituency.id
+                          ? 'border-[#014e5c] bg-[#014e5c] text-white shadow-md'
+                          : 'border-gray-200 hover:border-[#014e5c]/30 hover:bg-white'
+                      }`}
+                    >
+                      <div className={`font-medium ${selectedConstituency === constituency.id ? 'text-white' : 'text-gray-900'}`}>
+                        {isEnglish ? constituency.area_name : constituency.area_name_hi}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

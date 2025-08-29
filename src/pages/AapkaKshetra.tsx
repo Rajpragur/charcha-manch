@@ -74,6 +74,10 @@ const AapkaKshetra: React.FC = () => {
   const [scoresLoaded, setScoresLoaded] = useState<boolean>(false);
   const [departmentRatings, setDepartmentRatings] = useState<Record<string, number>>({});
   const [hasSubmittedQuestionnaire, setHasSubmittedQuestionnaire] = useState(false);
+  const [hasSubmittedDepartmentRatings, setHasSubmittedDepartmentRatings] = useState(false);
+  const [isCheckingSubmissionStatus, setIsCheckingSubmissionStatus] = useState(true);
+  const [isReadyToShowForm, setIsReadyToShowForm] = useState(false);
+  const [departmentRatingsLoaded, setDepartmentRatingsLoaded] = useState(false);
   const [, setOtherCandidates] = useState<Array<{
     candidate_name: string;
     candidate_image_url: string;
@@ -84,7 +88,7 @@ const AapkaKshetra: React.FC = () => {
   const [initialLoadComplete, setInitialLoadComplete] = useState<boolean>(false);
   const [showSignInPopup, setShowSignInPopup] = useState(false);
   const [manifestoScore, setManifestoScore] = useState<number>(0);
-
+  const [canShow,setCanshow] = useState(false);
   // Add Devanagari font import
   useEffect(() => {
     const link = document.createElement('link');
@@ -126,7 +130,41 @@ const AapkaKshetra: React.FC = () => {
   useEffect(() => {
     if (currentUser && constituencyId) {
       setScoresLoaded(false); // Reset loading state for new constituency
+      setIsCheckingSubmissionStatus(true); // Reset submission status checking
+      setHasSubmittedQuestionnaire(false); // Reset submission states
+      setHasSubmittedDepartmentRatings(false);
+      setSatisfactionVote(null);
+      setIsReadyToShowForm(false); // Reset ready state
+      setDepartmentRatingsLoaded(false); // Reset department ratings loaded state
+      setDepartmentRatings({}); // Reset department ratings
+      setCanshow(false); // Reset canShow until submission status is checked
       checkSatisfactionVoteStatus();
+    } else if (constituencyId) {
+      // For non-logged-in users, just reset the states
+      setScoresLoaded(false);
+      setIsReadyToShowForm(false);
+      setDepartmentRatingsLoaded(false);
+      setDepartmentRatings({});
+      setHasSubmittedQuestionnaire(false);
+      setHasSubmittedDepartmentRatings(false);
+      setSatisfactionVote(null);
+      setIsCheckingSubmissionStatus(false);
+      setCanshow(false); // Reset canShow for non-logged-in users
+      
+      // For non-logged-in users, we can show the form immediately since no submission check is needed
+      // But wait for candidate data to be loaded first
+      setTimeout(() => {
+        if (candidateData?.dept_info) {
+          setCanshow(true);
+        }
+      }, 200);
+    } else {
+      setIsCheckingSubmissionStatus(false);
+      setScoresLoaded(false);
+      setIsReadyToShowForm(false);
+      setDepartmentRatingsLoaded(false);
+      setDepartmentRatings({});
+      setCanshow(false); // Reset canShow when no constituency
     }
   }, [currentUser, constituencyId]);
 
@@ -134,7 +172,17 @@ const AapkaKshetra: React.FC = () => {
   useEffect(() => {
     if (currentUser) {
       checkedConstituencies.current.clear();
-
+    } else {
+      // Reset all states when user logs out
+      setHasSubmittedQuestionnaire(false);
+      setHasSubmittedDepartmentRatings(false);
+      setSatisfactionVote(null);
+      setIsCheckingSubmissionStatus(false);
+      setIsReadyToShowForm(false);
+      setDepartmentRatingsLoaded(false);
+      setScoresLoaded(false);
+      setDepartmentRatings({});
+      setCanshow(false); // Reset canShow when user logs out
     }
   }, [currentUser]);
 
@@ -144,6 +192,26 @@ const AapkaKshetra: React.FC = () => {
 
   useEffect(() => {
     if (selectedConstituency) {
+      // Reset all states when constituency changes
+      setHasSubmittedQuestionnaire(false);
+      setHasSubmittedDepartmentRatings(false);
+      setSatisfactionVote(null);
+      setIsCheckingSubmissionStatus(false);
+      setIsReadyToShowForm(false);
+      setDepartmentRatingsLoaded(false);
+      setScoresLoaded(false);
+      setDepartmentRatings({});
+      setManifestoScore(0);
+      setCanshow(false); // Reset canShow until submission status is checked for new constituency
+      
+      // Reset satisfaction vote counts for new constituency
+      setCurrentSatisfactionYes(0);
+      setCurrentSatisfactionNo(0);
+      
+      // Clear checked constituencies for the new constituency
+      checkedConstituencies.current.clear();
+      
+      // Fetch new constituency data
       fetchCandidateData(selectedConstituency);
       
       // Also set the English constituency name when selectedConstituency changes
@@ -197,9 +265,10 @@ const AapkaKshetra: React.FC = () => {
   useEffect(() => {
     const checkSubmission = async () => {
       if (!currentUser || !constituencyId) return;
-      const submitted = await FirebaseService.hasSubmittedQuestionnaire(currentUser.uid, constituencyId);
-      setHasSubmittedQuestionnaire(submitted);
-      
+              const submitted = await FirebaseService.hasSubmittedQuestionnaire(currentUser.uid, constituencyId);
+        setHasSubmittedQuestionnaire(submitted);
+        // Only set canShow to true after we have the submission status
+        setCanshow(true);
       try {
         const constituencyScores = await FirebaseService.getConstituencyScores(constituencyId);
         if (constituencyScores) {
@@ -360,6 +429,7 @@ const AapkaKshetra: React.FC = () => {
             const hasSubmitted = await FirebaseService.hasSubmittedQuestionnaire(currentUser.uid, userProfile.constituency_id);
             if (hasSubmitted) {
               setHasSubmittedQuestionnaire(true);
+              setCanshow(true);
             }
             
             // Check if user has already voted on satisfaction survey by checking if they have a satisfaction vote
@@ -378,18 +448,19 @@ const AapkaKshetra: React.FC = () => {
   const checkSatisfactionVoteStatus = async () => {
     if (!currentUser || !constituencyId) return;
     
+    setIsCheckingSubmissionStatus(true);
     const constituencyKey = `${currentUser.uid}-${constituencyId}`;
     
     // Prevent multiple calls for the same constituency
     if (checkedConstituencies.current.has(constituencyKey)) {
+      setIsCheckingSubmissionStatus(false);
       return;
     }
     
     try {      
       // Check if user has already voted on satisfaction survey for this constituency
-      const hasSubmitted = await FirebaseService.hasSubmittedQuestionnaire(currentUser.uid, constituencyId);      
+      const hasSubmitted = await FirebaseService.hasSubmittedQuestionnaire(currentUser.uid, constituencyId);
       if (hasSubmitted) {
-        setHasSubmittedQuestionnaire(true);        
         // Try to get the user's specific vote from the questionnaire submission
         try {
           const submissionsRef = collection(db, 'questionnaire_submissions');
@@ -405,6 +476,17 @@ const AapkaKshetra: React.FC = () => {
             if (submission.satisfaction_vote !== undefined) {
               const userVote = submission.satisfaction_vote ? 'yes' : 'no';
               setSatisfactionVote(userVote);
+              setHasSubmittedQuestionnaire(true);
+            }
+            // Check if user has submitted department ratings
+            if (submission.department_ratings && Object.keys(submission.department_ratings).length === 4) {
+              setHasSubmittedDepartmentRatings(true); // Mark as already submitted
+              // Load the user's previous department ratings as selected
+              setDepartmentRatings(submission.department_ratings);
+              setDepartmentRatingsLoaded(true);
+            } else {
+              setHasSubmittedDepartmentRatings(false); // Allow them to see the form
+              setDepartmentRatingsLoaded(true);
             }
           }
         } catch (error) {
@@ -412,7 +494,18 @@ const AapkaKshetra: React.FC = () => {
         }
       } else {
         setHasSubmittedQuestionnaire(false);
+        setHasSubmittedDepartmentRatings(false);
         setSatisfactionVote(null);
+        setDepartmentRatingsLoaded(false);
+        
+        // Initialize fresh department ratings structure for new constituency
+        if (candidateData?.dept_info) {
+          const freshRatings: Record<string, number> = {};
+          candidateData.dept_info.forEach((dept) => {
+            freshRatings[dept.dept_name] = 0;
+          });
+          setDepartmentRatings(freshRatings);
+        }
       }
       
       // Also refresh the constituency scores
@@ -420,7 +513,6 @@ const AapkaKshetra: React.FC = () => {
       if (constituencyScores) {
         setCurrentSatisfactionYes(constituencyScores.satisfaction_yes || 0);
         setCurrentSatisfactionNo(constituencyScores.satisfaction_no || 0);
-        setScoresLoaded(true);
       }
       
       // Mark this constituency as checked
@@ -430,7 +522,28 @@ const AapkaKshetra: React.FC = () => {
       console.error('Error checking satisfaction vote status:', error);
       // If there's an error, assume user hasn't voted to be safe
       setHasSubmittedQuestionnaire(false);
+      setHasSubmittedDepartmentRatings(false);
       setSatisfactionVote(null);
+      setDepartmentRatingsLoaded(false);
+    } finally {
+      setIsCheckingSubmissionStatus(false);
+      setScoresLoaded(true); // Set scores loaded after submission status check is complete
+      
+      // For non-logged-in users, initialize empty ratings structure
+      if (!currentUser && candidateData?.dept_info) {
+        const initialRatings: Record<string, number> = {};
+        candidateData.dept_info.forEach((dept) => {
+          initialRatings[dept.dept_name] = 0;
+        });
+        setDepartmentRatings(initialRatings);
+      }
+      
+      setDepartmentRatingsLoaded(true);
+      
+      setIsReadyToShowForm(true); // Mark that we're ready to show the form
+      
+      // Set canShow to true after all checks are complete
+      setCanshow(true);
     }
   };
 
@@ -482,22 +595,31 @@ const AapkaKshetra: React.FC = () => {
           })));
         }
         
-        // Initialize department ratings
-        const initialRatings: Record<string, number> = {};
-        candidate.dept_info.forEach((dept) => {
-          initialRatings[dept.dept_name] = 0;
-        });
-        setDepartmentRatings(initialRatings);
+        // Don't initialize department ratings here - wait for submission status check
+        // Only initialize if user has exactly 4 ratings to show them as selected
         
         // Check if user has already voted on satisfaction survey for this constituency
         if (currentUser && constituencyId) {
           await checkSatisfactionVoteStatus();
+        } else if (!currentUser) {
+          // For non-logged-in users, initialize fresh department ratings structure
+          if (candidate.dept_info) {
+            const freshRatings: Record<string, number> = {};
+            candidate.dept_info.forEach((dept) => {
+              freshRatings[dept.dept_name] = 0;
+            });
+            setDepartmentRatings(freshRatings);
+            setDepartmentRatingsLoaded(true);
+          }
         }
         
         // Fetch manifesto score from database
         if (constituencyId) {
           await fetchManifestoScore(constituencyId);
         }
+        
+        // Don't initialize department ratings here
+        // Only show form if user has exactly 4 ratings to show them as selected
       }
     } catch (error) {
       console.error('Error fetching candidate data:', error);
@@ -505,7 +627,7 @@ const AapkaKshetra: React.FC = () => {
   };
 
   const handleSatisfactionVote = async (vote: 'yes' | 'no') => {
-    if (currentUser && constituencyId && !hasSubmittedQuestionnaire) {
+    if (currentUser && constituencyId && satisfactionVote === null) {
       try {
         
         setSatisfactionVote(vote);
@@ -539,7 +661,7 @@ const AapkaKshetra: React.FC = () => {
         }
         
         // Mark that the user has submitted their satisfaction vote
-        setHasSubmittedQuestionnaire(true);
+        // Note: This doesn't prevent department ratings submission
         
         // Force a re-check to ensure state consistency
         setTimeout(() => {
@@ -554,7 +676,7 @@ const AapkaKshetra: React.FC = () => {
         alert(isEnglish ? 'Failed to record vote. Please try again.' : 'वोट रिकॉर्ड करने में विफल। कृपया पुनः प्रयास करें।');
       }
     } else {
-      if (hasSubmittedQuestionnaire) {
+      if (satisfactionVote !== null) {
         alert(isEnglish ? 'You have already voted on this question!' : 'आपने इस प्रश्न पर पहले ही वोट कर दिया है!');
       }
     }
@@ -570,7 +692,8 @@ const AapkaKshetra: React.FC = () => {
   };
 
   const canSubmitQuestionnaire = () => {
-    if (!currentUser || hasSubmittedQuestionnaire) return false;
+    // For non-logged-in users, allow submission if they have 4 ratings
+    if (hasSubmittedDepartmentRatings) return false;
     const deptValues = Object.values(departmentRatings);
     if (deptValues.length === 0) return false;
     if (deptValues.some(v => v === 0)) return false;
@@ -578,7 +701,11 @@ const AapkaKshetra: React.FC = () => {
   };
 
   const handleQuestionnaireSubmit = async () => {
-    if (!currentUser || !constituencyId) return;
+    if (!currentUser) {
+      setShowSignInPopup(true);
+      return;
+    }
+    if (!constituencyId) return;
     if (!canSubmitQuestionnaire()) return;
     
     try {
@@ -586,7 +713,7 @@ const AapkaKshetra: React.FC = () => {
       const deptValues = Object.values(departmentRatings);
       const newManifestoScore = deptValues.reduce((sum, rating) => sum + rating, 0) / deptValues.length;
       
-      // Submit questionnaire with calculated manifesto score (satisfaction vote is handled separately)
+      // Submit questionnaire with calculated manifesto score
       await FirebaseService.submitQuestionnaire({
         user_id: currentUser.uid,
         constituency_id: constituencyId,
@@ -598,8 +725,11 @@ const AapkaKshetra: React.FC = () => {
       // Update constituency scores with new average calculation
       await FirebaseService.updateManifestoAverageIncrement(constituencyId, newManifestoScore);
       
-      setHasSubmittedQuestionnaire(true);
-      alert(isEnglish ? 'Thank you! Your responses have been submitted.' : 'धन्यवाद! आपकी प्रतिक्रियाएं सबमिट कर दी गई हैं।');
+      // Refresh the manifesto score display
+      await fetchManifestoScore(constituencyId);
+      
+      setHasSubmittedDepartmentRatings(true);
+      alert(isEnglish ? 'Thank you! Your department ratings have been submitted and manifesto score updated.' : 'धन्यवाद! आपकी विभाग रेटिंग सबमिट कर दी गई हैं और मैनिफेस्टो स्कोर अपडेट हो गया है।');
     } catch (e) {
       console.error('Error submitting questionnaire', e);
       alert(isEnglish ? 'Failed to submit. Please try again.' : 'सबमिट करने में विफल। कृपया पुनः प्रयास करें।');
@@ -713,7 +843,31 @@ const AapkaKshetra: React.FC = () => {
       </div>
 
       <div className="px-4 py-3">
- 
+        {/* Constituency Selection */}
+        <div className="flex flex-col items-center justify-center px-4 py-6">
+          <div className="mb-6 max-w-md mx-auto w-full">
+            <div className="text-gray-800">
+              <div className="relative">
+                <div className="flex items-center justify-between min-h-[48px] outline-0 transition-all duration-100 bg-[#e5e7eb] border border-gray-300 rounded-lg hover:border-gray-400 focus-within:border-[#273F4F] focus-within:ring-2 focus-within:ring-[#273F4F]/20">
+                  <div className="flex-1 px-3 py-2">
+                    <select
+                      value={selectedConstituency}
+                      onChange={(e) => setSelectedConstituency(e.target.value)}
+                      className="w-full bg-transparent border-none outline-none text-gray-800 placeholder-gray-500 text-base"
+                    >
+                      <option value="">{isEnglish ? 'Search your constituency...' : 'अपना निर्वाचन क्षेत्र खोजें...'}</option>
+                      {constituencies.map((constituency) => (
+                        <option key={constituency} value={constituency}>
+                          {constituency}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
         {/* MLA Profile Card */}
         {candidateData && (
           <div className="bg-white rounded-lg p-3 lg:p-5 mb-2 shadow-sm">
@@ -774,7 +928,7 @@ const AapkaKshetra: React.FC = () => {
             </h3>
             
             {/* Show voting buttons - always visible but handle authentication */}
-            {!hasSubmittedQuestionnaire ? (
+            {satisfactionVote === null ? (
               <div className="flex items-center space-x-2 mb-2">
                 <button 
                   onClick={() => {
@@ -801,7 +955,7 @@ const AapkaKshetra: React.FC = () => {
                   {isEnglish ? "No" : "ना"}
                 </button>
               </div>
-            ) : hasSubmittedQuestionnaire ? (
+            ) : satisfactionVote !== null ? (
               /* Show vote counts and user's vote if they have already voted */
               <div className="mb-2">
                 <div className="flex items-center justify-between mb-2">
@@ -809,11 +963,11 @@ const AapkaKshetra: React.FC = () => {
                     <span className="text-xs text-gray-600">
                       {isEnglish ? "Your vote:" : "आपका वोट:"}
                     </span>
-                    {hasSubmittedQuestionnaire && satisfactionVote === 'yes' ? (
+                    {satisfactionVote === 'yes' ? (
                       <span className="px-2 py-1 text-xs rounded-full bg-[#014e5c] text-white">
                         {isEnglish ? "Yes" : "हाँ"}
                       </span>
-                    ) : hasSubmittedQuestionnaire && satisfactionVote === 'no' ? (
+                    ) : satisfactionVote === 'no' ? (
                       <span className="px-2 py-1 text-xs rounded-full bg-red-500 text-white">
                         {isEnglish ? "No" : "ना"}
                       </span>
@@ -964,7 +1118,7 @@ const AapkaKshetra: React.FC = () => {
             
             <div className="text-center">
               <div className="text-3xl font-bold text-[#273F4F] mb-2">
-                {manifestoScore.toFixed(1)}
+                {manifestoScore*20}%
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
                 <div 
@@ -983,100 +1137,197 @@ const AapkaKshetra: React.FC = () => {
         )}
 
         {/* Department Quiz Section */}
-        {candidateData && (
+        {candidateData && canShow && (
           <div className="bg-white rounded-lg p-4 mb-2 shadow-sm">
             <h3 className="text-lg font-medium text-black mb-4 text-center">
               {isEnglish ? 'Rate Government Performance by Department' : 'विभाग के अनुसार सरकार के प्रदर्शन को रेट करें'}
             </h3>
             
-            <div className="space-y-4">
-              {candidateData.dept_info.map((dept) => (
-                <div key={dept.dept_name} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center space-x-2 mb-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                      <span className="text-blue-600 text-lg">
-                        {dept.dept_name === 'स्वास्थ्य' || dept.dept_name === 'Health' ? <Hospital /> : '📚'}
-                      </span>
+            {(() => {
+              const shouldShowLoading = isCheckingSubmissionStatus || !scoresLoaded || !initialLoadComplete || !isReadyToShowForm || !departmentRatingsLoaded || !candidateData?.dept_info;
+              
+              if (shouldShowLoading) {
+                return (
+                  /* Show loading state while checking submission status, loading scores, initializing, not ready, ratings not loaded, or dept info missing */
+                  <div className="text-center py-8">
+                    <div className="text-gray-500">
+                      {isEnglish ? 'Loading department ratings...' : 'विभाग रेटिंग लोड हो रही है...'}
                     </div>
-                    <h4 className="text-lg font-semibold text-black">{dept.dept_name}</h4>
                   </div>
-                  
-                  <p className="text-gray-600 text-sm mb-4 leading-relaxed">
-                    {dept.work_info}
-                  </p>
-                  
-                  <div className="mb-4">
-                    <p className="text-sm text-gray-700 mb-2">
-                      {isEnglish ? 'How satisfied are you with the government\'s work on this subject?' : 'इस विषय पर सरकार के कार्य से आप कितने संतुष्ट हैं ?'}
+                );
+              }
+              
+              // For logged-in users who have already submitted
+              if (currentUser && hasSubmittedDepartmentRatings) {
+                return (
+                  /* Show submitted ratings for logged-in users */
+                  <div className="space-y-4">
+                    {candidateData.dept_info.map((dept) => (
+                      <div key={dept.dept_name} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center space-x-2 mb-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <span className="text-blue-600 text-lg">
+                              {dept.dept_name === 'स्वास्थ्य' || dept.dept_name === 'Health' ? <Hospital /> : '📚'}
+                            </span>
+                          </div>
+                          <h4 className="text-lg font-semibold text-black">{dept.dept_name}</h4>
+                        </div>
+                        
+                        <p className="text-gray-600 text-sm mb-4 leading-relaxed">
+                          {dept.work_info}
+                        </p>
+                        
+                        <div className="mb-4">
+                          <p className="text-sm text-gray-700 mb-2">
+                            {isEnglish ? 'Your submitted rating:' : 'आपकी सबमिट की गई रेटिंग:'}
+                          </p>
+                          
+                          <div className="flex items-center justify-center space-x-1 mb-3">
+                            {[1, 2, 3, 4, 5].map((rating) => (
+                              <div
+                                key={rating}
+                                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-semibold ${
+                                  departmentRatings[dept.dept_name] === rating
+                                    ? 'border-yellow-500 bg-yellow-100 text-yellow-600'
+                                    : 'border-gray-200 bg-gray-50 text-gray-400'
+                                }`}
+                              >
+                                {rating}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        <div className="text-center text-green-600 font-medium">
+                          ✓ {isEnglish ? 'Rating submitted' : 'रेटिंग सबमिट की गई'}
+                        </div>
+                      </div>
+                    ))}
+                    
+                    <div className="text-center pt-4">
+                      <div className="text-green-600 font-medium mb-4">
+                        ✓ {isEnglish ? 'Department ratings already submitted for this constituency' : 'इस निर्वाचन क्षेत्र के लिए विभाग रेटिंग पहले ही सबमिट की गई हैं'}
+                      </div>
+                      <button
+                        disabled
+                        className="bg-gray-400 text-gray-600 px-6 py-3 rounded-lg font-medium cursor-not-allowed"
+                      >
+                        {isEnglish ? 'Already Submitted' : 'पहले ही सबमिट की गई'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+              
+              // For all users (logged-in or not) - show rating form
+              return (
+              /* Show rating form for all users */
+              <div className="space-y-4">
+                {candidateData.dept_info.map((dept) => (
+                  <div key={dept.dept_name} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 text-lg">
+                          {dept.dept_name === 'स्वास्थ्य' || dept.dept_name === 'Health' ? <Hospital /> : '📚'}
+                        </span>
+                      </div>
+                      <h4 className="text-lg font-semibold text-black">{dept.dept_name}</h4>
+                    </div>
+                    
+                    <p className="text-gray-600 text-sm mb-4 leading-relaxed">
+                      {dept.work_info}
                     </p>
                     
-                    <div className="flex items-center justify-center space-x-1 mb-3">
-                      {[1, 2, 3, 4, 5].map((rating) => (
-                        <button
-                          key={rating}
-                          onClick={() => {
+                    <div className="mb-4">
+                      <p className="text-sm text-gray-700 mb-2">
+                        {isEnglish ? 'How satisfied are you with the government\'s work on this subject?' : 'इस विषय पर सरकार के कार्य से आप कितने संतुष्ट हैं ?'}
+                      </p>
+                      
+                      <div className="flex items-center justify-center space-x-1 mb-3">
+                        {[1, 2, 3, 4, 5].map((rating) => (
+                          <button
+                            key={rating}
+                                                      onClick={() => {
                             if (!currentUser) {
                               setShowSignInPopup(true);
                             } else {
                               handleDepartmentRating(dept.dept_name, rating);
                             }
                           }}
-                          className={`w-8 h-8 rounded-full border-2 transition-all duration-200 flex items-center justify-center text-sm font-semibold ${
-                            departmentRatings[dept.dept_name] === rating
-                              ? 'border-yellow-500 bg-yellow-100 text-yellow-600'
-                              : 'border-gray-300 hover:border-yellow-400 hover:bg-yellow-50 text-gray-600 hover:text-yellow-600'
-                          }`}
-                        >
-                          {rating}
-                        </button>
-                      ))}
+                            className={`w-8 h-8 rounded-full border-2 transition-all duration-200 flex items-center justify-center text-sm font-semibold ${
+                              departmentRatings[dept.dept_name] === rating
+                                ? 'border-yellow-500 bg-yellow-100 text-yellow-600'
+                                : 'border-gray-300 hover:border-yellow-400 hover:bg-yellow-50 text-gray-600 hover:text-yellow-600'
+                            }`}
+                          >
+                            {rating}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="text-right">
-                      <div className="flex items-center space-x-4">
-                        <div className="text-center">
-                          <div className="flex space-x-1">
-                            <span className="text-yellow-500">⭐</span>
-                          </div>
-                          <p className="text-xs text-gray-600">
-                            {isEnglish ? 'Very Bad' : 'बहुत खराब'}
-                          </p>
+                    
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex flex-col items-start">
+                        <div className="flex space-x-1">
+                          <span className="text-yellow-500">⭐</span>
                         </div>
-                        <div className="text-center">
-                          <div className="flex space-x-1">
-                            <span className="text-xs text-gray-600">
-                              {isEnglish ? 'Very Good' : 'बहुत अच्छा'}
-                            </span>
-                            <div className="flex space-x-1">
-                              <span className="text-yellow-500">⭐⭐⭐⭐⭐</span>
-                            </div>
-                          </div>
+                        <p className="text-xs text-gray-600">
+                          {isEnglish ? "Very Bad" : "बहुत खराब"}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <div className="flex space-x-1">
+                          <span className="text-xs text-gray-600">
+                            {isEnglish ? "Very Good" : "बहुत अच्छा"}
+                          </span>
+                          <span className="text-yellow-500">⭐⭐⭐⭐⭐</span>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-              
-              {/* Submit Button */}
-              <div className="text-center pt-4">
-                <button
-                  onClick={() => {
-                    if (!currentUser) {
-                      setShowSignInPopup(true);
-                    } else {
-                      handleQuestionnaireSubmit();
-                    }
-                  }}
-                  disabled={!currentUser && !canSubmitQuestionnaire()}
-                  className="bg-[#014e5c] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#014e5c]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isEnglish ? 'Submit Ratings' : 'रेटिंग सबमिट करें'}
-                </button>
+                ))}
+                
+                {/* Submit Button - Show for all users when they have 4 ratings */}
+                {(() => {
+                  const hasExactly4Ratings = Object.keys(departmentRatings).length === 4 && 
+                    Object.values(departmentRatings).every(rating => rating > 0);
+                  
+                  if (hasExactly4Ratings) {
+                    return (
+                      <div className="text-center pt-4">
+                        <button
+                          onClick={() => {
+                            if (!currentUser) {
+                              setShowSignInPopup(true);
+                            } else {
+                              handleQuestionnaireSubmit();
+                            }
+                          }}
+                          className="bg-[#014e5c] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#014e5c]/80 transition-colors"
+                        >
+                          {isEnglish ? 'Submit Department Ratings' : 'विभाग रेटिंग सबमिट करें'}
+                        </button>
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <div className="text-center pt-4">
+                      <div className="text-gray-500 mb-2">
+                        {isEnglish ? 'Please rate all 4 departments to submit' : 'कृपया सभी 4 विभागों को रेट करें'}
+                      </div>
+                      <button
+                        disabled
+                        className="bg-gray-400 text-gray-600 px-6 py-3 rounded-lg font-medium cursor-not-allowed"
+                      >
+                        {isEnglish ? 'Rate All Departments First' : 'पहले सभी विभागों को रेट करें'}
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
-            </div>
+            );
+            })()}
           </div>
         )}
 
@@ -1141,37 +1392,6 @@ const AapkaKshetra: React.FC = () => {
           </div>
         )}
 
-        {/* Constituency Selection */}
-        <div className="flex flex-col items-center justify-center px-4 py-6">
-          <div className="mb-6 max-w-md mx-auto w-full">
-            <div className="text-gray-800">
-              <div className="relative">
-                <div className="flex items-center justify-between min-h-[48px] outline-0 transition-all duration-100 bg-[#e5e7eb] border border-gray-300 rounded-lg hover:border-gray-400 focus-within:border-[#273F4F] focus-within:ring-2 focus-within:ring-[#273F4F]/20">
-                  <div className="flex-1 px-3 py-2">
-                    <select
-                      value={selectedConstituency}
-                      onChange={(e) => setSelectedConstituency(e.target.value)}
-                      className="w-full bg-transparent border-none outline-none text-gray-800 placeholder-gray-500 text-base"
-                    >
-                      <option value="">{isEnglish ? 'Search your constituency...' : 'अपना निर्वाचन क्षेत्र खोजें...'}</option>
-                      {constituencies.map((constituency) => (
-                        <option key={constituency} value={constituency}>
-                          {constituency}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex items-center pr-3">
-                    <svg height="20" width="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false" className="text-gray-400">
-                      <path d="M4.516 7.548c0.436-0.446 1.043-0.481 1.576 0l3.908 3.747 3.908-3.747c0.533-0.481 1.141-0.446 1.574 0 0.436 0.445 0.408 1.197 0 1.615-0.406 0.418-4.695 4.502-4.695 4.502-0.217 0.223-0.502 0.335-0.787 0.335s-0.57-0.112-0.789-0.335c0 0-4.287-4.084-4.695-4.502s-0.436-1.17 0-1.615z"></path>
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
 
         {/* Charcha Manch Button */}
         {candidateData && constituencyId && (
@@ -1199,57 +1419,6 @@ const AapkaKshetra: React.FC = () => {
         )}
       </div>
       
-      {/* Footer */}
-      <footer className="bg-[#273F4F] text-white py-8 mt-auto">
-        <div className="max-w-3xl mx-auto px-4">
-          <div className="grid md:grid-cols-3 gap-8 mb-8">
-            <div>
-              <h3 className="text-lg font-semibold mb-4">{isEnglish ? 'Links' : 'लिंक'}</h3>
-              <ul className="space-y-2">
-                <li>
-                  <a href="/about" className="hover:text-gray-300 transition-colors">
-                    {isEnglish ? 'Our Vision' : 'हमारा नज़रिया'}
-                  </a>
-                </li>
-                <li>
-                  <a href="/contact" className="hover:text-gray-300 transition-colors">
-                    {isEnglish ? 'Contact' : 'संपर्क'}
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-4">{isEnglish ? 'Connect with us' : 'हमसे जुड़ें'}</h3>
-              <div className="flex gap-3">
-                <a href="https://www.facebook.com/charchagram/" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"></path>
-                  </svg>
-                </a>
-                <a href="https://x.com/Charchagram_" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"></path>
-                  </svg>
-                </a>
-                <a href="https://www.instagram.com/charchagram.collective/" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"></path>
-                  </svg>
-                </a>
-                <a href="https://www.youtube.co/@CharchagramCollective" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"></path>
-                  </svg>
-                </a>
-              </div>
-            </div>
-          </div>
-          <div className="pt-8 border-t border-gray-600 text-sm">
-            <p className="text-center mb-2">© 2025 {isEnglish ? 'CharchaGram' : 'चर्चाग्राम'} - {isEnglish ? 'All rights reserved' : 'सभी अधिकार सुरक्षित'}</p>
-            <p className="text-center text-gray-400">{isEnglish ? 'Powered by Charcha Foundation' : 'चर्चा फाउंडेशन द्वारा संचालित'}</p>
-          </div>
-        </div>
-      </footer>
 
       {/* Sign In Popup */}
       {showSignInPopup && (

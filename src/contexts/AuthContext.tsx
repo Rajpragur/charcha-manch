@@ -13,6 +13,7 @@ import {
   signInWithCredential
 } from 'firebase/auth';
 import { auth } from '../configs/firebase';
+import FirebaseService from '../services/firebaseService';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -23,6 +24,8 @@ interface AuthContextType {
   verifyPhoneCode: (verificationId: string, code: string) => Promise<any>;
   logout: () => Promise<void>;
   loading: boolean;
+  onboardingCompleted: boolean;
+  checkOnboardingStatus: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -36,6 +39,25 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+
+  const checkOnboardingStatus = async (): Promise<boolean> => {
+    if (!currentUser) {
+      setOnboardingCompleted(false);
+      return false;
+    }
+
+    try {
+      const userProfile = await FirebaseService.getUserProfile(currentUser.uid);
+      const isCompleted = !!(userProfile && userProfile.constituency_id && userProfile.gender && userProfile.age_group && userProfile.area);
+      setOnboardingCompleted(isCompleted);
+      return isCompleted;
+    } catch (error) {
+      console.error('Error checking onboarding status:', error);
+      setOnboardingCompleted(false);
+      return false;
+    }
+  };
 
   const signup = async (email: string, password: string) => {
     return createUserWithEmailAndPassword(auth, email, password);
@@ -60,12 +82,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    setOnboardingCompleted(false);
     return signOut(auth);
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+      
+      if (user) {
+        // Check onboarding status when user signs in
+        await checkOnboardingStatus();
+      } else {
+        setOnboardingCompleted(false);
+      }
+      
       setLoading(false);
     });
 
@@ -80,7 +111,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInWithPhone, 
     verifyPhoneCode, 
     logout, 
-    loading 
+    loading,
+    onboardingCompleted,
+    checkOnboardingStatus
   };
 
   return (

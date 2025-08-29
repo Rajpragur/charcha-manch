@@ -58,7 +58,7 @@ const Navbar: React.FC = () => {
           {/* Left Side - Logo */}
           <div className="flex items-center z-10">
             <img
-              src="/images/logo.png"
+              src="/images/mainlogonew.png"
               className="h-8 w-8 lg:h-10 lg:w-10 object-contain"
               alt="Logo"
             />

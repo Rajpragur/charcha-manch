@@ -125,10 +125,6 @@ const Home: React.FC = () => {
   const [, setHindiData] = useState<CandidateData[]>([]);
   const [userSurveys, setUserSurveys] = useState<Set<string>>(new Set());
   const [userVotesLoading, setUserVotesLoading] = useState(true);
-
-
-
-
   // Ref for dropdown to handle click outside
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -252,8 +248,9 @@ const Home: React.FC = () => {
     } else {
       // Clear user votes when user logs out
       setUserSurveys(new Set());
+      setUserVotesLoading(false);
     }
-  }, [currentUser]);
+  }, [currentUser?.uid]); // Only depend on the user ID, not the entire user object
 
   // Popup helper functions
   const showPopup = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {

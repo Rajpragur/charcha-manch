@@ -20,12 +20,14 @@ import { AdminProvider } from './contexts/AdminContext';
 import Signup from './components/Signup';
 import Signin from './components/Signin';
 import Onboarding from './components/Onboarding';
+import ProtectedRoute from './components/ProtectedRoute';
 
 import AdminPanel from './pages/AdminPanel';
 import AdminSetup from './pages/AdminSetup';
 import BlogCreate from './pages/BlogCreate';
 import PostDetail from './pages/PostDetail';
 import './App.css';
+import Footer from './components/Footer';
 
 const App: React.FC = () => {
   return (
@@ -35,33 +37,44 @@ const App: React.FC = () => {
           <Router>
             <div className="App min-h-screen flex flex-col">
               <Navbar />
-              <main className="flex-grow pb-20 lg:pb-24">
+              <main className="flex-grow">
                 <Routes>
-                  {/* Public routes - no constituency check needed */}
-                  <Route path="/signup" element={<Signup />} />
-                  <Route path="/signin" element={<Signin />} />
-                  <Route path="/onboarding" element={<Onboarding />} />
-                  <Route path="/admin" element={<AdminPanel />} />
-                  <Route path="/admin-setup" element={<AdminSetup />} />
-                  <Route path="/admin/blog/create" element={<BlogCreate />} />
-                  <Route path="/admin/blog/edit/:blogId" element={<BlogCreate />} />
-                  
-                  {/* Main routes - no constituency restrictions */}
+                  {/* Public routes - no authentication required */}
                   <Route path="/" element={<Home />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/contact" element={<Contact />} />
                   <Route path="/blog" element={<BlogPost />} />
                   <Route path="/blog/:blogId" element={<BlogDetail />} />
-                  <Route path="/discussion" element={<DiscussionForum />} />
-                  <Route path="/post/:postId" element={<PostDetail />} />
-                  <Route path="/constituency/:constituencySlug" element={<Constituency />} />
-                  <Route path="/constituency/:constituencyId" element={<ConstituencyDetails />} />
-                  <Route path="/aapka-kshetra" element={<AapkaKshetra />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/signup" element={<Signup />} />
+                  <Route path="/signin" element={<Signin />} />
+
+                  {/* Onboarding route - requires authentication but not onboarding completion */}
+                  <Route path="/onboarding" element={
+                    <ProtectedRoute requireOnboarding={false}>
+                      <Onboarding />
+                    </ProtectedRoute>
+                  } />
+
+                  {/* Admin routes - require authentication and admin role */}
+                  <Route path="/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
+                  <Route path="/admin-setup" element={<ProtectedRoute><AdminSetup /></ProtectedRoute>} />
+                  <Route path="/admin/blog/create" element={<ProtectedRoute><BlogCreate /></ProtectedRoute>} />
+                  <Route path="/admin/blog/edit/:blogId" element={<ProtectedRoute><BlogCreate /></ProtectedRoute>} />
+
+                  {/* Protected routes - require authentication AND onboarding completion */}
+                  <Route path="/discussion" element={<ProtectedRoute><DiscussionForum /></ProtectedRoute>} />
+                  <Route path="/post/:postId" element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
+                  <Route path="/constituency/:constituencySlug" element={<ProtectedRoute><Constituency /></ProtectedRoute>} />
+                  <Route path="/constituency/:constituencyId" element={<ProtectedRoute><ConstituencyDetails /></ProtectedRoute>} />
+                  <Route path="/aapka-kshetra" element={<ProtectedRoute><AapkaKshetra /></ProtectedRoute>} />
+                  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                  <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                  <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 </Routes>
               </main>
+              <div className="pb-20 lg:pb-24">
+                <Footer />
+              </div>
               <Toaster 
                 position="top-right"
                 toastOptions={{

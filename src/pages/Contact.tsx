@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Mail, Phone, MapPin, Clock, MessageSquare, Send, Building2, Star, CheckCircle, AlertCircle } from 'lucide-react';
-import PhotoPlaceholder from '../components/PhotoPlaceholder';
+import { Mail, Phone, MapPin, MessageSquare, Send, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface ContactForm {
   name: string;
@@ -335,6 +334,7 @@ const Contact: React.FC = () => {
             </section>
 
             {/* FAQ Section */}
+            {/*
             <section>
               <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 text-slate-800">
                 {content.faqTitle}
@@ -362,11 +362,13 @@ const Contact: React.FC = () => {
                 </div>
               </div>
             </section>
+            */}
           </div>
 
           {/* Right Sidebar */}
           <div className="xl:col-span-1 space-y-6">
             {/* Contact Information */}
+            {/*
             <div className="bg-white rounded-lg shadow-md p-6 border border-slate-100">
               <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
                 <MapPin className="h-5 w-5 mr-2 text-sky-600" />
@@ -408,8 +410,10 @@ const Contact: React.FC = () => {
                 </div>
               </div>
             </div>
+            */}
 
             {/* Additional Info */}
+            {/*
             <div className="bg-white rounded-lg shadow-md p-6 border border-slate-100">
               <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
                 <Star className="h-5 w-5 mr-2 text-amber-600" />
@@ -434,8 +438,10 @@ const Contact: React.FC = () => {
                 </div>
               </div>
             </div>
+            */}
 
             {/* Office Location */}
+            {/*
             <div className="bg-white rounded-lg shadow-md p-6 border border-slate-100">
               <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
                 <Building2 className="h-5 w-5 mr-2 text-emerald-600" />
@@ -452,6 +458,7 @@ const Contact: React.FC = () => {
                 </div>
               </div>
             </div>
+            */}
           </div>
         </div>
       </div>
