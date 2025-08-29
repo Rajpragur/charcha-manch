@@ -47,6 +47,12 @@ const App: React.FC = () => {
                   <Route path="/blog/:blogId" element={<BlogDetail />} />
                   <Route path="/signup" element={<Signup />} />
                   <Route path="/signin" element={<Signin />} />
+                  <Route path="/aapka-kshetra" element=<AapkaKshetra/> />
+                  <Route path="/discussion" element={<DiscussionForum />} />
+                  <Route path="/post/:postId" element={<PostDetail />} />
+                  <Route path="/constituency-details/:constituencyId" element={<ConstituencyDetails />} />
+                  <Route path="/constituency/:constituencySlug" element={<Constituency />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
 
                   {/* Onboarding route - requires authentication but not onboarding completion */}
                   <Route path="/onboarding" element={
@@ -62,12 +68,6 @@ const App: React.FC = () => {
                   <Route path="/admin/blog/edit/:blogId" element={<ProtectedRoute><BlogCreate /></ProtectedRoute>} />
 
                   {/* Protected routes - require authentication AND onboarding completion */}
-                  <Route path="/discussion" element={<ProtectedRoute><DiscussionForum /></ProtectedRoute>} />
-                  <Route path="/post/:postId" element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
-                  <Route path="/constituency/:constituencySlug" element={<ProtectedRoute><Constituency /></ProtectedRoute>} />
-                  <Route path="/constituency/:constituencyId" element={<ProtectedRoute><ConstituencyDetails /></ProtectedRoute>} />
-                  <Route path="/aapka-kshetra" element={<ProtectedRoute><AapkaKshetra /></ProtectedRoute>} />
-                  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                   <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 </Routes>

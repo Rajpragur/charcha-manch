@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   MapPin, 
   GraduationCap,
@@ -13,6 +14,8 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import AllConstituencies from '../components/AllConstituencies';
+import SignInPopup from '../components/SignInPopup';
+import FirebaseService from '../services/firebaseService';
 
 interface CandidateData {
   area_name: string;
@@ -88,6 +91,7 @@ interface ConstituencyData {
 
 const Constituency: React.FC = () => {
   const { isEnglish } = useLanguage();
+  const { currentUser } = useAuth();
   const { constituencySlug } = useParams<{ constituencySlug: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -112,6 +116,10 @@ const Constituency: React.FC = () => {
   const [, setEnglishData] = useState<CandidateData[]>([]);
   const [, setHindiData] = useState<CandidateData[]>([]);
   const [transformedConstituencies, setTransformedConstituencies] = useState<ConstituencyData[]>([]);
+  const [satisfactionAnswer, setSatisfactionAnswer] = useState<boolean | null>(null);
+  const [satisfactionResults, setSatisfactionResults] = useState({ yesCount: 0, noCount: 0 });
+  const [showSignInPopup, setShowSignInPopup] = useState(false);
+  const [manifestoScore, setManifestoScore] = useState<number>(0);
 
 
 
@@ -121,6 +129,14 @@ const Constituency: React.FC = () => {
     setError(null);
     setIsLoading(true);
   }, [constituencyId, constituencySlug]);
+
+  // Load satisfaction results and manifesto score when constituency data changes
+  useEffect(() => {
+    if (constituencyData && constituencyId) {
+      loadSatisfactionResults();
+      loadManifestoScore();
+    }
+  }, [constituencyData, constituencyId]);
 
     // Load all candidates data first
   useEffect(() => {
@@ -407,14 +423,48 @@ const Constituency: React.FC = () => {
   };
 
   // Format currency
-  const formatCurrency = (amount: number): string => {
+  const formatCurrency = (amount: number, isEnglish: boolean): string => {
     if (amount >= 10000000) {
-      return `₹${(amount / 10000000).toFixed(2)} Cr`;
+      return isEnglish ? `₹${(amount / 10000000).toFixed(2)} Cr` : `₹${(amount / 10000000).toFixed(2)} करोड़`;
     } else if (amount >= 100000) {
-      return `₹${(amount / 100000).toFixed(2)} L`;
+      return isEnglish ? `₹${(amount / 10000000).toFixed(2)} L` : `₹${(amount / 10000000).toFixed(2)} लाख`;
     } else {
-      return `₹${amount.toLocaleString()}`;
+      return isEnglish ? `₹${amount.toLocaleString()}` : `₹${amount.toLocaleString()}`;
     }
+  };
+
+  const submitSatisfactionSurvey = async (answer: boolean) => {
+    if (!currentUser || !constituencyId) return;
+    try {
+      await FirebaseService.submitSatisfactionSurvey({
+        user_id: currentUser.uid,
+        constituency_id: parseInt(constituencyId),
+        candidate_id: 0,
+        question: 'Are you satisfied with your tenure of last 5 years?',
+        answer
+      });
+      setSatisfactionAnswer(answer);
+      // Reload satisfaction results
+      loadSatisfactionResults();
+    } catch (err) {
+      console.error('Error submitting satisfaction survey:', err);
+    }
+  };
+
+  const loadSatisfactionResults = async () => {
+    if (!constituencyId) return;
+    try {
+      const { yesCount, noCount } = await FirebaseService.getSatisfactionResults(parseInt(constituencyId));
+      setSatisfactionResults({ yesCount, noCount });
+    } catch (err) {
+      console.error('Error loading satisfaction results:', err);
+      setSatisfactionResults({ yesCount: 0, noCount: 0 });
+    }
+  };
+
+  const loadManifestoScore = async () => {
+    if (!constituencyData) return;
+    setManifestoScore(constituencyData.vidhayak_info.manifesto_score || 0);
   };
 
   // Loading state
@@ -496,17 +546,21 @@ const Constituency: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#9ca8b4]">
-      <div className="px-4 py-3">
-        {/* Constituency Information Card */}
-        <div className="bg-white rounded-lg p-1 mb-4 shadow-sm text-center">
-          <h1 className="lg:text-2xl text-xl font-bold text-black mb-1">
-            {constituencyData ? constituencyData.area_name + ' ' + (isEnglish ? 'Vidhan Sabha Constituency' : 'विधानसभा क्षेत्र') : (isEnglish ? 'Constituency Details' : 'निर्वाचन क्षेत्र विवरण')}
+    <div className="min-h-screen bg-[#c1cbd1] py-2">
+      {/* Header Section with Flyer */}
+      <div className="bg-[#273F4F] shadow-sm border-b border-gray-200 text-center relative overflow-hidden px-4">
+        <div className="relative z-10 pt-8 px-2 pb-12">
+          <h1 className="lg:text-4xl text-2xl font-bold text-white mt-1 mb-1">
+            {constituencyData ? constituencyData.area_name : (isEnglish ? 'Constituency Details' : 'निर्वाचन क्षेत्र विवरण')}
           </h1>
-          <p className="text-gray-600 text-sm">
-            {isEnglish ? 'Information about this constituency' : 'इस निर्वाचन क्षेत्र की जानकारी'}
+          <p className="aapke-kshetra-ki" style={{fontWeight: 600, fontSize: '1.5rem', letterSpacing: 0}}>
+            <span style={{color: '#a4abb6ff'}}>{isEnglish ? 'Information about' : 'आपके क्षेत्र की'}</span>
+            <span style={{color: '#DC3C22'}}>{isEnglish ? ' Your Area' : ' जानकारी'}</span>
           </p>
         </div>
+      </div>
+
+      <div className="px-4 py-3">
 
         {/* MLA Profile Card */}
         {constituencyData && (
@@ -561,6 +615,90 @@ const Constituency: React.FC = () => {
           </div>
         )}
 
+        {/* Public Satisfaction Card */}
+        {constituencyData && (
+          <div className="bg-white rounded-lg p-4 lg:p-6 mb-2 lg:mb-4 shadow-sm">
+            <h3 className="text-xs lg:text-lg font-medium text-black mb-2">
+              {isEnglish ? 'Are you satisfied with the last five years of tenure?' : 'क्या आप पिछले पांच साल के कार्यकाल से संतुष्ट हैं?'}
+            </h3>
+            
+            {/* Show voting buttons - always visible but handle authentication */}
+            {satisfactionAnswer === null ? (
+              <div className="flex items-center space-x-2 mb-2">
+                <button 
+                  onClick={() => {
+                    if (!currentUser) {
+                      setShowSignInPopup(true);
+                    } else {
+                      submitSatisfactionSurvey(true);
+                    }
+                  }}
+                  className="px-3 py-1 text-xs rounded-full transition-colors bg-white text-gray-700 border border-gray-300 hover:bg-green-50 hover:border-green-300"
+                >
+                  {isEnglish ? "Yes" : "हाँ"}
+                </button>
+                <button 
+                  onClick={() => {
+                    if (!currentUser) {
+                      setShowSignInPopup(true);
+                    } else {
+                      submitSatisfactionSurvey(false);
+                    }
+                  }}
+                  className="px-3 py-1 text-xs rounded-full transition-colors bg-white text-gray-700 border border-gray-300 hover:bg-red-50 hover:border-red-300"
+                >
+                  {isEnglish ? "No" : "ना"}
+                </button>
+              </div>
+            ) : satisfactionAnswer !== null ? (
+              /* Show vote counts and user's vote if they have already voted */
+              <div className="mb-2">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-600">
+                      {isEnglish ? "Your vote:" : "आपका वोट:"}
+                    </span>
+                    {satisfactionAnswer === true ? (
+                      <span className="px-2 py-1 text-xs rounded-full bg-[#014e5c] text-white">
+                        {isEnglish ? "Yes" : "हाँ"}
+                      </span>
+                    ) : satisfactionAnswer === false ? (
+                      <span className="px-2 py-1 text-xs rounded-full bg-red-500 text-white">
+                        {isEnglish ? "No" : "ना"}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="text-sm font-bold text-green-600">
+                    {satisfactionResults.yesCount + satisfactionResults.noCount > 0 ? (
+                      Math.round(
+                        (satisfactionResults.yesCount /
+                          (satisfactionResults.yesCount + satisfactionResults.noCount)) *
+                          100,
+                      )
+                    ) : (
+                      0
+                    )}
+                    % {isEnglish ? "Satisfied" : "संतुष्ट"}
+                  </div>
+                </div>
+                
+                {/* Show detailed vote counts */}
+                <div className="flex items-center justify-between text-xs text-gray-600">
+                  <span>
+                    {isEnglish ? "Yes:" : "हाँ:"} {satisfactionResults.yesCount || 0}
+                  </span>
+                  <span>
+                    {isEnglish ? "No:" : "ना:"} {satisfactionResults.noCount || 0}
+                  </span>
+                  <span>
+                    {isEnglish ? "Total:" : "कुल:"} {satisfactionResults.yesCount + satisfactionResults.noCount || 0}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+
         {/* Key Metrics Grid */}
         {constituencyData && (
           <div className="grid grid-cols-2 gap-3 mb-4">
@@ -585,7 +723,7 @@ const Constituency: React.FC = () => {
               <div>
                 <p className="text-xs lg:text-sm text-black mb-0.5">{isEnglish ? 'Net Worth' : 'कुल संपत्ति'}</p>
                 <p className="text-blue-600 font-semibold text-xs lg:text-sm">
-                  {formatCurrency(constituencyData.vidhayak_info.metadata.net_worth)}
+                  {formatCurrency(constituencyData.vidhayak_info.metadata.net_worth, isEnglish)}
                 </p>
               </div>
             </div>
@@ -661,6 +799,52 @@ const Constituency: React.FC = () => {
           </div>
         )}
 
+        {/* Manifesto Score Display */}
+        {constituencyData && (
+          <div className="bg-white rounded-lg p-4 mb-2 shadow-sm">
+            <h3 className="text-lg font-medium text-black mb-4 text-center">
+              {isEnglish ? 'Manifesto Promise Score' : 'घोषणापत्र वादा स्कोर'}
+            </h3>
+            
+            <div className="text-center">
+              <div className="text-4xl font-bold text-[#273F4F] mb-2">
+                {manifestoScore * 20}%
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-4 mb-4">
+                <div 
+                  className="bg-[#273F4F] h-4 rounded-full transition-all duration-300"
+                  style={{ width: `${manifestoScore * 20}%` }}
+                ></div>
+              </div>
+              <div className="grid grid-cols-3 gap-4 mb-4 text-sm">
+                <div className="text-center">
+                  <div className="font-semibold text-gray-700">{isEnglish ? 'Score' : 'स्कोर'}</div>
+                  <div className="text-lg font-bold text-[#273F4F]">{manifestoScore}/5</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-semibold text-gray-700">{isEnglish ? 'Percentage' : 'प्रतिशत'}</div>
+                  <div className="text-lg font-bold text-[#273F4F]">{manifestoScore * 20}%</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-semibold text-gray-700">{isEnglish ? 'Rating' : 'रेटिंग'}</div>
+                  <div className="text-lg font-bold text-[#273F4F]">
+                    {manifestoScore >= 4 ? (isEnglish ? 'Excellent' : 'उत्कृष्ट') :
+                     manifestoScore >= 3 ? (isEnglish ? 'Good' : 'अच्छा') :
+                     manifestoScore >= 2 ? (isEnglish ? 'Average' : 'औसत') :
+                     (isEnglish ? 'Poor' : 'खराब')}
+                  </div>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600">
+                {isEnglish 
+                  ? 'Based on public feedback and performance metrics' 
+                  : 'जनता की प्रतिक्रिया और प्रदर्शन मापदंडों के आधार पर'
+                }
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Other Candidates Section */}
         {constituencyData && constituencyData.other_candidates && constituencyData.other_candidates.length > 0 && (
           <div className="bg-white rounded-lg p-4 mb-2 shadow-sm">
@@ -724,19 +908,26 @@ const Constituency: React.FC = () => {
 
         {/* Charcha Manch Button */}
         {constituencyData && (
-          <div className="text-center mt-4 sm:mt-6 mb-3 sm:mb-4">
-            <button 
-              className="px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-medium transition-all duration-200 shadow-lg text-base sm:text-lg flex items-center justify-center space-x-2 sm:space-x-3 mx-auto bg-gray-700 text-white hover:bg-[#014e5c]/80 hover:shadow-xl transform hover:-translate-y-1"
+          <div className="bg-white rounded-lg p-4 mb-2 shadow-sm text-center">
+            <button
               onClick={() => navigate(`/discussion?constituency=${constituencyData.area_name}&name=${encodeURIComponent(constituencyData.area_name)}`)}
+              className="inline-flex items-center space-x-2 bg-[#DEAF13] text-white px-6 py-3 rounded-lg hover:bg-[#C49F11] transition-colors font-medium"
             >
-              <MessageCircle className="w-4 h-4 lg:w-6 lg:h-6" />
-              <span className="text-sm lg:text-base">                  
-                {isEnglish ? 'Go to this area\'s Charcha Manch' : 'इस क्षेत्र के चर्चा मंच पर जाएं'}
-              </span>
+              <MessageCircle className="w-5 h-5" />
+              <span>{isEnglish ? 'Join Discussion' : 'चर्चा में शामिल हों'}</span>
             </button>
           </div>
         )}
       </div>
+
+      {/* Sign In Popup */}
+      {showSignInPopup && (
+        <SignInPopup
+          isOpen={showSignInPopup}
+          onClose={() => setShowSignInPopup(false)}
+          customMessage={isEnglish ? "Please sign in to submit your satisfaction survey" : "कृपया अपनी संतुष्टि सर्वेक्षण जमा करने के लिए साइन इन करें"}
+        />
+      )}
       
       {/* Bottom Navigation - Mobile */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20 shadow-lg">

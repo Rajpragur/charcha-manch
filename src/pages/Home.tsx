@@ -726,7 +726,7 @@ const Home: React.FC = () => {
 
   // Handle constituency selection from dropdown
   const handleConstituencySelect = (constituency: ConstituencyData) => {
-    navigate(`/constituency/${constituency.constituencyName.en.toLowerCase().replace(/\s+/g, '-')}-${constituency.id}?id=${constituency.id}`);
+    navigate(`/constituency-details/${constituency.id}`);
     setShowDropdown(false);
     setSearchQuery('');
   };

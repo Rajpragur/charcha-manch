@@ -3,10 +3,60 @@ import PopupCard from "./PopupCard";
 import SignInPopup from "./SignInPopup";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import type { User } from "firebase/auth";
 import {
   Loader2,
   ArrowRight,
 } from "lucide-react";
+
+interface CandidateData {
+  area_name: string;
+  vidhayak_info: {
+    name: string;
+    image_url: string;
+    age: number;
+    last_election_vote_percentage: number;
+    experience: string;
+    party_name: string;
+    party_icon_url: string;
+    manifesto_link: string;
+    manifesto_score: number;
+    metadata: {
+      education: string;
+      net_worth: number;
+      criminal_cases: number;
+      attendance: string;
+      questions_asked: string;
+      funds_utilisation: string;
+    };
+    survey_score: Array<{
+      question: string;
+      yes_votes: number;
+      no_votes: number;
+      score: number;
+    }>;
+  };
+  dept_info: Array<{
+    dept_name: string;
+    work_info: string;
+    survey_score: Array<{
+      question: string;
+      ratings: Record<string, number>;
+      score: number;
+    }>;
+    average_score: number;
+  }>;
+  other_candidates: Array<{
+    candidate_name: string;
+    candidate_image_url: string | null;
+    candidate_party: string;
+    vote_share: number;
+  }>;
+  latest_news: Array<{
+    title: string;
+    date?: string;
+  }>;
+}
 
 interface ConstituencyData {
   id: string;
@@ -29,7 +79,7 @@ interface ConstituencyData {
   attendance: string;
   questionsAsked: string;
   fundsUtilization: string;
-  rawData: any;
+  rawData: CandidateData;
 }
 
 const fetchPartyIcon = (partyName: string) => {
@@ -147,7 +197,7 @@ interface CharchitVidhanSabhaProps {
     type: "success" | "error" | "info";
   };
   closePopup: () => void;
-  currentUser: any;
+  currentUser: User | null;
   userSurveys: Set<string>;
   userVotesLoading: boolean;
 }
@@ -179,7 +229,7 @@ export default function CharchitVidhanSabha({
   // Handle constituency selection from dropdown
   const handleConstituencySelect = (constituency: ConstituencyData) => {
     navigate(
-      `/constituency/${constituency.constituencyName.en.toLowerCase().replace(/\s+/g, "-")}-${constituency.id}?id=${constituency.id}`,
+      `/constituency-details/${constituency.id}`,
     );
   };
   const handleCharchaManch = (area: string) => {
@@ -190,7 +240,11 @@ export default function CharchitVidhanSabha({
     setVisibleCount(prev => prev + 12);
   };
 
-  const formatCurrency = (amount: number, isEnglish: boolean): string => {
+  const formatCurrency = (amount: number | null | undefined, isEnglish: boolean): string => {
+    if (amount === null || amount === undefined || isNaN(amount)) {
+      return isEnglish ? "₹0" : "₹0";
+    }
+    
     if (amount >= 10000000) {
       return isEnglish ? `₹${(amount / 10000000).toFixed(2)} Cr` : `₹${(amount / 10000000).toFixed(2)} करोड़`;
     } else if (amount >= 100000) {
@@ -252,7 +306,7 @@ export default function CharchitVidhanSabha({
                       {/* Active Discussion Badge */}
                       <div 
                         className="absolute top-2 right-2 bg-[#DEAF13] px-4 py-2 rounded-xl cursor-pointer hover:bg-[#C49F11] transition-colors"
-                        onClick={() => handleCharchaManch(isEnglish ? constituency.constituencyName.en : constituency.constituencyName.hi)}
+                        onClick={() => handleCharchaManch(isEnglish ? (constituency.constituencyName?.en || "Constituency") : (constituency.constituencyName?.hi || "निर्वाचन क्षेत्र"))}
                       >
                         <div className="text-center">
                           <div 
@@ -268,29 +322,29 @@ export default function CharchitVidhanSabha({
                       <div className="mb-4 flex items-start space-x-3 pr-20">
                         <div className="flex-shrink-0">
                           <img 
-                            alt={isEnglish ? constituency.candidateName.en : constituency.candidateName.hi}
+                            alt={isEnglish ? (constituency.candidateName?.en || "Candidate") : (constituency.candidateName?.hi || "उम्मीदवार")}
                             className="w-16 h-16 rounded-full border-2 border-gray-300 object-cover"
                             src={constituency.profileImage || "https://via.placeholder.com/64x64"}
                           />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="mb-1 candidate-profile-heading text-left">
-                            {isEnglish ? constituency.constituencyName.en : constituency.constituencyName.hi}
+                            {isEnglish ? (constituency.constituencyName?.en || "Constituency") : (constituency.constituencyName?.hi || "निर्वाचन क्षेत्र")}
                           </div>
                           <div className="text-xl font-bold candidate-profile-subheading mb-2 text-left">
-                            {isEnglish ? constituency.candidateName.en : constituency.candidateName.hi}
+                            {isEnglish ? (constituency.candidateName?.en || "Candidate") : (constituency.candidateName?.hi || "उम्मीदवार")}
                           </div>
                           <div className="flex items-center space-x-2 mb-2">
                             <button 
-                              className={`${getPartyColor(constituency.partyName.name)} text-white px-3 py-2 rounded-lg text-sm font-medium min-w-fit flex-shrink-0 text-center leading-tight`}
+                              className={`${getPartyColor(constituency.partyName?.name || "independent")} text-white px-3 py-2 rounded-lg text-sm font-medium min-w-fit flex-shrink-0 text-center leading-tight`}
                             >
-                              {getPartyAbbreviation(isEnglish ? constituency.partyName.name : constituency.partyName.nameHi)}
+                              {getPartyAbbreviation(isEnglish ? (constituency.partyName?.name || "independent") : (constituency.partyName?.nameHi || "स्वतंत्र"))}
                             </button>
                             <div className="w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center p-2">
                               <img 
-                                alt={isEnglish ? constituency.partyName.name : constituency.partyName.nameHi}
+                                alt={isEnglish ? (constituency.partyName?.name || "independent") : (constituency.partyName?.nameHi || "स्वतंत्र")}
                                 className="w-full h-full rounded-full object-contain"
-                                src={fetchPartyIcon(constituency.partyName.name)}
+                                src={fetchPartyIcon(constituency.partyName?.name || "independent")}
                                 onError={(e) => {
                                   e.currentTarget.src = "/images/party_logo/independent.png";
                                 }}
@@ -312,7 +366,7 @@ export default function CharchitVidhanSabha({
                         </div>
                         <div className="text-right">
                           <div className="vidhayak-info-text font-bold">
-                            {isEnglish ? constituency.education?.en : constituency.education?.hi || "स्नातक"}
+                            {isEnglish ? (constituency.education?.en || "Graduate") : (constituency.education?.hi || "स्नातक")}
                           </div>
                           <div className="text-sm text-gray-600">
                             {isEnglish ? "Education" : "शिक्षा"}
@@ -341,7 +395,9 @@ export default function CharchitVidhanSabha({
                                   if (!currentUser) {
                                     setShowSignInPopup(true);
                                   } else {
-                                    submitSatisfactionSurvey(constituency.id, true);
+                                    if (constituency.id) {
+                                      submitSatisfactionSurvey(constituency.id, true);
+                                    }
                                   }
                                 }}
                                 className="text-center w-[40px] h-[34px] pl-[10px] pr-[10px] rounded-full text-base font-medium mx-auto transition-colors bg-[#f6f6f6] text-[#026A00]"
@@ -353,7 +409,9 @@ export default function CharchitVidhanSabha({
                                   if (!currentUser) {
                                     setShowSignInPopup(true);
                                   } else {
-                                    submitSatisfactionSurvey(constituency.id, false);
+                                    if (constituency.id) {
+                                      submitSatisfactionSurvey(constituency.id, false);
+                                    }
                                   }
                                 }}
                                 className="text-center w-[40px] h-[34px] rounded-full text-base pr-[9px] pl-[3px] font-medium transition-colors bg-[#f6f6f6] text-[#026A00]"
@@ -379,10 +437,10 @@ export default function CharchitVidhanSabha({
                           <div className="flex items-center justify-center">
                             <div className="text-center">
                               <div className="text-lg font-bold text-green-600">
-                                {constituency.satisfactionYes + constituency.satisfactionNo > 0 ? (
+                                {(constituency.satisfactionYes || 0) + (constituency.satisfactionNo || 0) > 0 ? (
                                   Math.round(
-                                    (constituency.satisfactionYes /
-                                      (constituency.satisfactionYes + constituency.satisfactionNo)) *
+                                    ((constituency.satisfactionYes || 0) /
+                                      ((constituency.satisfactionYes || 0) + (constituency.satisfactionNo || 0))) *
                                       100
                                   )
                                 ) : (
@@ -403,16 +461,16 @@ export default function CharchitVidhanSabha({
                         <div className="flex justify-between items-center mb-2">
                           <span className="text-sm text-gray-600 manifesto-score-text">
                             {isEnglish 
-                              ? `Manifesto Promise Score: ${constituency.manifestoScore || 4}/5`
-                              : `घोषणापत्र वादा स्कोर: ${constituency.manifestoScore || 4}/5`
+                              ? `Manifesto Promise Score: ${constituency.manifestoScore ?? 80}/100`
+                              : `घोषणापत्र वादा स्कोर: ${(constituency.manifestoScore ?? 4)*20}/100`
                             }
                           </span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-[#273F4F] h-2 rounded-full"
-                            style={{ width: `${(constituency.manifestoScore || 0) * 20}%` }}
-                          ></div>
+                                                      <div 
+                              className="bg-[#273F4F] h-2 rounded-full"
+                              style={{ width: `${(constituency.manifestoScore ?? 4)*20}%` }}
+                            ></div>
                         </div>
                       </div>
 
@@ -431,7 +489,11 @@ export default function CharchitVidhanSabha({
                       {/* Action Button */}
                       <div className="flex items-center space-x-3">
                         <button 
-                          onClick={() => handleConstituencySelect(constituency)}
+                          onClick={() => {
+                            if (constituency) {
+                              handleConstituencySelect(constituency);
+                            }
+                          }}
                           className="flex-1 bg-[#273F4F] text-white py-3 px-4 rounded-lg text-sm font-medium"
                         >
                           {isEnglish ? "View Details" : "विस्तार से देखे"}

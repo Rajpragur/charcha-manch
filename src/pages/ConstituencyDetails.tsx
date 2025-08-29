@@ -5,23 +5,64 @@ import { useLanguage } from '../contexts/LanguageContext';
 import FirebaseService from '../services/firebaseService';
 import { 
   ArrowLeft, 
-  MapPin, 
-  User, 
-  Award, 
-  FileText, 
-  Share2, 
-  TrendingUp,
-  Users,
-  Building,
-  BarChart3,
-  DollarSign,
-  Heart,
-  MessageCircle,
-  BookOpen,
-  Shield,
-  GraduationCap
+  Calendar, 
+  GraduationCap, 
+  MessageCircle, 
+  Scale, 
+  CircleQuestionMark, 
+  IndianRupee,
+  BanknoteArrowUp
 } from 'lucide-react';
-import PlaceholderImages from '../components/PlaceholderImages';
+import SignInPopup from '../components/SignInPopup';
+
+interface CandidateData {
+  area_name: string;
+  vidhayak_info: {
+    name: string;
+    image_url: string;
+    age: number;
+    last_election_vote_percentage: number;
+    experience: string;
+    party_name: string;
+    party_icon_url: string;
+    manifesto_link: string;
+    manifesto_score: number;
+    metadata: {
+      education: string;
+      net_worth: number;
+      criminal_cases: number;
+      attendance: string;
+      questions_asked: string;
+      funds_utilisation: string;
+    };
+    survey_score: Array<{
+      question: string;
+      yes_votes: number;
+      no_votes: number;
+      score: number;
+    }>;
+  };
+  dept_info: Array<{
+    dept_name: string;
+    work_info: string;
+    survey_score: Array<{
+      question: string;
+      ratings: Record<string, number>;
+      score: number;
+    }>;
+    average_score: number;
+  }>;
+  other_candidates: Array<{
+    candidate_name: string;
+    candidate_image_url: string | null;
+    candidate_party: string;
+    vote_share: number;
+  }>;
+  latest_news: Array<{
+    title: string;
+    date?: string;
+  }>;
+}
 
 interface ConstituencyData {
   id: number;
@@ -42,7 +83,7 @@ interface ConstituencyData {
     net_worth: number | null;
     criminal_cases: number;
     attendance_percentage: number | null;
-    questions_asked: number;
+    questions_asked: string;
     funds_utilisation: string | null;
     manifesto_score: number;
     last_election_vote_percentage: number | null;
@@ -58,12 +99,7 @@ interface ConstituencyData {
   }>;
 }
 
-interface DepartmentRating {
-  department: string;
-  rating: number;
-  totalRatings: number;
-  userRating?: number;
-}
+
 
 const ConstituencyDetails: React.FC = () => {
   const { isEnglish } = useLanguage();
@@ -72,25 +108,28 @@ const ConstituencyDetails: React.FC = () => {
   const navigate = useNavigate();
   
   const [constituencyData, setConstituencyData] = useState<ConstituencyData | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [satisfactionAnswer, setSatisfactionAnswer] = useState<boolean | null>(null);
   const [satisfactionResults, setSatisfactionResults] = useState({ yesCount: 0, noCount: 0 });
-  const [departmentRatings, setDepartmentRatings] = useState<DepartmentRating[]>([]);
-  const [userRatings, setUserRatings] = useState<Record<string, number>>({});
-  const [englishData, setEnglishData] = useState<any[]>([]);
-  const [hindiData, setHindiData] = useState<any[]>([]);
+  const [englishData, setEnglishData] = useState<CandidateData[]>([]);
+  const [hindiData, setHindiData] = useState<CandidateData[]>([]);
+  const [showSignInPopup, setShowSignInPopup] = useState(false);
+  const [manifestoScore, setManifestoScore] = useState<number>(0);
 
   // Load constituency data
   useEffect(() => {
     if (constituencyId) {
       loadConstituencyData();
-      loadSatisfactionResults();
-      loadDepartmentRatings();
-      if (currentUser) {
-        loadUserRatings();
-      }
+      // Load Firebase data with error handling
+      Promise.allSettled([
+        loadSatisfactionResults(),
+        fetchManifestoScore(parseInt(constituencyId)),
+        checkUserSatisfactionVote()
+      ]).then(() => {
+        // All Firebase calls completed (success or failure)
+        console.log('Firebase data loading completed');
+      });
     }
   }, [constituencyId, currentUser]);
 
@@ -101,8 +140,16 @@ const ConstituencyDetails: React.FC = () => {
 
   // Retry loading constituency data when JSON data is available
   useEffect(() => {
+    console.log('JSON data effect triggered:', {
+      englishDataLength: englishData.length,
+      hindiDataLength: hindiData.length,
+      constituencyId,
+      hasConstituencyData: !!constituencyData
+    });
+    
     if (englishData.length > 0 && hindiData.length > 0 && constituencyId && !constituencyData) {
       // If we have JSON data but no constituency data, try loading from JSON
+      console.log('Triggering loadFromJsonFiles from effect');
       loadFromJsonFiles();
     }
   }, [englishData, hindiData, constituencyId, constituencyData]);
@@ -115,8 +162,8 @@ const ConstituencyDetails: React.FC = () => {
         fetch('/data/candidates.json')
       ]);
 
-      const englishData: any[] = await englishResponse.json();
-      const hindiData: any[] = await hindiResponse.json();
+      const englishData: CandidateData[] = await englishResponse.json();
+      const hindiData: CandidateData[] = await hindiResponse.json();
 
       setEnglishData(englishData);
       setHindiData(hindiData);
@@ -134,8 +181,12 @@ const ConstituencyDetails: React.FC = () => {
         return;
       }
 
+      console.log('Loading constituency with ID:', constituencyId);
       const constituencyIndex = parseInt(constituencyId!);
+      console.log('Parsed constituency index:', constituencyIndex);
+      
       if (isNaN(constituencyIndex) || constituencyIndex < 0 || constituencyIndex >= englishData.length) {
+        console.error('Invalid constituency index:', constituencyIndex, 'Data length:', englishData.length);
         setError('Constituency not found');
         return;
       }
@@ -163,14 +214,14 @@ const ConstituencyDetails: React.FC = () => {
           net_worth: englishConstituency.vidhayak_info.metadata.net_worth,
           criminal_cases: englishConstituency.vidhayak_info.metadata.criminal_cases,
           attendance_percentage: null,
-          questions_asked: 0,
+          questions_asked: englishConstituency.vidhayak_info.metadata.questions_asked,
           funds_utilisation: englishConstituency.vidhayak_info.metadata.funds_utilisation,
           manifesto_score: englishConstituency.vidhayak_info.manifesto_score,
           last_election_vote_percentage: englishConstituency.vidhayak_info.last_election_vote_percentage,
           manifesto_link: englishConstituency.vidhayak_info.manifesto_link,
           is_current_representative: true
         }],
-        news: englishConstituency.latest_news?.map((news: any, index: number) => ({
+        news: englishConstituency.latest_news?.map((news: { title: string }, index: number) => ({
           id: index,
           title: news.title || 'No news available',
           title_hi: hindiConstituency.latest_news?.[index]?.title || 'कोई समाचार उपलब्ध नहीं',
@@ -180,6 +231,7 @@ const ConstituencyDetails: React.FC = () => {
       };
 
       setConstituencyData(transformedData);
+      setManifestoScore(englishConstituency.vidhayak_info.manifesto_score || 0);
       console.log('Loaded constituency data from JSON files:', transformedData);
     } catch (err) {
       console.error('Error loading from JSON files:', err);
@@ -191,8 +243,10 @@ const ConstituencyDetails: React.FC = () => {
     try {
       setIsLoading(true);
       setError(null);
+      console.log('Starting to load constituency data for ID:', constituencyId);
       // Use JSON files as the primary source for now
       await loadFromJsonFiles();
+      console.log('Constituency data loading completed');
     } catch (err) {
       console.error('Error loading constituency data:', err);
       setError('Failed to load constituency data');
@@ -207,49 +261,37 @@ const ConstituencyDetails: React.FC = () => {
       setSatisfactionResults({ yesCount, noCount });
     } catch (err) {
       console.error('Error loading satisfaction results:', err);
+      // Set default values when Firebase fails
+      setSatisfactionResults({ yesCount: 0, noCount: 0 });
     }
   };
 
-  const loadDepartmentRatings = async () => {
+  const fetchManifestoScore = async (constituencyId: number) => {
     try {
-      const raw = await FirebaseService.getDepartmentRatings(parseInt(constituencyId!));
-      const departmentMap = new Map<string, { total: number; count: number }>();
-      raw.forEach(r => {
-        const existing = departmentMap.get(r.department) || { total: 0, count: 0 };
-        existing.total += r.rating;
-        existing.count += 1;
-        departmentMap.set(r.department, existing);
-      });
-
-      const ratings: DepartmentRating[] = [
-        { department: 'Health', rating: 0, totalRatings: 0 },
-        { department: 'Education', rating: 0, totalRatings: 0 },
-        { department: 'Crime', rating: 0, totalRatings: 0 },
-        { department: 'Infrastructure', rating: 0, totalRatings: 0 }
-      ];
-
-      ratings.forEach(rating => {
-        const deptData = departmentMap.get(rating.department);
-        if (deptData) {
-          rating.rating = Math.round((deptData.total / deptData.count) * 10) / 10;
-          rating.totalRatings = deptData.count;
-        }
-      });
-
-      setDepartmentRatings(ratings);
-    } catch (err) {
-      console.error('Error loading department ratings:', err);
+      const constituencyData = await FirebaseService.getConstituencyDataWithSatisfaction();
+      const constituencyScore = constituencyData.find(data => data.constituency_id === constituencyId);
+      if (constituencyScore) {
+        setManifestoScore(constituencyScore.manifesto_average || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching manifesto score:', error);
+      setManifestoScore(0);
     }
   };
 
-  const loadUserRatings = async () => {
+  const checkUserSatisfactionVote = async () => {
+    if (!currentUser || !constituencyId) return;
     try {
-      const ratings = await FirebaseService.getUserDepartmentRatings(currentUser!.uid, parseInt(constituencyId!));
-      setUserRatings(ratings);
+      // For now, we'll rely on the satisfactionAnswer state
+      // which gets set when the user submits a survey
+      // This function can be enhanced later when more Firebase methods are available
+      console.log('User satisfaction vote check completed');
     } catch (err) {
-      console.error('Error loading user ratings:', err);
+      console.error('Error checking user satisfaction vote:', err);
     }
   };
+
+
 
   const submitSatisfactionSurvey = async (answer: boolean) => {
     if (!currentUser || !constituencyId) return;
@@ -268,42 +310,9 @@ const ConstituencyDetails: React.FC = () => {
     }
   };
 
-  const submitDepartmentRating = async (department: string, rating: number) => {
-    if (!currentUser || !constituencyId) return;
-    try {
-      await FirebaseService.submitDepartmentRating({
-        user_id: currentUser.uid,
-        constituency_id: parseInt(constituencyId),
-        department: department as any,
-        rating: rating
-      });
-      setUserRatings(prev => ({ ...prev, [department]: rating }));
-      loadDepartmentRatings();
-    } catch (err) {
-      console.error('Error submitting department rating:', err);
-    }
-  };
 
-  const handleShare = async () => {
-    const url = window.location.href;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `${isEnglish ? constituencyData?.area_name : constituencyData?.area_name_hi} - Charcha Manch`,
-          url: url
-        });
-      } catch (err) {
-        console.log('Error sharing:', err);
-      }
-    } else {
-      try {
-        await navigator.clipboard.writeText(url);
-        alert(isEnglish ? 'Link copied to clipboard!' : 'लिंक क्लिपबोर्ड पर कॉपी हो गया!');
-      } catch (err) {
-        console.log('Error copying to clipboard:', err);
-      }
-    }
-  };
+
+
 
   // Get party color
   const getPartyColor = (partyName: string): string => {
@@ -311,16 +320,16 @@ const ConstituencyDetails: React.FC = () => {
       'Bharatiya Janata Party': 'bg-amber-600',
       'Janata Dal (United)': 'bg-emerald-600',
       'Rashtriya Janata Dal': 'bg-green-600',
-      'Indian national Congress': 'bg-blue-600',
+      'Indian National Congress': 'bg-blue-600',
       'Communist Party of India': 'bg-red-500',
       'Lok Janshakti Party': 'bg-purple-600',
-      'Hindustani Awam front (secular)': 'bg-green-600',
+      'Hindustani Awam Front (Secular)': 'bg-green-600',
       'Rashtriya Lok Samta Party': 'bg-blue-600',
       'Bahujan Samaj Party': 'bg-blue-500',
-      'Jan Adhikar Party (democratic)': 'bg-orange-600',
+      'Jan Adhikar Party (Democratic)': 'bg-orange-600',
       'Communist Party of India (Marxist)': 'bg-rose-500',
-      'Communist Party of India (Marxist-Leninist) (Liberation)':'bg-red-600',
-      'All India Majlis-e-Itihadul Muslimeen':'bg-emerald-600',
+      'Communist Party of India (Marxist-Leninist) (Liberation)': 'bg-red-600',
+      'All India Majlis-e-Itihadul Muslimeen': 'bg-emerald-900',
       'Independent': 'bg-yellow-600',
       'NOTA': 'bg-gray-800'
     };
@@ -328,22 +337,49 @@ const ConstituencyDetails: React.FC = () => {
   };
 
   // Format currency
-  const formatCurrency = (amount: number): string => {
+  const formatCurrency = (amount: number | null | undefined, isEnglish: boolean): string => {
+    if (amount === null || amount === undefined || isNaN(amount)) {
+      return isEnglish ? "₹0" : "₹0";
+    }
+    
     if (amount >= 10000000) {
-      return `₹${(amount / 10000000).toFixed(2)} Cr`;
+      return isEnglish ? `₹${(amount / 10000000).toFixed(2)} Cr` : `₹${(amount / 10000000).toFixed(2)} करोड़`;
     } else if (amount >= 100000) {
-      return `₹${(amount / 100000).toFixed(2)} L`;
+      return isEnglish ? `₹${(amount / 100000).toFixed(2)} L` : `₹${(amount / 100000).toFixed(2)} लाख`;
     } else {
-      return `₹${amount.toLocaleString()}`;
+      return isEnglish ? `₹${amount.toLocaleString()}` : `₹${amount.toLocaleString()}`;
+    }
+  };
+
+  const fetchPartyIcon = (partyName: string) => {
+    const partyIcons: Record<string, string> = {
+      'Bharatiya Janata Party': '/images/party_logo/bjp.png',
+      'Janata Dal (United)': '/images/party_logo/jdu.png',
+      'Rashtriya Janata Dal': '/images/party_logo/rjd.png',
+      'Indian National Congress': '/images/party_logo/inc.png',
+      'Communist Party of India': '/images/party_logo/cpi.png',
+      'Hindustani Awam Front (Secular)': '/images/party_logo/HAM.png',
+      'Communist Party of India (Marxist)': '/images/party_logo/cpim.png',
+      'Communist Party of India (Marxist-Leninist) (Liberation)': '/images/party_logo/cpiml.png',
+      'All India Majlis-e-Itihadul Muslimeen': '/images/party_logo/aimim.png',
+      'Independent': '/images/party_logo/independent.png',
+      'NOTA': '/images/party_logo/nota.png',
+    };
+    return partyIcons[partyName] || '/images/party_logo/independent.png';
+  };
+
+  const handleCharchaManchClick = () => {
+    if (constituencyData) {
+      navigate(`/discussion?constituency=${constituencyData.area_name}&name=${encodeURIComponent(constituencyData.area_name)}`);
     }
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[#c1cbd1] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-slate-600">Loading constituency data...</p>
+          <p className="mt-4 text-slate-600">{isEnglish ? 'Loading constituency data...' : 'निर्वाचन क्षेत्र डेटा लोड हो रहा है...'}</p>
         </div>
       </div>
     );
@@ -351,7 +387,7 @@ const ConstituencyDetails: React.FC = () => {
 
   if (error || !constituencyData) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[#c1cbd1] flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-500 text-6xl mb-4">⚠️</div>
           <h1 className="text-2xl font-bold text-slate-800 mb-2">
@@ -374,165 +410,75 @@ const ConstituencyDetails: React.FC = () => {
   const currentCandidate = constituencyData.candidates.find(c => c.is_current_representative);
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => navigate(-1)}
-              className="flex items-center space-x-2 text-slate-600 hover:text-slate-800 transition-colors"
-            >
-              <ArrowLeft className="h-5 w-5" />
-              <span>{isEnglish ? 'Back' : 'वापस'}</span>
-            </button>
-            
-            <div className="text-center">
-              <h1 className="text-xl font-semibold text-slate-800">
-                {isEnglish ? constituencyData.area_name : constituencyData.area_name_hi}
-              </h1>
-              <p className="text-sm text-slate-500">
-                {isEnglish ? 'Constituency Details' : 'निर्वाचन क्षेत्र विवरण'}
-              </p>
-              <div className="mt-1">
-                <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                  isEnglish 
-                    ? 'bg-blue-100 text-blue-800' 
-                    : 'bg-green-100 text-green-800'
-                }`}>
-                  {isEnglish ? 'English' : 'हिंदी'}
-                </span>
-              </div>
-            </div>
-            
-            <button 
-              onClick={handleShare}
-              className="p-2 text-slate-600 hover:text-slate-800 transition-colors"
-            >
-              <Share2 className="h-5 w-5" />
-            </button>
-          </div>
+    <div className="min-h-screen bg-[#c1cbd1] py-2">
+      {/* Header Section with Flyer */}
+      <div className="bg-[#273F4F] shadow-sm border-b border-gray-200 text-center relative overflow-hidden px-4">
+        <div className="relative z-10 pt-8 px-2 pb-12">
+          <button
+            onClick={() => navigate(-1)}
+            className="absolute top-4 left-4 flex items-center space-x-2 text-white hover:text-gray-200 transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            <span>{isEnglish ? 'Back' : 'वापस'}</span>
+          </button>
+          
+          <h1 className="lg:text-4xl text-2xl font-bold text-white mt-1 mb-1">
+            {isEnglish ? constituencyData.area_name : constituencyData.area_name_hi}
+          </h1>
+          <p className="aapke-kshetra-ki" style={{fontWeight: 600, fontSize: '1.5rem', letterSpacing: 0}}>
+            <span style={{color: '#a4abb6ff'}}>{isEnglish ? 'Information about' : 'आपके क्षेत्र की'}</span>
+            <span style={{color: '#DC3C22'}}>{isEnglish ? ' Your Area' : ' जानकारी'}</span>
+          </p>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Candidate Overview Card */}
+      <div className="px-4 py-3">
+        {/* MLA Profile Card */}
         {currentCandidate && (
-          <div className="bg-white rounded-xl shadow-lg border border-slate-200 mb-8 overflow-hidden">
-            <div className={`${getPartyColor(currentCandidate.party_name)} h-2`}></div>
-            
-            <div className="p-6 lg:p-8">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Candidate Photo and Basic Info */}
-                <div className="lg:col-span-1 text-center lg:text-left">
-                  {currentCandidate.image_url ? (
-                    <img 
-                      src={currentCandidate.image_url} 
-                      alt={currentCandidate.name}
-                      className="w-32 h-32 lg:w-40 lg:h-40 rounded-full object-cover mx-auto lg:mx-0 mb-4 border-4 border-slate-100"
-                    />
-                  ) : (
-                    <PlaceholderImages type="profile" size="xl" className="mx-auto lg:mx-0 mb-4" />
-                  )}
-                  
-                  <h2 className="text-2xl lg:text-3xl font-bold text-slate-800 mb-2">
-                    {isEnglish ? currentCandidate.name : currentCandidate.name_hi}
-                  </h2>
-                  
-                  <div className={`inline-block px-4 py-2 rounded-full text-sm font-medium text-white mb-4 ${getPartyColor(currentCandidate.party_name)}`}>
+          <div className="bg-white rounded-lg p-3 lg:p-5 mb-2 shadow-sm">
+            <div className="flex items-start space-x-4">
+              <div className="relative">
+                <img 
+                  src={currentCandidate.image_url || '/images/logo.png'} 
+                  alt={currentCandidate.name}
+                  className="w-15 h-15 lg:w-25 lg:h-25 rounded-full object-cover border-2 border-gray-200"
+                  onError={(e) => {
+                    e.currentTarget.src = '/images/logo.png';
+                  }}
+                />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-start justify-between mb-2">
+                  <h2 className="text-xl font-bold text-black">{isEnglish ? currentCandidate.name : currentCandidate.name_hi}</h2>
+                  <span className="bg-gray-200 text-black text-xs px-3 py-1 rounded-full">
+                    {isEnglish ? 'MLA' : 'विधायक'}
+                  </span>
+                </div>
+                <p className="text-gray-600 text-sm mb-3">
+                  {isEnglish ? `Age: ${currentCandidate.age || 'N/A'} years` : `उम्र: ${currentCandidate.age || 'N/A'} वर्ष`}
+                </p>
+                <div className="flex items-center space-x-3 mb-3">
+                  <span className={`px-2 py-1 rounded-full text-white text-xs font-medium ${getPartyColor(currentCandidate.party_name)}`}>
                     {isEnglish ? currentCandidate.party_name : currentCandidate.party_name_hi}
-                  </div>
-                  
-                  <div className="space-y-2 text-sm text-slate-600">
-                    <div className="flex items-center justify-center lg:justify-start space-x-2">
-                      <MapPin className="h-4 w-4" />
-                      <span>{isEnglish ? constituencyData.area_name : constituencyData.area_name_hi}</span>
-                    </div>
-                    <div className="flex items-center justify-center lg:justify-start space-x-2">
-                      <User className="h-4 w-4" />
-                      <span>{currentCandidate.age || 'Not specified'} years old</span>
-                    </div>
-                    <div className="flex items-center justify-center lg:justify-start space-x-2">
-                      <Award className="h-4 w-4" />
-                      <span>{currentCandidate.last_election_vote_percentage || 0}% votes</span>
-                    </div>
+                  </span>
+                  <div className="w-10 h-10 lg:w-10 lg:h-10 ml-10 lg:ml-320 rounded-full flex items-center justify-center border border-gray-200">
+                    <img 
+                      className="w-10 h-10 lg:w-10 lg:h-10 font-thin object-contain" 
+                      src={fetchPartyIcon(currentCandidate.party_name)} 
+                      alt={`${currentCandidate.party_name} logo`}
+                      onError={(e) => {
+                        e.currentTarget.src = '/images/party_logo/independent.png';
+                      }}
+                    />
                   </div>
                 </div>
-
-                {/* Key Metrics */}
-                <div className="lg:col-span-2">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                    
-                    <div className="bg-slate-50 rounded-lg p-4 text-center">
-                      <div className="text-2xl font-bold text-emerald-600 mb-1">
-                        {currentCandidate.criminal_cases || 0}
-                      </div>
-                      <div className="text-sm text-slate-600">
-                        {isEnglish ? 'Criminal Cases' : 'आपराधिक मामले'}
-                      </div>
-                    </div>
-                    
-                    <div className="bg-slate-50 rounded-lg p-4 text-center">
-                      <div className="text-2xl font-bold text-amber-600 mb-1">
-                        {formatCurrency(currentCandidate.net_worth || 0)}
-                      </div>
-                      <div className="text-sm text-slate-600">
-                        {isEnglish ? 'Net Worth' : 'कुल संपत्ति'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Satisfaction Survey */}
-                  <div className="bg-slate-50 rounded-lg p-4">
-                    <h3 className="font-semibold text-slate-800 mb-3">
-                      {isEnglish ? 'Are you satisfied with your tenure of last 5 years?' : 'क्या आप पिछले 5 वर्षों के कार्यकाल से संतुष्ट हैं?'}
-                    </h3>
-                    
-                    {currentUser ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center space-x-4">
-                          <label className="flex items-center space-x-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="satisfaction"
-                              value="yes"
-                              checked={satisfactionAnswer === true}
-                              onChange={() => submitSatisfactionSurvey(true)}
-                              className="text-green-600"
-                            />
-                            <span className="text-slate-700">
-                              {isEnglish ? 'Yes' : 'हाँ'} ({satisfactionResults.yesCount})
-                            </span>
-                          </label>
-                          <label className="flex items-center space-x-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="satisfaction"
-                              value="no"
-                              checked={satisfactionAnswer === false}
-                              onChange={() => submitSatisfactionSurvey(false)}
-                              className="text-red-600"
-                            />
-                            <span className="text-slate-700">
-                              {isEnglish ? 'No' : 'नहीं'} ({satisfactionResults.noCount})
-                            </span>
-                          </label>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-4">
-                        <p className="text-slate-600 mb-3">
-                          {isEnglish ? 'Sign in to participate in the survey' : 'सर्वेक्षण में भाग लेने के लिए साइन इन करें'}
-                        </p>
-                        <Link
-                          to="/signin"
-                          className="inline-block bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                        >
-                          {isEnglish ? 'Sign In' : 'साइन इन'}
-                        </Link>
-                      </div>
-                    )}
+                <div className="flex items-center justify-between space-x-2">
+                  <span className="bg-[#e2ebf3] justify-left text-black text-xs px-2 py-[0.5px] rounded-full">
+                    {isEnglish ? `Last election: ${currentCandidate.last_election_vote_percentage || 'N/A'}% votes` : `अंतिम चुनाव: ${currentCandidate.last_election_vote_percentage || 'N/A'}% वोट`}
+                  </span>
+                  <div className="text-center">
+                    <div className="text-sm font-bold text-black">{currentCandidate.experience || 'N/A'}</div>
+                    <div className="text-xs text-gray-600">{isEnglish ? 'Post experience' : 'पद अनुभव'}</div>
                   </div>
                 </div>
               </div>
@@ -540,320 +486,247 @@ const ConstituencyDetails: React.FC = () => {
           </div>
         )}
 
-        {/* Tabs Navigation */}
-        <div className="bg-white rounded-lg shadow-md border border-slate-200 mb-8">
-          <div className="border-b border-slate-200">
-            <nav className="flex space-x-8 px-6">
-              {[
-                { id: 'overview', label: isEnglish ? 'Overview' : 'अवलोकन', icon: BarChart3 },
-                { id: 'departments', label: isEnglish ? 'Departments' : 'विभाग', icon: Building },
-                { id: 'candidates', label: isEnglish ? 'Candidates' : 'उम्मीदवार', icon: Users },
-                { id: 'news', label: isEnglish ? 'News' : 'समाचार', icon: FileText },
-                { id: 'charcha', label: isEnglish ? 'Charcha Manch' : 'चर्चा मंच', icon: MessageCircle }
-              ].map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 transition-colors ${
-                      activeTab === tab.id
-                        ? 'border-green-500 text-green-600'
-                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
-          {/* Tab Content */}
-          <div className="p-6">
-            {/* Overview Tab */}
-            {activeTab === 'overview' && currentCandidate && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Personal Information */}
-                  <div className="bg-slate-50 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-                      <User className="h-5 w-5 mr-2 text-sky-600" />
-                      {isEnglish ? 'Personal Information' : 'व्यक्तिगत जानकारी'}
-                    </h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">{isEnglish ? 'Age' : 'आयु'}</span>
-                        <span className="font-medium">{currentCandidate.age || 'Not specified'} years</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">{isEnglish ? 'Education' : 'शिक्षा'}</span>
-                        <span className="font-medium">{currentCandidate.education || 'Not specified'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">{isEnglish ? 'Experience' : 'अनुभव'}</span>
-                        <span className="font-medium">{currentCandidate.experience || 'Not specified'}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Financial Information */}
-                  <div className="bg-slate-50 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-                      <DollarSign className="h-5 w-5 mr-2 text-emerald-600" />
-                      {isEnglish ? 'Financial Information' : 'वित्तीय जानकारी'}
-                    </h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">{isEnglish ? 'Net Worth' : 'कुल संपत्ति'}</span>
-                        <span className="font-medium">{formatCurrency(currentCandidate.net_worth || 0)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">{isEnglish ? 'Funds Utilisation' : 'धन उपयोग'}</span>
-                        <span className="font-medium">{currentCandidate.funds_utilisation || 'Not specified'}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Performance Metrics */}
-                <div className="bg-slate-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-                    <TrendingUp className="h-5 w-5 mr-2 text-amber-600" />
-                    {isEnglish ? 'Performance Metrics' : 'कार्य प्रदर्शन मापदंड'}
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-sky-600 mb-1">
-                        {currentCandidate.last_election_vote_percentage || 0}%
-                      </div>
-                      <div className="text-sm text-slate-600">
-                        {isEnglish ? 'Vote Share' : 'वोट शेयर'}
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-emerald-600 mb-1">
-                        {currentCandidate.attendance_percentage || 'N/A'}%
-                      </div>
-                      <div className="text-sm text-slate-600">
-                        {isEnglish ? 'Attendance' : 'उपस्थिति'}
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-amber-600 mb-1">
-                        {currentCandidate.questions_asked || 'N/A'}
-                      </div>
-                      <div className="text-sm text-slate-600">
-                        {isEnglish ? 'Questions Asked' : 'पूछे गए प्रश्न'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Manifesto Link */}
-                {currentCandidate.manifesto_link && (
-                  <div className="bg-slate-50 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-                      <BookOpen className="h-5 w-5 mr-2 text-purple-600" />
-                      {isEnglish ? 'Manifesto' : 'घोषणापत्र'}
-                    </h3>
-                    <a
-                      href={currentCandidate.manifesto_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
-                    >
-                      <FileText className="h-4 w-4" />
-                      <span>{isEnglish ? 'View Manifesto' : 'घोषणापत्र देखें'}</span>
-                    </a>
-                  </div>
-                )}
+        {/* Public Satisfaction Card */}
+        {currentCandidate && (
+          <div className="bg-white rounded-lg p-4 lg:p-6 mb-2 lg:mb-4 shadow-sm">
+            <h3 className="text-xs lg:text-lg font-medium text-black mb-2">
+              {isEnglish ? 'Are you satisfied with the last five years of tenure?' : 'क्या आप पिछले पांच साल के कार्यकाल से संतुष्ट हैं?'}
+            </h3>
+            
+            {/* Show voting buttons - always visible but handle authentication */}
+            {satisfactionAnswer === null ? (
+              <div className="flex items-center space-x-2 mb-2">
+                <button 
+                  onClick={() => {
+                    if (!currentUser) {
+                      setShowSignInPopup(true);
+                    } else {
+                      submitSatisfactionSurvey(true);
+                    }
+                  }}
+                  className="px-3 py-1 text-xs rounded-full transition-colors bg-white text-gray-700 border border-gray-300 hover:bg-green-50 hover:border-green-300"
+                >
+                  {isEnglish ? "Yes" : "हाँ"}
+                </button>
+                <button 
+                  onClick={() => {
+                    if (!currentUser) {
+                      setShowSignInPopup(true);
+                    } else {
+                      submitSatisfactionSurvey(false);
+                    }
+                  }}
+                  className="px-3 py-1 text-xs rounded-full transition-colors bg-white text-gray-700 border border-gray-300 hover:bg-red-50 hover:border-red-300"
+                >
+                  {isEnglish ? "No" : "ना"}
+                </button>
               </div>
-            )}
-
-            {/* Departments Tab */}
-            {activeTab === 'departments' && (
-              <div className="space-y-6">
-                <div className="mb-6">
-                  <h3 className="text-xl font-semibold text-slate-800 mb-2">
-                    {isEnglish ? 'Department Performance & Ratings' : 'विभाग प्रदर्शन और रेटिंग'}
-                  </h3>
-                  <p className="text-slate-600">
-                    {isEnglish ? 'Rate the performance of different departments and provide your feedback' : 'विभिन्न विभागों के प्रदर्शन को रेट करें और अपनी प्रतिक्रिया दें'}
-                  </p>
+            ) : satisfactionAnswer !== null ? (
+              /* Show vote counts and user's vote if they have already voted */
+              <div className="mb-2">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-600">
+                      {isEnglish ? "Your vote:" : "आपका वोट:"}
+                    </span>
+                    {satisfactionAnswer === true ? (
+                      <span className="px-2 py-1 text-xs rounded-full bg-[#014e5c] text-white">
+                        {isEnglish ? "Yes" : "हाँ"}
+                      </span>
+                    ) : satisfactionAnswer === false ? (
+                      <span className="px-2 py-1 text-xs rounded-full bg-red-500 text-white">
+                        {isEnglish ? "No" : "ना"}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="text-sm font-bold text-green-600">
+                    {satisfactionResults.yesCount + satisfactionResults.noCount > 0 ? (
+                      Math.round(
+                        (satisfactionResults.yesCount /
+                          (satisfactionResults.yesCount + satisfactionResults.noCount)) *
+                          100,
+                      )
+                    ) : (
+                      0
+                    )}
+                    % {isEnglish ? "Satisfied" : "संतुष्ट"}
+                  </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {departmentRatings.map((dept) => (
-                    <div key={dept.department} className="bg-white rounded-lg border border-slate-200 p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-lg font-semibold text-slate-800 flex items-center">
-                          {dept.department === 'Health' && <Heart className="h-5 w-5 mr-2 text-red-500" />}
-                          {dept.department === 'Education' && <GraduationCap className="h-5 w-5 mr-2 text-blue-500" />}
-                          {dept.department === 'Crime' && <Shield className="h-5 w-5 mr-2 text-amber-500" />}
-                          {dept.department === 'Infrastructure' && <Building className="h-5 w-5 mr-2 text-green-500" />}
-                          {dept.department}
-                        </h4>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-slate-700">
-                            {dept.rating}/5
-                          </div>
-                          <div className="text-sm text-slate-500">
-                            {dept.totalRatings} {isEnglish ? 'ratings' : 'रेटिंग'}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {currentUser ? (
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-center space-x-2">
-                            {[1, 2, 3, 4, 5].map((rating) => (
-                              <button
-                                key={rating}
-                                onClick={() => submitDepartmentRating(dept.department, rating)}
-                                className={`w-10 h-10 rounded-lg border-2 transition-all duration-200 flex items-center justify-center text-sm font-semibold ${
-                                  userRatings[dept.department] === rating
-                                    ? 'border-green-500 bg-green-50 text-green-600'
-                                    : 'border-slate-300 hover:border-green-400 hover:bg-green-50 text-slate-600 hover:text-green-600'
-                                }`}
-                              >
-                                {rating}
-                              </button>
-                            ))}
-                          </div>
-                          <div className="flex items-center justify-center text-xs text-slate-500">
-                            <span className="mr-4">1 = {isEnglish ? 'Poor' : 'खराब'}</span>
-                            <span className="mr-4">3 = {isEnglish ? 'Average' : 'औसत'}</span>
-                            <span>5 = {isEnglish ? 'Excellent' : 'उत्कृष्ट'}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center py-4">
-                          <p className="text-slate-600 mb-3">
-                            {isEnglish ? 'Sign in to rate this department' : 'इस विभाग को रेट करने के लिए साइन इन करें'}
-                          </p>
-                          <Link
-                            to="/signin"
-                            className="inline-block bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                          >
-                            {isEnglish ? 'Sign In' : 'साइन इन'}
-                          </Link>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            {/* Candidates Tab */}
-            {activeTab === 'candidates' && (
-              <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                  {isEnglish ? 'All Candidates' : 'सभी उम्मीदवार'}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {constituencyData.candidates.map((candidate) => (
-                    <div key={candidate.id} className="bg-slate-50 rounded-lg p-4">
-                      <div className="flex items-center space-x-3">
-                        {candidate.image_url ? (
-                          <img 
-                            src={candidate.image_url} 
-                            alt={candidate.name}
-                            className="w-12 h-12 rounded-full object-cover"
-                          />
-                        ) : (
-                          <PlaceholderImages type="profile" size="sm" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-slate-800 truncate">
-                            {candidate.name}
-                          </h4>
-                          <p className="text-sm text-slate-600 truncate">
-                            {candidate.party_name}
-                          </p>
-                          <div className="flex items-center space-x-1 mt-1">
-                            <TrendingUp className="h-3 w-3 text-emerald-500" />
-                            <span className="text-xs text-slate-500">
-                              {candidate.last_election_vote_percentage || 0}% votes
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
-            )}
-
-            {/* News Tab */}
-            {activeTab === 'news' && (
-              <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                  {isEnglish ? 'Latest News' : 'ताजा समाचार'}
-                </h3>
-                {constituencyData.news && constituencyData.news.length > 0 ? (
-                  <div className="space-y-4">
-                    {constituencyData.news.map((news) => (
-                      <div key={news.id} className="bg-slate-50 rounded-lg p-4">
-                        <div className="flex items-start space-x-3">
-                          <FileText className="h-5 w-5 text-sky-600 mt-1 flex-shrink-0" />
-                          <div>
-                            <p className="text-slate-700 font-medium">
-                          {isEnglish ? news.title : news.title_hi}
-                        </p>
-                            {news.published_date && (
-                              <p className="text-sm text-slate-500 mt-1">
-                                {new Date(news.published_date).toLocaleDateString()}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-slate-500">
-                    <FileText className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                    <p>{isEnglish ? 'No recent news available' : 'कोई ताजा समाचार उपलब्ध नहीं'}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Charcha Manch Tab */}
-            {activeTab === 'charcha' && (
-              <div className="space-y-6">
-                <div className="text-center py-8">
-                  <MessageCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-slate-800 mb-2">
-                    {isEnglish ? 'Charcha Manch' : 'चर्चा मंच'}
-                  </h3>
-                  <p className="text-slate-600 mb-6">
-                    {isEnglish ? 'Join the discussion about your constituency' : 'अपने निर्वाचन क्षेत्र के बारे में चर्चा में शामिल हों'}
-                  </p>
-                  {currentUser ? (
-                    <Link
-                      to={`/charcha/${constituencyData.id}`}
-                      className="inline-block bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
-                    >
-                      {isEnglish ? 'Join Discussion' : 'चर्चा में शामिल हों'}
-                    </Link>
-                  ) : (
-                    <Link
-                      to="/signin"
-                      className="inline-block bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
-                    >
-                      {isEnglish ? 'Sign In to Join' : 'शामिल होने के लिए साइन इन करें'}
-                    </Link>
-                  )}
-                </div>
-              </div>
-            )}
+            ) : null}
           </div>
+        )}
+
+        {/* Key Metrics Grid */}
+        {currentCandidate && (
+          <div className="grid grid-cols-2 gap-3 mb-4 bg-white px-2 py-2">
+            {/* Education */}
+            <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm flex items-center min-h-[80px] lg:min-h-[100px]">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+                <GraduationCap className="w-5 h-5 lg:w-7 lg:h-7 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm lg:text-base text-black mb-1">{isEnglish ? 'Education level' : 'शिक्षा स्तर'}</p>
+                <p className="text-blue-600 font-semibold text-sm lg:text-base">
+                  {isEnglish ? currentCandidate.education : currentCandidate.education}
+                </p>
+              </div>
+            </div>
+
+            {/* Net Worth */}
+            <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm flex items-center min-h-[80px] lg:min-h-[100px]">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+                <IndianRupee className="w-5 h-5 lg:w-7 lg:h-7 text-blue-600" />
+              </div>
+              <div className="flex-1 items-center">
+                <p className="text-sm lg:text-base text-black mb-1">{isEnglish ? 'Net Worth' : 'संपत्ति'}</p>
+                <p className="text-blue-600 font-semibold text-sm lg:text-base">
+                  {formatCurrency(currentCandidate.net_worth, isEnglish)}
+                </p>
+              </div>
+            </div>
+
+            {/* Criminal Cases */}
+            <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm flex items-center min-h-[80px] lg:min-h-[100px]">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
+                <Scale className="w-5 h-5 lg:w-7 lg:h-7 text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm lg:text-base text-black mb-1">{isEnglish ? 'Criminal cases' : 'आपराधिक मामले'}</p>
+                <p className="text-blue-600 font-semibold text-sm lg:text-base">
+                  {currentCandidate.criminal_cases}
+                </p>
+              </div>
+            </div>
+
+            {/* Assembly Attendance */}
+            <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm flex items-center min-h-[80px] lg:min-h-[100px]">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-purple-100 rounded-full flex items-center justify-center mr-4">
+                <Calendar className="w-5 h-5 lg:w-7 lg:h-7 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm lg:text-base text-black mb-1">{isEnglish ? 'Assembly attendance' : 'विधानसभा उपस्थिति'}</p>
+                <p className="text-blue-600 font-semibold text-sm lg:text-base">
+                  {currentCandidate.attendance_percentage || '0%'}
+                </p>
+              </div>
+            </div>
+
+            {/* Questions Asked */}
+            <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm flex items-center min-h-[80px] lg:min-h-[100px]">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-orange-100 rounded-full flex items-center justify-center mr-4">
+                <CircleQuestionMark className="w-5 h-5 lg:w-7 lg:h-7 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-sm lg:text-base text-black mb-1">{isEnglish ? 'Questions asked' : 'सवाल पूछे'}</p>
+                <p className="text-blue-600 font-semibold text-sm lg:text-base">
+                  {currentCandidate.questions_asked || '0'}
+                </p>
+              </div>
+            </div>
+
+            {/* Fund Utilization */}
+            <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm flex items-center min-h-[80px] lg:min-h-[100px]">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-orange-100 rounded-full flex items-center justify-center mr-4">
+                <BanknoteArrowUp className="w-5 h-5 lg:w-7 lg:h-7 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-sm lg:text-base text-black mb-1">{isEnglish ? 'Fund utilization' : 'निधि उपयोग'}</p>
+                <p className="text-blue-600 font-semibold text-sm lg:text-base">
+                  {currentCandidate.funds_utilisation || '0%'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Manifesto Link */}
+        {currentCandidate && currentCandidate.manifesto_link && (
+          <div className="bg-white rounded-lg p-4 mb-2 shadow-sm text-center">
+            <a 
+              href={currentCandidate.manifesto_link} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="inline-flex items-center space-x-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              <span className="text-lg">📜</span>
+              <span className="text-sm font-medium">
+                {isEnglish ? 'View Previous Manifesto' : 'पूर्व घोषणापत्र देखें'}
+              </span>
+            </a>
+          </div>
+        )}
+
+        {/* Manifesto Score Display */}
+        {currentCandidate && (
+          <div className="bg-white rounded-lg p-4 mb-2 shadow-sm">
+            <h3 className="text-lg font-medium text-black mb-4 text-center">
+              {isEnglish ? 'Manifesto Promise Score' : 'घोषणापत्र वादा स्कोर'}
+            </h3>
+            
+            <div className="text-center">
+              <div className="text-4xl font-bold text-[#273F4F] mb-2">
+                {manifestoScore * 20}%
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-4 mb-4">
+                <div 
+                  className="bg-[#273F4F] h-4 rounded-full transition-all duration-300"
+                  style={{ width: `${manifestoScore * 20}%` }}
+                ></div>
+              </div>
+              <div className="grid grid-cols-3 gap-4 mb-4 text-sm">
+                <div className="text-center">
+                  <div className="font-semibold text-gray-700">{isEnglish ? 'Score' : 'स्कोर'}</div>
+                  <div className="text-lg font-bold text-[#273F4F]">{manifestoScore}/5</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-semibold text-gray-700">{isEnglish ? 'Percentage' : 'प्रतिशत'}</div>
+                  <div className="text-lg font-bold text-[#273F4F]">{manifestoScore * 20}%</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-semibold text-gray-700">{isEnglish ? 'Rating' : 'रेटिंग'}</div>
+                  <div className="text-lg font-bold text-[#273F4F]">
+                    {manifestoScore >= 4 ? (isEnglish ? 'Excellent' : 'उत्कृष्ट') :
+                     manifestoScore >= 3 ? (isEnglish ? 'Good' : 'अच्छा') :
+                     manifestoScore >= 2 ? (isEnglish ? 'Average' : 'औसत') :
+                     (isEnglish ? 'Poor' : 'खराब')}
+                  </div>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600">
+                {isEnglish 
+                  ? 'Based on public feedback and performance metrics' 
+                  : 'जनता की प्रतिक्रिया और प्रदर्शन मापदंडों के आधार पर'
+                }
+              </p>
+            </div>
+          </div>
+        )}
+
+
+
+        {/* Charcha Manch Button */}
+        <div className="bg-white rounded-lg p-4 mb-2 shadow-sm text-center">
+          <button
+            onClick={handleCharchaManchClick}
+            className="inline-flex items-center space-x-2 bg-[#DEAF13] text-white px-6 py-3 rounded-lg hover:bg-[#C49F11] transition-colors font-medium"
+          >
+            <MessageCircle className="w-5 h-5" />
+            <span>{isEnglish ? 'Join Discussion' : 'चर्चा में शामिल हों'}</span>
+          </button>
         </div>
       </div>
+
+      {/* Sign In Popup */}
+      {showSignInPopup && (
+        <SignInPopup
+          isOpen={showSignInPopup}
+          onClose={() => setShowSignInPopup(false)}
+          customMessage={isEnglish ? "Please sign in to submit your satisfaction survey" : "कृपया अपनी संतुष्टि सर्वेक्षण जमा करने के लिए साइन इन करें"}
+        />
+      )}
     </div>
   );
 };
