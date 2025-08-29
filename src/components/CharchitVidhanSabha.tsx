@@ -190,6 +190,15 @@ export default function CharchitVidhanSabha({
     setVisibleCount(prev => prev + 12);
   };
 
+  const formatCurrency = (amount: number, isEnglish: boolean): string => {
+    if (amount >= 10000000) {
+      return isEnglish ? `₹${(amount / 10000000).toFixed(2)} Cr` : `₹${(amount / 10000000).toFixed(2)} करोड़`;
+    } else if (amount >= 100000) {
+      return isEnglish ? `₹${(amount / 100000).toFixed(2)} L` : `₹${(amount / 100000).toFixed(2)} लाख`;
+    } else {
+      return isEnglish ? `₹${amount.toLocaleString()}` : `₹${amount.toLocaleString()}`;
+    }
+  };
   return (
     <div 
       className="min-h-screen bg-[#c5ced4]"
@@ -293,15 +302,15 @@ export default function CharchitVidhanSabha({
 
                       {/* Candidate Info */}
                       <div className="flex space-x-6 mb-4 justify-between mx-auto">
-                        <div className="text-center">
-                          <div className="vidhayak-info-text">
-                            {constituency.experience?.en || "1"}
+                        <div className="text-left">
+                          <div className="vidhayak-info-text font-bold">
+                            {formatCurrency(constituency.netWorth, isEnglish)}
                           </div>
-                          <div className="text-sm text-gray-600 vidhayak-info-text-subheading">
-                            {isEnglish ? "" : ""}
+                          <div className="text-sm text-gray-600">
+                            {isEnglish ? "Net Worth" : "सम्पत्ति"}
                           </div>
                         </div>
-                        <div className="text-center">
+                        <div className="text-right">
                           <div className="vidhayak-info-text font-bold">
                             {isEnglish ? constituency.education?.en : constituency.education?.hi || "स्नातक"}
                           </div>
