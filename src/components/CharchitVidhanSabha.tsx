@@ -302,7 +302,7 @@ export default function CharchitVidhanSabha({
                           </div>
                         </div>
                         <div className="text-center">
-                          <div className="vidhayak-info-text">
+                          <div className="vidhayak-info-text font-bold">
                             {isEnglish ? constituency.education?.en : constituency.education?.hi || "स्नातक"}
                           </div>
                           <div className="text-sm text-gray-600">
