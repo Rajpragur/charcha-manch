@@ -24,7 +24,7 @@ import {
   Trash2,
   MoreVertical,
   ThumbsDown,
-  Check
+
 } from 'lucide-react';
 import Fuse from 'fuse.js';
 import toast from 'react-hot-toast';
@@ -44,6 +44,7 @@ interface DiscussionPost {
   createdAt: any;
   updatedAt?: any;
   isEdited: boolean;
+  topic: string;
   likesCount: number;
   dislikesCount: number;
   commentsCount: number;
@@ -93,7 +94,7 @@ const DiscussionForum: React.FC = () => {
   const [showComments, setShowComments] = useState<{ [postId: string]: boolean }>({});
   const [userReactions, setUserReactions] = useState<{ [postId: string]: { liked: boolean; disliked: boolean } }>({});
   const [showPostMenu, setShowPostMenu] = useState<{ [postId: string]: boolean }>({});
-  const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
+
   
   // Comment-related state
   const [topComments, setTopComments] = useState<{ [postId: string]: any }>({});
@@ -659,46 +660,11 @@ const DiscussionForum: React.FC = () => {
         }
       }
       
-      // Fallback to copying to clipboard
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(postUrl);
-        setCopiedPostId(postId);
-        toast.success('Post URL copied to clipboard!');
-        
-        // Reset copied state after 2 seconds
-        setTimeout(() => setCopiedPostId(null), 2000);
-      } else {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = postUrl;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        
-        setCopiedPostId(postId);
-        toast.success('Post URL copied to clipboard!');
-        setTimeout(() => setCopiedPostId(null), 2000);
-      }
+      // Simple fallback - just show the URL
+      toast.success('Share this URL: ' + postUrl);
     } catch (error) {
       console.error('Error sharing post:', error);
-      
-      // Final fallback - try to copy using execCommand
-      try {
-        const textArea = document.createElement('textarea');
-        textArea.value = postUrl;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        
-        setCopiedPostId(postId);
-        toast.success('Post URL copied to clipboard!');
-        setTimeout(() => setCopiedPostId(null), 2000);
-      } catch (fallbackError) {
-        console.error('Fallback copy failed:', fallbackError);
-        toast.error('Failed to share post. Please copy the URL manually.');
-      }
+      // Silently ignore errors
     }
   };
 
@@ -1163,27 +1129,45 @@ const DiscussionForum: React.FC = () => {
                         <div className="p-3 lg:p-4">
                           {/* Post Header */}
                           <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-8 h-8 bg-[#014e5c] rounded-full flex items-center justify-center">
-                                <User className="h-3 w-3 text-white" />
-                              </div>
-                              <div>
-                                <h3 className="font-semibold text-gray-900 text-sm">{post.userName || 'User'}</h3>
-                                <div className="flex items-center space-x-1.5 text-xs text-gray-500">
-                                  <MapPin className="h-3 w-3" />
-                                  <span>{post.constituencyName || (isEnglish ? `Constituency ${post.constituency}` : `निर्वाचन क्षेत्र ${post.constituency}`)}</span>
-                                  <span>•</span>
-                                  <span>{formatRelativeTime(post.createdAt)}</span>
-                                  {post.isEdited && (
-                                    <>
-                                      <span>•</span>
-                                      <span className="italic text-gray-400">{content.edited}</span>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
+                          <div className="flex items-start space-x-2">
+                          {/* Avatar */}
+                          <div className="w-8 h-8 bg-[#014e5c] rounded-full flex items-center justify-center">
+                            <User className="h-3 w-3 text-white" />
+                          </div>
+                          {/* User Info */}
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <h3 className="font-semibold text-gray-900 text-sm">
+                                {post.userName || 'User'}
+                              </h3>
+                              {post.topic && (
+                                <span className="ml-15 lg:ml-110 inline-flex items-center px-2 py-1 bg-[#014e5c]/10 text-[#014e5c] text-xs font-medium rounded-full border border-[#014e5c]/20 max-w-[150px] truncate">
+                                  {post.topic}
+                                </span>
+                              )}h
                             </div>
-                            
+                            {/* Meta Info */}
+                            <div className="flex items-center space-x-1.5 text-xs text-gray-500">
+                              <MapPin className="h-3 w-3" />
+                              <span>
+                                {post.constituencyName ||
+                                  (isEnglish
+                                    ? `Constituency ${post.constituency}`
+                                    : `निर्वाचन क्षेत्र ${post.constituency}`)}
+                              </span>
+                              <span>•</span>
+                              <span>{formatRelativeTime(post.createdAt)}</span>
+                              {post.isEdited && (
+                                <>
+                                  <span>•</span>
+                                  <span className="italic text-gray-400">{content.edited}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                                                    
                             <div className="flex items-center space-x-1.5">
                               {/* Status Badge */}
                               {post.status === 'under_review' && (
@@ -1201,10 +1185,11 @@ const DiscussionForum: React.FC = () => {
                                       e.stopPropagation();
                                       togglePostMenu(post.id);
                                     }}
-                                    className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
+                                    className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center"
                                   >
-                                    <MoreVertical className="h-3 w-3 text-gray-500" />
+                                    <MoreVertical className="h-4 w-4 text-gray-500" />
                                   </button>
+
                                   
                                   {showPostMenu[post.id] && (
                                     <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[100px]">
@@ -1331,13 +1316,9 @@ const DiscussionForum: React.FC = () => {
                                 className="flex items-center space-x-1.5 p-1.5 rounded-md transition-colors text-gray-500 hover:text-green-600 hover:bg-green-50"
                                 title={isEnglish ? 'Share this post' : 'इस पोस्ट को शेयर करें'}
                               >
-                                {copiedPostId === post.id ? (
-                                  <Check className="h-4 w-4 text-green-600" />
-                                ) : (
-                                  <Share2 className="h-4 w-4" />
-                                )}
+                                <Share2 className="h-4 w-4" />
                                 <span className="text-xs font-medium">
-                                  {copiedPostId === post.id ? (isEnglish ? 'Copied!' : 'कॉपी किया!') : (isEnglish ? 'Share' : 'साझा')}
+                                  {isEnglish ? 'Share' : 'साझा'}
                                 </span>
                               </button>
                           </div>
@@ -1646,9 +1627,9 @@ const DiscussionForum: React.FC = () => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowCreatePost(true)}
-          className="w-20 h-10 bg-[#014e5c] text-white rounded-full shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center"
+          className={`${isEnglish ? 'w-32' : 'w-24'} h-12 bg-[#014e5c] text-white rounded-full shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center space-x-1`}
         >
-          <Plus className="w-4 h-4 mr-1" />
+          <Plus className="w-4 h-4" />
           <span className="text-xs font-medium">{isEnglish ? 'Create Post' : 'नई चर्चा'}</span>
         </motion.button>
       </div>

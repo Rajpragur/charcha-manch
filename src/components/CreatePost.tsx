@@ -54,6 +54,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated,
   const [filteredConstituencies, setFilteredConstituencies] = useState<Constituency[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
+  const [selectedTopic, setSelectedTopic] = useState<string>('');
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -69,6 +70,9 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated,
     postContentPlaceholder: isEnglish ? 'Share your thoughts, questions, or concerns with your community...' : 'अपने समुदाय के साथ अपने विचार, प्रश्न या चिंताएं साझा करें...',
     constituency: isEnglish ? 'Constituency' : 'निर्वाचन क्षेत्र',
     selectConstituency: isEnglish ? 'Choose your constituency' : 'अपना निर्वाचन क्षेत्र चुनें',
+    topic: isEnglish ? 'Topic' : 'विषय',
+    selectTopic: isEnglish ? 'Select a topic' : 'एक विषय चुनें',
+    topicRequired: isEnglish ? 'Please select a topic' : 'कृपया एक विषय चुनें',
     tags: isEnglish ? 'Tags & Topics' : 'टैग और विषय',
     addTag: isEnglish ? 'Add Tag' : 'टैग जोड़ें',
     tagPlaceholder: isEnglish ? 'e.g., roads, education, healthcare' : 'जैसे, सड़कें, शिक्षा, स्वास्थ्य',
@@ -87,6 +91,20 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated,
     guidelines: isEnglish ? 'Community Guidelines' : 'समुदाय दिशानिर्देश',
     guidelinesText: isEnglish ? 'Keep discussions respectful, constructive, and focused on local community issues.' : 'चर्चाओं को सम्मानजनक, रचनात्मक और स्थानीय समुदाय के मुद्दों पर केंद्रित रखें।'
   };
+
+  // Available topics
+  const topics = [
+    { hi: "अन्य", en: "Others" },
+    { hi: "कानून-व्यवस्था / अपराध", en: "Law & Order / Crime" },
+    { hi: "कृषि और किसान", en: "Agriculture & Farmers" },
+    { hi: "बिजली/पानी/सफाई", en: "Electricity / Water / Sanitation" },
+    { hi: "भ्रष्टाचार और पारदर्शिता", en: "Corruption & Transparency" },
+    { hi: "महिला सुरक्षा और सशक्तिकरण", en: "Women Safety & Empowerment" },
+    { hi: "रोज़गार और नौकरी", en: "Employment & Jobs" },
+    { hi: "शिक्षा", en: "Education" },
+    { hi: "सड़क व परिवहन", en: "Roads & Transport" },
+    { hi: "स्वास्थ्य सुविधाएँ / अस्पताल", en: "Healthcare / Hospitals" }
+  ];
 
 
 
@@ -120,6 +138,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated,
       setTitle(editingPost.title || editingPost.titlefirst || '');
       setPostContent(editingPost.content || '');
       setSelectedConstituency(editingPost.constituency || null);
+      setSelectedTopic(editingPost.topic || '');
       setTags(editingPost.tags || []);
       // Note: Media files would need to be handled separately
     }
@@ -305,6 +324,11 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated,
       return;
     }
 
+    if (!selectedTopic) {
+      toast.error(content.topicRequired);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
 
@@ -349,6 +373,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated,
         userName,
         status: moderatedContent.status,
         isEdited: false,
+        topic: selectedTopic,
         createdAt: new Date(),
         likesCount: 0,
         dislikesCount: 0,
@@ -400,6 +425,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated,
       setSelectedConstituency(null);
       setConstituencySearchQuery('');
       setShowConstituencyDropdown(false);
+      setSelectedTopic('');
       setTags([]);
       setMediaFiles([]);
       
@@ -609,6 +635,45 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated,
                 {isEnglish 
                   ? '✓ Constituency selected successfully' 
                   : '✓ निर्वाचन क्षेत्र सफलतापूर्वक चुना गया'
+                }
+              </div>
+            )}
+          </div>
+
+          {/* Topic Selection */}
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 bg-[#014e5c] rounded-lg flex items-center justify-center">
+                <MessageSquare className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <label htmlFor="topic" className="block text-lg font-semibold text-[#014e5c]">
+                  {content.topic}
+                </label>
+                <p className="text-sm text-[#014e5c]/70">Choose a topic that best describes your discussion</p>
+              </div>
+            </div>
+            <select
+              id="topic"
+              value={selectedTopic}
+              onChange={(e) => setSelectedTopic(e.target.value)}
+              className="w-full px-4 py-3 border-2 border-[#014e5c]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#014e5c]/20 focus:border-[#014e5c] text-base transition-all duration-200 bg-white hover:bg-[#014e5c]/5"
+              required
+            >
+              <option value="">{content.selectTopic}</option>
+              {topics.map((topic, index) => (
+                <option key={index} value={isEnglish ? topic.en : topic.hi}>
+                  {isEnglish ? topic.en : topic.hi}
+                </option>
+              ))}
+            </select>
+            
+            {/* Selected topic confirmation */}
+            {selectedTopic && (
+              <div className="mt-2 text-sm text-[#014e5c] font-medium">
+                {isEnglish 
+                  ? '✓ Topic selected successfully' 
+                  : '✓ विषय सफलतापूर्वक चुना गया'
                 }
               </div>
             )}
@@ -953,7 +1018,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated,
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !title.trim() || !postContent.trim() || !selectedConstituency}
+              disabled={isSubmitting || !title.trim() || !postContent.trim() || !selectedConstituency || !selectedTopic}
               className="px-6 py-2.5 bg-[#014e5c] text-white rounded-lg hover:bg-[#014e5c]/90 transition-all duration-200 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md hover:shadow-lg"
             >
               {isSubmitting ? (

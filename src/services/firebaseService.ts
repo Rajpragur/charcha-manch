@@ -127,6 +127,7 @@ export interface FirebaseDiscussionPost {
   createdAt: any;
   updatedAt?: any;
   isEdited: boolean;
+  topic: string;
   status: 'published' | 'under_review' | 'removed';
   likesCount?: number;
   commentsCount?: number;

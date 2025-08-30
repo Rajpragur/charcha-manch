@@ -19,7 +19,7 @@ import {
   Clock,
   ChevronDown,
   ChevronUp,
-  Check,
+  CheckCircle,
   MessageCircle as ChatBubble,
   Bold,
   Italic,
@@ -46,6 +46,7 @@ interface DiscussionPost {
   createdAt: any;
   updatedAt?: any;
   isEdited: boolean;
+  topic: string;
   likesCount: number;
   dislikesCount: number;
   commentsCount: number;
@@ -103,7 +104,7 @@ const PostDetail: React.FC = () => {
   const [isSubmittingReply, setIsSubmittingReply] = useState<{ [commentId: string]: boolean }>({});
   const [showReplyInput, setShowReplyInput] = useState<{ [commentId: string]: boolean }>({});
   const [expandedComments, setExpandedComments] = useState<{ [commentId: string]: boolean }>({});
-  const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
+
   const [userConstituency, setUserConstituency] = useState<string | null>(null);
   const [isEditingPost, setIsEditingPost] = useState(false);
   const [editedPostTitle, setEditedPostTitle] = useState('');
@@ -646,46 +647,11 @@ const PostDetail: React.FC = () => {
         }
       }
       
-      // Fallback to copying to clipboard
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(postUrl);
-        setCopiedPostId(post.id);
-        toast.success('Post URL copied to clipboard!');
-        
-        // Reset copied state after 2 seconds
-        setTimeout(() => setCopiedPostId(null), 2000);
-      } else {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = postUrl;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        
-        setCopiedPostId(post.id);
-        toast.success('Post URL copied to clipboard!');
-        setTimeout(() => setCopiedPostId(null), 2000);
-      }
+      // Simple fallback - just show the URL
+      toast.success('Share this URL: ' + postUrl);
     } catch (error) {
       console.error('Error sharing post:', error);
-      
-      // Final fallback - try to copy using execCommand
-      try {
-        const textArea = document.createElement('textarea');
-        textArea.value = postUrl;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        
-        setCopiedPostId(post.id);
-        toast.success('Post URL copied to clipboard!');
-        setTimeout(() => setCopiedPostId(null), 2000);
-      } catch (fallbackError) {
-        console.error('Fallback copy failed:', fallbackError);
-        toast.error('Failed to share post. Please copy the URL manually.');
-      }
+      // Silently ignore errors
     }
   };
 
@@ -1163,6 +1129,15 @@ const PostDetail: React.FC = () => {
                             </>
                           )}
                         </div>
+                        
+                        {/* Topic Badge */}
+                        {post.topic && (
+                          <div className="mt-2">
+                            <span className="inline-flex items-center px-2 py-1 bg-[#014e5c]/10 text-[#014e5c] text-xs font-medium rounded-full border border-[#014e5c]/20">
+                              {post.topic}
+                            </span>
+                          </div>
+                        )}
                       </div>
                   </div>
                   
@@ -1204,7 +1179,7 @@ const PostDetail: React.FC = () => {
                               onClick={handleUpdatePost}
                               className="text-green-600 hover:bg-green-50 p-2 rounded-md transition-colors flex items-center space-x-1"
                             >
-                              <Check className="h-3 w-3" />
+                              <CheckCircle className="h-3 w-3" />
                               <span className="text-xs font-medium">{content.save}</span>
                             </button>
                             
@@ -1312,13 +1287,9 @@ const PostDetail: React.FC = () => {
                       onClick={handleShare}
                       className="text-gray-500 hover:text-[#014e5c] hover:bg-[#014e5c]/10 p-1.5 rounded-md transition-colors flex items-center space-x-1.5 lg:space-x-2"
                     >
-                      {copiedPostId === post.id ? (
-                        <Check className="h-3 w-3 lg:h-4 lg:w-4 text-green-600" />
-                      ) : (
-                        <Share2 className="h-3 w-3 lg:h-4 lg:w-4" />
-                      )}
+                      <Share2 className="h-3 w-3 lg:h-4 lg:w-4" />
                       <span className="text-[10px] lg:text-sm font-medium">
-                        {copiedPostId === post.id ? (isEnglish ? 'Copied!' : 'कॉपी किया!') : content.share}
+                        {content.share}
                       </span>
                     </button>
                   </div>

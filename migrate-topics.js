@@ -1,4 +1,4 @@
-// Migration script to add isEdited field to existing posts
+// Migration script to add topic field to existing posts
 // Run this script once to update all existing posts
 
 import { initializeApp } from 'firebase/app';
@@ -13,9 +13,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-async function migrateIsEditedField() {
+// Default topic for existing posts
+const DEFAULT_TOPIC = "Others";
+
+async function migrateTopicsField() {
   try {
-    console.log('🔄 Starting migration to add isEdited field...');
+    console.log('🔄 Starting migration to add topic field...');
     
     // Get all existing posts
     const postsRef = collection(db, 'discussion_posts');
@@ -31,25 +34,18 @@ async function migrateIsEditedField() {
       try {
         const postData = postDoc.data();
         
-        // Check if post already has isEdited field
-        if (postData.isEdited !== undefined) {
-          console.log(`⏭️  Post ${postDoc.id} already has isEdited field: ${postData.isEdited}`);
+        // Check if post already has topic field
+        if (postData.topic !== undefined) {
+          console.log(`⏭️  Post ${postDoc.id} already has topic field: ${postData.topic}`);
           continue;
         }
         
-        // Determine if post was edited by comparing timestamps
-        const isEdited = postData.updatedAt && 
-                        postData.createdAt && 
-                        postData.updatedAt.toDate && 
-                        postData.createdAt.toDate &&
-                        postData.updatedAt.toDate().getTime() !== postData.createdAt.toDate().getTime();
-        
-        // Update the post with isEdited field
+        // Update the post with default topic
         await updateDoc(doc(db, 'discussion_posts', postDoc.id), {
-          isEdited: isEdited
+          topic: DEFAULT_TOPIC
         });
         
-        console.log(`✅ Migrated post ${postDoc.id}: isEdited = ${isEdited}`);
+        console.log(`✅ Migrated post ${postDoc.id}: topic = ${DEFAULT_TOPIC}`);
         migratedCount++;
         
       } catch (error) {
@@ -62,6 +58,7 @@ async function migrateIsEditedField() {
     console.log(`✅ Successfully migrated: ${migratedCount} posts`);
     console.log(`❌ Errors: ${errorCount} posts`);
     console.log(`⏭️  Skipped (already migrated): ${postsSnapshot.size - migratedCount - errorCount} posts`);
+    console.log(`📝 Default topic assigned: "${DEFAULT_TOPIC}"`);
     
   } catch (error) {
     console.error('❌ Migration failed:', error);
@@ -69,4 +66,4 @@ async function migrateIsEditedField() {
 }
 
 // Run the migration
-migrateIsEditedField();
+migrateTopicsField();
