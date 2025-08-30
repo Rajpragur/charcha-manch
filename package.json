@@ -7,7 +7,12 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "migrate-nagrik": "node scripts/run-nagrik-migration.js",
+    "test-nagrik": "node scripts/test-nagrik-system.js",
+    "test-existing-content": "node scripts/test-existing-content-nagrik.js",
+    "test-language-nagrik": "node scripts/test-language-nagrik.js",
+    "test-nagrik-only": "node scripts/test-nagrik-only-system.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.56.0",

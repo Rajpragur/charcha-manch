@@ -114,7 +114,7 @@ const Profile: React.FC = () => {
       setIsLoading(true);
       
       // Get user profile
-      let profile = await FirebaseService.getUserProfile(currentUser.uid);
+              let profile = await FirebaseService.getUserProfile(currentUser.uid, true);
       
               // If no profile exists, create a default one
         if (!profile) {
@@ -125,7 +125,7 @@ const Profile: React.FC = () => {
             tier_level: 0, // Start at tier 0 - same as Home.tsx
             engagement_score: 0
           });
-          profile = await FirebaseService.getUserProfile(currentUser.uid);
+          profile = await FirebaseService.getUserProfile(currentUser.uid, true);
         }
       
       if (profile) {

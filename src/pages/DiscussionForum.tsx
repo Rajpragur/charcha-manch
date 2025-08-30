@@ -21,7 +21,6 @@ import {
   Share2,
   Award,
   Heart,
-
   Trash2,
   MoreVertical,
   ThumbsDown,
@@ -44,6 +43,7 @@ interface DiscussionPost {
   status: 'published' | 'under_review' | 'removed';
   createdAt: any;
   updatedAt?: any;
+  isEdited: boolean;
   likesCount: number;
   dislikesCount: number;
   commentsCount: number;
@@ -63,6 +63,7 @@ interface Constituency {
   id: number;
   name: string;
   area_name?: string;
+  area_name_hi?: string;
   district?: string;
 }
 
@@ -93,6 +94,12 @@ const DiscussionForum: React.FC = () => {
   const [userReactions, setUserReactions] = useState<{ [postId: string]: { liked: boolean; disliked: boolean } }>({});
   const [showPostMenu, setShowPostMenu] = useState<{ [postId: string]: boolean }>({});
   const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
+  
+  // Comment-related state
+  const [topComments, setTopComments] = useState<{ [postId: string]: any }>({});
+  const [commentTexts, setCommentTexts] = useState<{ [postId: string]: string }>({});
+  const [isSubmittingComment, setIsSubmittingComment] = useState<{ [postId: string]: boolean }>({});
+  const [commentReactions, setCommentReactions] = useState<{ [commentId: string]: { liked: boolean; disliked: boolean } }>({});
 
   const content = {
     titlefirst: isEnglish ? 'Charcha' : 'चर्चा',
@@ -100,7 +107,7 @@ const DiscussionForum: React.FC = () => {
     subtitle: isEnglish ? 'Platform for Dialogue and Community Cooperation' : 'संवाद और सामुदायिक सहयोग का मंच',
     createPost: isEnglish ? 'New Discussion' : 'नई चर्चा',
     searchPlaceholder: isEnglish ? 'Search discussions, issues, candidates...' : 'चर्चा, मुद्दे, उम्मीदवार खोजें...',
-    allConstituencies: isEnglish ? 'All Constituencies' : 'All Constituencies',
+    allConstituencies: isEnglish ? 'All Constituencies' : 'सभी निर्वाचन क्षेत्र',
     selectConstituency: isEnglish ? 'Select Constituency' : 'निर्वाचन क्षेत्र चुनें',
     noPosts: isEnglish ? 'No discussions found' : 'कोई चर्चा नहीं मिली',
     noPostsDescription: isEnglish ? 'Be the first to start a discussion in your constituency!' : 'अपने निर्वाचन क्षेत्र में चर्चा शुरू करने वाले पहले व्यक्ति बनें!',
@@ -118,7 +125,23 @@ const DiscussionForum: React.FC = () => {
     delete: isEnglish ? 'Delete' : 'हटाएं',
     deleteConfirm: isEnglish ? 'Are you sure you want to delete this post? This action cannot be undone.' : 'क्या आप वाकई इस पोस्ट को हटाना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।',
     postDeleted: isEnglish ? 'Post deleted successfully' : 'पोस्ट सफलतापूर्वक हटा दी गई',
-    deleteFailed: isEnglish ? 'Failed to delete post' : 'पोस्ट हटाने में विफल'
+    deleteFailed: isEnglish ? 'Failed to delete post' : 'पोस्ट हटाने में विफल',
+    sortBy: isEnglish ? 'Sort by' : 'क्रमबद्ध करें',
+    recent: isEnglish ? 'Recent' : 'हाल ही का',
+    trending: isEnglish ? 'Trending' : 'लोकप्रिय',
+    interactions: isEnglish ? 'Interactions' : 'संवाद',
+    top: isEnglish ? 'Top' : 'शीर्ष',
+    latestComment: isEnglish ? 'Latest comment:' : 'नवीनतम टिप्पणी:',
+    loadingComment: isEnglish ? 'Loading comment...' : 'टिप्पणी लोड हो रही है...',
+    showComments: isEnglish ? 'Show Comments' : 'टिप्पणियाँ दिखाएं',
+    hideComments: isEnglish ? 'Hide Comments' : 'टिप्पणियाँ छुपाएं',
+    comments: isEnglish ? 'Comments' : 'टिप्पणियाँ',
+    writeCommentPlaceholder: isEnglish ? 'Write your comment...' : 'अपनी टिप्पणी लिखें...',
+    postComment: isEnglish ? 'Post Comment' : 'टिप्पणी करें',
+    replyToComment: isEnglish ? 'Reply' : 'टिप्पणी दें',
+    viewMoreComments: isEnglish ? 'View more comments' : 'और टिप्पणियां देखें',
+    noCommentsYet: isEnglish ? 'No comments yet. Be the first to comment!' : 'अभी तक कोई टिप्पणी नहीं। पहली टिप्पणी करने वाले बनें!',
+    edited: isEnglish ? 'Edited' : 'संपादित'
   };
 
   // Fuse.js instance for fuzzy search
@@ -262,6 +285,20 @@ const DiscussionForum: React.FC = () => {
       fetchPostForEdit(editPostId);
     }
   }, [searchParams, isLoading, posts.length]);
+
+  // Load top comments after posts are loaded
+  useEffect(() => {
+    if (posts.length > 0 && currentUser?.uid) {
+      loadTopCommentsForPosts();
+    }
+  }, [posts, currentUser?.uid]);
+
+
+
+  // Debug comment reactions state changes
+  useEffect(() => {
+    console.log('📊 Comment reactions state changed:', commentReactions);
+  }, [commentReactions]);
 
   // Handle constituency selection
   const handleConstituencyChange = (constituencyId: number | null) => {
@@ -449,8 +486,8 @@ const DiscussionForum: React.FC = () => {
     try {
       setIsLoading(true);
       
-      // Fetch posts
-      const fetchedPosts = await FirebaseService.getDiscussionPosts();
+      // Fetch posts with language preference
+      const fetchedPosts = await FirebaseService.getDiscussionPosts(isEnglish);
       setPosts(fetchedPosts);
       
       // Fetch constituencies
@@ -671,6 +708,210 @@ const DiscussionForum: React.FC = () => {
     navigate(`/post/${postId}`);
   };
 
+  // Load top comment for a post
+  const loadTopComment = async (postId: string) => {
+    try {
+      const topComment = await FirebaseService.getTopComment(postId, isEnglish);
+      setTopComments(prev => ({
+        ...prev,
+        [postId]: topComment
+      }));
+    } catch (error) {
+      console.error('Error loading top comment:', error);
+    }
+  };
+
+  // Handle comment submission
+  const handleSubmitComment = async (postId: string) => {
+    if (!currentUser?.uid) {
+      toast.error('Please sign in to comment');
+      return;
+    }
+
+    const commentText = commentTexts[postId]?.trim();
+    if (!commentText) {
+      toast.error('Please write a comment');
+      return;
+    }
+
+    try {
+      setIsSubmittingComment(prev => ({ ...prev, [postId]: true }));
+      
+      // Get user's constituency
+      const userProfile = await FirebaseService.getUserProfile(currentUser.uid, true);
+      const constituencyId = userProfile?.constituency_id || 0;
+      
+      await FirebaseService.addCommentFromForum(postId, {
+        userId: currentUser.uid,
+        content: commentText,
+        constituencyId
+      });
+
+      // Clear comment text
+      setCommentTexts(prev => ({ ...prev, [postId]: '' }));
+      
+      // Reload top comment
+      await loadTopComment(postId);
+      
+      // Update post comment count
+      setPosts(prev => prev.map(post => 
+        post.id === postId 
+          ? { ...post, commentsCount: (post.commentsCount || 0) + 1 }
+          : post
+      ));
+      
+      // Load comment reactions for the new comment
+      if (topComments[postId]) {
+        // Load reactions for the new comment specifically
+        const commentId = topComments[postId].id;
+        if (commentId) {
+          const hasLiked = await FirebaseService.hasUserLikedComment(commentId, currentUser.uid);
+          const hasDisliked = await FirebaseService.hasUserDislikedComment(commentId, currentUser.uid);
+          setCommentReactions(prev => ({
+            ...prev,
+            [commentId]: { liked: hasLiked, disliked: hasDisliked }
+          }));
+        }
+      }
+      
+      toast.success('Comment posted successfully!');
+    } catch (error: any) {
+      console.error('Error posting comment:', error);
+      toast.error('Failed to post comment');
+    } finally {
+      setIsSubmittingComment(prev => ({ ...prev, [postId]: false }));
+    }
+  };
+
+  // Load top comments for all posts
+  const loadTopCommentsForPosts = async () => {
+    if (!currentUser?.uid) return;
+    
+    try {
+      for (const post of posts) {
+        if (post.commentsCount > 0) {
+          await loadTopComment(post.id);
+        }
+      }
+      // Load comment reactions after all top comments are loaded
+      await loadCommentReactions();
+    } catch (error) {
+      console.error('Error loading top comments:', error);
+    }
+  };
+
+  // Load comment reactions for top comments
+  const loadCommentReactions = async () => {
+    if (!currentUser?.uid) return;
+    
+    try {
+      console.log('🔄 Loading comment reactions for user:', currentUser.uid);
+      const reactions: { [commentId: string]: { liked: boolean; disliked: boolean } } = {};
+      for (const post of posts) {
+        if (topComments[post.id]) {
+          const commentId = topComments[post.id].id;
+          console.log(`🔍 Checking reactions for comment ${commentId} in post ${post.id}`);
+          const hasLiked = await FirebaseService.hasUserLikedComment(commentId, currentUser.uid);
+          const hasDisliked = await FirebaseService.hasUserDislikedComment(commentId, currentUser.uid);
+          reactions[commentId] = { liked: hasLiked, disliked: hasDisliked };
+          console.log(`✅ Comment ${commentId}: liked=${hasLiked}, disliked=${hasDisliked}`);
+        }
+      }
+      console.log('📊 Setting comment reactions:', reactions);
+      setCommentReactions(reactions);
+    } catch (error) {
+      console.error('Error loading comment reactions:', error);
+    }
+  };
+
+  // Handle comment like
+  const handleCommentLike = async (commentId: string, postId: string) => {
+    if (!currentUser?.uid) {
+      toast.error('Please sign in to like comments');
+      return;
+    }
+
+    try {
+      console.log(`❤️ User ${currentUser.uid} attempting to like comment ${commentId}`);
+      console.log(`📊 Current comment reactions:`, commentReactions[commentId]);
+      
+      await FirebaseService.likeComment(commentId, currentUser.uid);
+      
+      // Get current like state
+      const currentLikeState = commentReactions[commentId]?.liked || false;
+      console.log(`🔄 Current like state: ${currentLikeState}, will change to: ${!currentLikeState}`);
+      
+      // Update local state
+      setCommentReactions(prev => {
+        const newState = {
+          ...prev,
+          [commentId]: { liked: !currentLikeState, disliked: false }
+        };
+        console.log(`📊 Updated comment reactions:`, newState);
+        return newState;
+      });
+      
+      // Update top comment like count
+      setTopComments(prev => ({
+        ...prev,
+        [postId]: {
+          ...prev[postId],
+          likesCount: (prev[postId]?.likesCount || 0) + (currentLikeState ? -1 : 1),
+          dislikesCount: prev[postId]?.dislikesCount || 0
+        }
+      }));
+      
+      toast.success(!currentLikeState ? 'Comment liked!' : 'Comment unliked');
+    } catch (error: any) {
+      console.error('Error updating comment like:', error);
+      toast.error('Failed to update comment like');
+    }
+  };
+
+  // Handle comment dislike
+  const handleCommentDislike = async (commentId: string, postId: string) => {
+    if (!currentUser?.uid) {
+      toast.error('Please sign in to dislike comments');
+      return;
+    }
+
+    try {
+      console.log(`👎 User ${currentUser.uid} attempting to dislike comment ${commentId}`);
+      console.log(`📊 Current comment reactions:`, commentReactions[commentId]);
+      
+      await FirebaseService.dislikeComment(commentId, currentUser.uid);
+      
+      // Get current dislike state
+      const currentDislikeState = commentReactions[commentId]?.disliked || false;
+      console.log(`🔄 Current dislike state: ${currentDislikeState}, will change to: ${!currentDislikeState}`);
+      
+      // Update local state
+      setCommentReactions(prev => {
+        const newState = {
+          ...prev,
+          [commentId]: { liked: false, disliked: !currentDislikeState }
+        };
+        console.log(`📊 Updated comment reactions:`, newState);
+        return newState;
+      });
+      
+      // Update top comment dislike count
+      setTopComments(prev => ({
+        ...prev,
+        [postId]: {
+          ...prev[postId],
+          dislikesCount: (prev[postId]?.dislikesCount || 0) + (currentDislikeState ? -1 : 1),
+          likesCount: prev[postId]?.likesCount || 0
+        }
+      }));
+      
+      toast.success(!currentDislikeState ? 'Comment disliked!' : 'Comment undisliked');
+    } catch (error: any) {
+      console.error('Error updating comment dislike:', error);
+      toast.error('Failed to update comment dislike');
+    }
+  };
+
 
 
   return (
@@ -753,7 +994,7 @@ const DiscussionForum: React.FC = () => {
                         onClick={() => handleConstituencyChange(constituency.id)}
                         className="w-full text-left px-2 py-1.5 rounded-md transition-colors text-sm bg-[#014e5c] text-white"
                       >
-                        {constituency.name}
+                        {isEnglish ? (constituency.name || constituency.area_name) : (constituency.area_name_hi || constituency.name)}
                       </button>
                     ))}
                     
@@ -769,7 +1010,7 @@ const DiscussionForum: React.FC = () => {
                     onClick={() => handleConstituencyChange(constituency.id)}
                     className="w-full text-left px-2 py-1.5 rounded-md transition-colors text-sm text-gray-700 hover:bg-gray-50"
                   >
-                    {constituency.name}
+                    {isEnglish ? (constituency.name || constituency.area_name) : (constituency.area_name_hi || constituency.name)}
                   </button>
                 ))}
               </div>
@@ -777,13 +1018,13 @@ const DiscussionForum: React.FC = () => {
 
             {/* Sort Options */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <h3 className="text-base font-semibold text-gray-900 mb-3">Sort by</h3>
+              <h3 className="text-base font-semibold text-gray-900 mb-3">{content.sortBy}</h3>
               <div className="space-y-1.5">
                 {[
-                  { key: 'recent', label: 'Latest', icon: Clock },
-                  { key: 'trending', label: 'Trending', icon: Flame },
-                  { key: 'interactions', label: 'Most Active', icon: TrendingUp },
-                  { key: 'top', label: 'Top', icon: Award }
+                  { key: 'recent', label: content.recent, icon: Clock },
+                  { key: 'trending', label: content.trending, icon: Flame },
+                  { key: 'interactions', label: content.interactions, icon: TrendingUp },
+                  { key: 'top', label: content.top, icon: Award }
                 ].map((option) => (
                   <button
                     key={option.key}
@@ -845,7 +1086,7 @@ const DiscussionForum: React.FC = () => {
                           onClick={() => handleMultiConstituencyChange(constituency.id)}
                           className="w-full text-left px-2 py-1.5 rounded-md transition-colors text-sm bg-[#014e5c] text-white"
                         >
-                          {constituency.name}
+                          {isEnglish ? (constituency.name || constituency.area_name) : (constituency.area_name_hi || constituency.name)}
                         </button>
                       ))}
                       
@@ -861,7 +1102,7 @@ const DiscussionForum: React.FC = () => {
                       onClick={() => handleMultiConstituencyChange(constituency.id)}
                       className="w-full text-left px-2 py-1.5 rounded-md transition-colors text-sm text-gray-700 hover:bg-gray-50"
                     >
-                      {constituency.name}
+                      {isEnglish ? (constituency.name || constituency.area_name) : (constituency.area_name_hi || constituency.name)}
                     </button>
                   ))}
                 </div>
@@ -930,9 +1171,15 @@ const DiscussionForum: React.FC = () => {
                                 <h3 className="font-semibold text-gray-900 text-sm">{post.userName || 'User'}</h3>
                                 <div className="flex items-center space-x-1.5 text-xs text-gray-500">
                                   <MapPin className="h-3 w-3" />
-                                  <span>{post.constituencyName || `Constituency ${post.constituency}`}</span>
+                                  <span>{post.constituencyName || (isEnglish ? `Constituency ${post.constituency}` : `निर्वाचन क्षेत्र ${post.constituency}`)}</span>
                                   <span>•</span>
                                   <span>{formatRelativeTime(post.createdAt)}</span>
+                                  {post.isEdited && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="italic text-gray-400">{content.edited}</span>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -999,12 +1246,6 @@ const DiscussionForum: React.FC = () => {
 
                           {/* Post Content */}
                           <div className="mb-3">
-                            {/* Poster Name - Above Title */}
-                            <div className="mb-1.5">
-                              <span className="text-xs text-gray-600">
-                                {isEnglish ? `Posted by ${post.userName || 'User'}` : `${post.userName || 'उपयोगकर्ता'} द्वारा पोस्ट किया गया`}
-                              </span>
-                            </div>
                             
                             {/* Post Title - More Prominent */}
                             <h2 
@@ -1073,8 +1314,15 @@ const DiscussionForum: React.FC = () => {
                                 <ThumbsDown className={`h-3 w-3 ${userReactions[post.id]?.disliked ? 'fill-current' : ''}`} />
                                 <span className="text-xs font-medium">{post.dislikesCount || 0}</span>
                               </button>
-
-                              {/* Share Button */}
+                              <button
+                                onClick={() => toggleComments(post.id)}
+                                className="flex items-center space-x-1 text-xs text-gray-500 hover:text-green-600 transition-colors"
+                              >
+                              <MessageSquare className="h-3 w-3 mx-2" />
+                              {showComments[post.id] ? content.hideComments : `${post.commentsCount || 0} ${content.comments}`}
+                              </button>
+                            </div>
+                            {/* Share Button */}
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1089,30 +1337,126 @@ const DiscussionForum: React.FC = () => {
                                   <Share2 className="h-4 w-4" />
                                 )}
                                 <span className="text-xs font-medium">
-                                  {copiedPostId === post.id ? (isEnglish ? 'Copied!' : 'कॉपी किया!') : (isEnglish ? 'Share' : 'शेयर')}
+                                  {copiedPostId === post.id ? (isEnglish ? 'Copied!' : 'कॉपी किया!') : (isEnglish ? 'Share' : 'साझा')}
                                 </span>
                               </button>
-                            </div>
-                            
-                            <button
-                              onClick={() => toggleComments(post.id)}
-                              className="text-xs text-gray-500 hover:text-green-600 transition-colors"
-                            >
-                            {showComments[post.id] ? isEnglish ? 'Hide Comments' : 'टिप्पणियाँ छुपाएं' : isEnglish ? `Show ${post.commentsCount || 0} Comments` : `${post.commentsCount || 0} टिप्पणियाँ दिखाएं `}
-                            </button>
                           </div>
-
-                          {/* Comments Section */}
-                          {showComments[post.id] && (
-                            <div className="mt-3 pt-3 border-t border-gray-100">
-                              <div className="space-y-2">
-                                {/* Comments will be loaded from Firebase here */}
-                                <div className="text-center text-gray-500 py-3 text-sm">
-                                  No comments yet. Be the first to comment!
+                          
+                          {/* Comment Section - Show 1 comment below post */}
+                          <div className="pt-4 space-y-3">
+                            {/* Comment Input - Only show if user is logged in */}
+                            {currentUser?.uid ? (
+                              <div className="flex flex-col items-center w-full px-2 gap-2">
+                                <textarea 
+                                  placeholder={content.writeCommentPlaceholder}
+                                  value={commentTexts[post.id] || ''}
+                                  onChange={(e) => setCommentTexts(prev => ({ ...prev, [post.id]: e.target.value }))}
+                                  className="flex-1 p-2 border rounded-md w-full h-[120px] text-sm focus:outline-none focus:ring-1 focus:ring-[#273F4F] bg-[#F8FAFB] border-gray-200"
+                                />
+                                <div className="w-full flex justify-items-start mt-1">
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSubmitComment(post.id);
+                                    }}
+                                    disabled={isSubmittingComment[post.id]}
+                                    className="bg-[#273F4F] text-white px-2 py-2 rounded-md w-fit flex items-center gap-2 item-center hover:bg-[#1e2f3a] transition-colors disabled:opacity-50"
+                                  >
+                                    <span className="text-xs">{content.postComment}</span>
+                                  </button>
                                 </div>
                               </div>
-                            </div>
-                          )}
+                            ) : (
+                              <div className="text-center py-4 text-gray-500 text-sm">
+                                {isEnglish ? 'Sign in to comment on this post' : 'इस पोस्ट पर टिप्पणी करने के लिए साइन इन करें'}
+                              </div>
+                            )}
+
+                            {/* Top Comment Display */}
+                            {post.commentsCount > 0 && (
+                              <div className="space-y-2">
+                                {topComments[post.id] ? (
+                                  <div className="rounded-md p-3">
+                                    <div className="flex items-center space-x-2 mb-1">
+                                      <div className="w-8 h-8 rounded-full bg-[#F0F2F4] flex items-center justify-center">
+                                        <User className="w-3 h-3 text-gray-600" />
+                                      </div>
+                                      <p className="font-medium text-gray-900 text-xs">
+                                        {topComments[post.id].userName}
+                                      </p>
+                                      <span className="text-xs text-gray-500">• {topComments[post.id].constituencyName}</span>
+                                      <span className="text-xs text-gray-500">• {formatRelativeTime(topComments[post.id].createdAt)}</span>
+                                    </div>
+                                    <p className="text-gray-700 text-xs leading-relaxed mb-2">
+                                      {topComments[post.id].content}
+                                    </p>
+                                    <div className="flex items-center space-x-4 gap-2">
+                                      <button 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          console.log(`🖱️ Like button clicked for comment ${topComments[post.id].id}`);
+                                          handleCommentLike(topComments[post.id].id, post.id);
+                                        }}
+                                        disabled={commentReactions[topComments[post.id].id]?.disliked}
+                                        className={`flex items-center space-x-1 p-1 rounded transition-colors ${
+                                          commentReactions[topComments[post.id].id]?.liked 
+                                            ? 'text-red-500 bg-red-50' 
+                                            : commentReactions[topComments[post.id].id]?.disliked
+                                            ? 'text-gray-300 cursor-not-allowed'
+                                            : 'text-gray-500 hover:text-red-500 hover:bg-red-50'
+                                        }`}
+                                        title={commentReactions[topComments[post.id].id]?.liked ? 'Unlike comment' : 'Like comment'}
+                                      >
+                                        <Heart className={`w-3 h-3 ${commentReactions[topComments[post.id].id]?.liked ? 'fill-current' : ''}`} />
+                                        <span className="text-xs">{topComments[post.id].likesCount || 0}</span>
+                                      </button>
+                                      <button 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          console.log(`🖱️ Dislike button clicked for comment ${topComments[post.id].id}`);
+                                          handleCommentDislike(topComments[post.id].id, post.id);
+                                        }}
+                                        disabled={commentReactions[topComments[post.id].id]?.liked}
+                                        className={`flex items-center space-x-1 p-1 rounded transition-colors ${
+                                          commentReactions[topComments[post.id].id]?.disliked 
+                                            ? 'text-blue-500 bg-blue-50' 
+                                            : commentReactions[topComments[post.id].id]?.liked
+                                            ? 'text-gray-300 cursor-not-allowed'
+                                            : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50'
+                                        }`}
+                                        title={commentReactions[topComments[post.id].id]?.disliked ? 'Remove dislike' : 'Dislike comment'}
+                                      >
+                                        <ThumbsDown className={`w-3 h-3 ${commentReactions[topComments[post.id].id]?.disliked ? 'fill-current' : ''}`} />
+                                        <span className="text-xs">{topComments[post.id].dislikesCount || 0}</span>
+                                      </button>
+                                      <span className="text-xs text-gray-500 hover:text-green-600 cursor-pointer">{content.replyToComment}</span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="bg-gray-50 rounded-md p-2">
+                                    <div className="text-xs text-gray-500 mb-1">
+                                      {content.loadingComment}
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* View More Comments Button */}
+                                {post.commentsCount > 1 && (
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handlePostClick(post.id);
+                                    }}
+                                    className="w-full text-center text-sm text-gray-500 hover:text-green-600 py-2 border-t border-gray-100 transition-colors"
+                                  >
+                                    {content.viewMoreComments} ({post.commentsCount - 1})
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+
                         </div>
                       )}
                     </motion.div>

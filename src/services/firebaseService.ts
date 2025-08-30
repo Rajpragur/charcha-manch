@@ -36,6 +36,7 @@ export interface FirebaseUserProfile {
   tier_level: number;
   engagement_score: number;
   constituency_id?: number;
+  nagrik_number?: number; // Unique nagrik number for each user
   gender?: string;
   age_group?: string;
   area?: string;
@@ -125,6 +126,7 @@ export interface FirebaseDiscussionPost {
   userName?: string;
   createdAt: any;
   updatedAt?: any;
+  isEdited: boolean;
   status: 'published' | 'under_review' | 'removed';
   likesCount?: number;
   commentsCount?: number;
@@ -169,11 +171,31 @@ export class FirebaseService {
   }
 
   // User Profile Operations
-  static async getUserProfile(userId: string): Promise<FirebaseUserProfile | null> {
+  static async getUserProfile(userId: string, autoAssignNagrik: boolean = false): Promise<FirebaseUserProfile | null> {
     try {
       const userDoc = await getDoc(doc(db, 'user_profiles', userId));
       if (userDoc.exists()) {
-        return { id: userDoc.id, ...userDoc.data() } as FirebaseUserProfile;
+        const userData = { id: userDoc.id, ...userDoc.data() } as FirebaseUserProfile;
+        
+        // Only auto-assign nagrik number if explicitly requested and user has permission
+        if (autoAssignNagrik && !userData.nagrik_number) {
+          try {
+            console.log(`🔄 Auto-assigning nagrik number to existing user: ${userId}`);
+            const nagrikNumber = await this.generateNagrikNumber();
+            
+            // Update the user profile with the nagrik number
+            await this.updateUserProfile(userId, { nagrik_number: nagrikNumber });
+            
+            // Update the returned data
+            userData.nagrik_number = nagrikNumber;
+            console.log(`✅ Assigned nagrik number ${nagrikNumber} to user ${userId}`);
+          } catch (error) {
+            console.error(`❌ Failed to auto-assign nagrik number to user ${userId}:`, error);
+            // Continue without nagrik number - will use fallback display
+          }
+        }
+        
+        return userData;
       }
       return null;
     } catch (error: any) {
@@ -190,9 +212,17 @@ export class FirebaseService {
     try {
       const { setDoc } = await import('firebase/firestore');
       const userRef = doc(db, 'user_profiles', userId);
+      
+      // Generate a unique nagrik number if not provided
+      let nagrikNumber = profileData.nagrik_number;
+      if (!nagrikNumber) {
+        nagrikNumber = await this.generateNagrikNumber();
+      }
+      
       await setDoc(userRef, {
         ...profileData,
         id: userId,
+        nagrik_number: nagrikNumber,
         created_at: serverTimestamp(),
         updated_at: serverTimestamp()
       }, { merge: true });
@@ -200,6 +230,34 @@ export class FirebaseService {
     } catch (error) {
       console.error('Error creating user profile:', error);
       throw error;
+    }
+  }
+
+  // Generate a unique nagrik number
+  static async generateNagrikNumber(): Promise<number> {
+    try {
+      const userProfilesRef = collection(db, 'user_profiles');
+      const q = query(userProfilesRef, orderBy('nagrik_number', 'desc'), limit(1));
+      const querySnapshot = await getDocs(q);
+      
+      let nextNumber = 1001; // Start from 1001
+      
+      if (!querySnapshot.empty) {
+        const highestProfile = querySnapshot.docs[0];
+        const highestNumber = highestProfile.data().nagrik_number;
+        if (highestNumber && typeof highestNumber === 'number') {
+          nextNumber = highestNumber + 1;
+        }
+      }
+      
+      console.log(`✅ Generated unique nagrik number: ${nextNumber}`);
+      return nextNumber;
+    } catch (error) {
+      console.error('Error generating nagrik number:', error);
+      // Fallback: generate a random number between 10000-99999 to avoid conflicts
+      const fallbackNumber = Math.floor(Math.random() * 90000) + 10000;
+      console.log(`⚠️ Using fallback nagrik number: ${fallbackNumber}`);
+      return fallbackNumber;
     }
   }
 
@@ -1981,7 +2039,7 @@ export class FirebaseService {
     }
   }
 
-  static async getDiscussionPosts(): Promise<any[]> {
+  static async getDiscussionPosts(isEnglish: boolean = false): Promise<any[]> {
     try {
       const postsRef = collection(db, 'discussion_posts');
       
@@ -2006,11 +2064,18 @@ export class FirebaseService {
             const userProfile = await this.getUserProfile(post.userId);
             
             // Get constituency name
-            const constituencyName = await this.getConstituencyName(post.constituency);
+            const constituencyName = await this.getConstituencyName(post.constituency, isEnglish);
+            
+            // Generate nagrik name if user has a nagrik number
+            let displayName = 'User'; // Default fallback - no display names
+            if (userProfile?.nagrik_number) {
+              displayName = isEnglish ? `Nagrik_${userProfile.nagrik_number}` : `नागरिक_${userProfile.nagrik_number}`;
+            }
             
             return {
               ...post,
-              userName: post.userName || userProfile?.display_name || 'User',
+              userName: displayName,
+              nagrikNumber: userProfile?.nagrik_number,
               userConstituency: userProfile?.constituency_id,
               constituencyName: constituencyName || `Constituency ${post.constituency}`,
               interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
@@ -2075,14 +2140,19 @@ export class FirebaseService {
     }
   }
 
-  static async getConstituencyName(constituencyId: number): Promise<string | null> {
+  static async getConstituencyName(constituencyId: number, isEnglish: boolean = true): Promise<string | null> {
     try {
       // First try to get from merged_candidates.json
       const constituencies = await this.loadConstituenciesFromJSON();
       const constituency = constituencies.find(c => c.id === constituencyId);
       
       if (constituency) {
-        return constituency.name;
+        // Return language-appropriate constituency name
+        if (isEnglish) {
+          return constituency.name || constituency.area_name || `Constituency ${constituencyId}`;
+        } else {
+          return constituency.area_name_hi || constituency.name || `निर्वाचन क्षेत्र ${constituencyId}`;
+        }
       }
       
       // Fallback to database if JSON file fails
@@ -2092,13 +2162,26 @@ export class FirebaseService {
       
       if (!constituencySnapshot.empty) {
         const constituencyData = constituencySnapshot.docs[0].data();
-        return constituencyData.area_name || constituencyData.name || `Constituency ${constituencyId}`;
+        if (isEnglish) {
+          return constituencyData.area_name || constituencyData.name || `Constituency ${constituencyId}`;
+        } else {
+          return constituencyData.area_name_hi || constituencyData.area_name || `निर्वाचन क्षेत्र ${constituencyId}`;
+        }
       }
       
-      return `Constituency ${constituencyId}`;
+      // Final fallback
+      if (isEnglish) {
+        return `Constituency ${constituencyId}`;
+      } else {
+        return `निर्वाचन क्षेत्र ${constituencyId}`;
+      }
     } catch (error) {
       console.error('Error getting constituency name:', error);
-      return `Constituency ${constituencyId}`;
+      if (isEnglish) {
+        return `Constituency ${constituencyId}`;
+      } else {
+        return `निर्वाचन क्षेत्र ${constituencyId}`;
+      }
     }
   }
 
@@ -2251,6 +2334,7 @@ export class FirebaseService {
       const postsRef = collection(db, 'discussion_posts');
       const newPost = await addDoc(postsRef, {
         ...postData,
+        isEdited: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
@@ -2308,9 +2392,10 @@ export class FirebaseService {
       const postRef = doc(db, 'discussion_posts', postId);
       await updateDoc(postRef, {
         ...updateData,
+        isEdited: true,
         updatedAt: serverTimestamp()
       });
-      console.log(`✅ Updated discussion post ${postId}`);
+      console.log(`✅ Updated discussion post ${postId} with isEdited: true`);
     } catch (error: any) {
       console.error('Error updating discussion post:', error);
       throw error;
@@ -2329,6 +2414,8 @@ export class FirebaseService {
       const newComment = {
         postId,
         ...comment,
+        likesCount: 0,
+        dislikesCount: 0,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
@@ -2340,6 +2427,7 @@ export class FirebaseService {
       await updateDoc(postRef, {
         commentsCount: increment(1),
         updatedAt: serverTimestamp()
+        // Note: Not setting isEdited: true for comment additions
       });
       
       console.log('✅ Comment added successfully');
@@ -2349,8 +2437,245 @@ export class FirebaseService {
     }
   }
 
+  // Add comment from discussion forum (with constituency info)
+  static async addCommentFromForum(postId: string, comment: {
+    userId: string;
+    content: string;
+    constituencyId: number;
+  }): Promise<void> {
+    try {
+      // Get user profile for constituency name
+      const userProfile = await this.getUserProfile(comment.userId, true);
+      const constituencyName = userProfile?.constituency_id ? 
+        await this.getConstituencyName(userProfile.constituency_id) : 
+        (comment.constituencyId ? await this.getConstituencyName(comment.constituencyId) : 'Unknown');
+      
+      // Get user display name (nagrik number)
+      let userName = 'User';
+      if (userProfile?.nagrik_number) {
+        userName = `नागरिक_${userProfile.nagrik_number}`;
+      }
+      
+      const commentsRef = collection(db, 'comments');
+      const newComment = {
+        postId,
+        userId: comment.userId,
+        userName,
+        content: comment.content,
+        constituencyName,
+        likesCount: 0,
+        dislikesCount: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+      
+      await addDoc(commentsRef, newComment);
+      
+      // Update post comment count
+      const postRef = doc(db, 'discussion_posts', postId);
+      await updateDoc(postRef, {
+        commentsCount: increment(1),
+        updatedAt: serverTimestamp()
+        // Note: Not setting isEdited: true for comment additions
+      });
+      
+      console.log('✅ Comment added from forum successfully');
+    } catch (error: any) {
+      console.error('Error adding comment from forum:', error);
+      throw error;
+    }
+  }
+
+  // Like a comment (one like per user, removes any existing dislike)
+  static async likeComment(commentId: string, userId: string): Promise<void> {
+    try {
+      console.log(`🔍 Starting like operation for comment ${commentId} by user ${userId}`);
+      
+      const commentRef = doc(db, 'comments', commentId);
+      
+      // Check if user already liked the comment
+      const likesRef = collection(db, 'comment_likes');
+      const likeQuery = query(
+        likesRef,
+        where('commentId', '==', commentId),
+        where('userId', '==', userId)
+      );
+      
+      const existingLike = await getDocs(likeQuery);
+      console.log(`🔍 Existing like check: ${existingLike.empty ? 'No existing like' : 'User already liked'}`);
+      
+      if (existingLike.empty) {
+        // Check if user has disliked the comment and remove it first
+        const dislikesRef = collection(db, 'comment_dislikes');
+        const dislikeQuery = query(
+          dislikesRef,
+          where('commentId', '==', commentId),
+          where('userId', '==', userId)
+        );
+        
+        const existingDislike = await getDocs(dislikeQuery);
+        console.log(`🔍 Existing dislike check: ${existingDislike.empty ? 'No existing dislike' : 'User already disliked'}`);
+        
+        if (!existingDislike.empty) {
+          console.log('🔍 Removing existing dislike before adding like');
+          // Remove existing dislike
+          const dislikeDoc = existingDislike.docs[0];
+          await deleteDoc(doc(db, 'comment_dislikes', dislikeDoc.id));
+          
+          // Update comment dislike count
+          await updateDoc(commentRef, {
+            dislikesCount: increment(-1),
+            updatedAt: serverTimestamp()
+          });
+        }
+        
+        // Add new like
+        await addDoc(likesRef, {
+          commentId,
+          userId,
+          createdAt: serverTimestamp()
+        });
+        
+        // Update comment like count
+        await updateDoc(commentRef, {
+          likesCount: increment(1),
+          updatedAt: serverTimestamp()
+        });
+        
+        console.log('✅ Comment liked successfully');
+      } else {
+        // Remove existing like
+        const likeDoc = existingLike.docs[0];
+        await deleteDoc(doc(db, 'comment_likes', likeDoc.id));
+        
+        // Update comment like count
+        await updateDoc(commentRef, {
+          likesCount: increment(-1),
+          updatedAt: serverTimestamp()
+        });
+        
+        console.log('✅ Comment unliked successfully');
+      }
+    } catch (error: any) {
+      console.error('❌ Error updating comment like:', error);
+      throw error;
+    }
+  }
+
+  // Dislike a comment (one dislike per user, removes any existing like)
+  static async dislikeComment(commentId: string, userId: string): Promise<void> {
+    try {
+      console.log(`🔍 Starting dislike operation for comment ${commentId} by user ${userId}`);
+      
+      const commentRef = doc(db, 'comments', commentId);
+      
+      // Check if user already disliked the comment
+      const dislikesRef = collection(db, 'comment_dislikes');
+      const dislikeQuery = query(
+        dislikesRef,
+        where('commentId', '==', commentId),
+        where('userId', '==', userId)
+      );
+      
+      const existingDislike = await getDocs(dislikeQuery);
+      console.log(`🔍 Existing dislike check: ${existingDislike.empty ? 'No existing dislike' : 'User already disliked'}`);
+      
+      if (existingDislike.empty) {
+        // Check if user has liked the comment and remove it first
+        const likesRef = collection(db, 'comment_likes');
+        const likeQuery = query(
+          likesRef,
+          where('commentId', '==', commentId),
+          where('userId', '==', userId)
+        );
+        
+        const existingLike = await getDocs(likeQuery);
+        console.log(`🔍 Existing like check: ${existingLike.empty ? 'No existing like' : 'User already liked'}`);
+        
+        if (!existingLike.empty) {
+          console.log('🔍 Removing existing like before adding dislike');
+          // Remove existing like
+          const likeDoc = existingLike.docs[0];
+          await deleteDoc(doc(db, 'comment_likes', likeDoc.id));
+          
+          // Update comment like count
+          await updateDoc(commentRef, {
+            likesCount: increment(-1),
+            updatedAt: serverTimestamp()
+          });
+        }
+        
+        // Add new dislike
+        await addDoc(dislikesRef, {
+          commentId,
+          userId,
+          createdAt: serverTimestamp()
+        });
+        
+        // Update comment dislike count
+        await updateDoc(commentRef, {
+          dislikesCount: increment(1),
+          updatedAt: serverTimestamp()
+        });
+        
+        console.log('✅ Comment disliked successfully');
+      } else {
+        // Remove existing dislike
+        const dislikeDoc = existingDislike.docs[0];
+        await deleteDoc(doc(db, 'comment_likes', dislikeDoc.id));
+        
+        // Update comment dislike count
+        await updateDoc(commentRef, {
+          dislikesCount: increment(-1),
+          updatedAt: serverTimestamp()
+        });
+        
+        console.log('✅ Comment undisliked successfully');
+      }
+    } catch (error: any) {
+      console.error('❌ Error updating comment dislike:', error);
+      throw error;
+    }
+  }
+
+  // Check if user has liked a comment
+  static async hasUserLikedComment(commentId: string, userId: string): Promise<boolean> {
+    try {
+      const likesRef = collection(db, 'comment_likes');
+      const q = query(
+        likesRef,
+        where('commentId', '==', commentId),
+        where('userId', '==', userId)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      return !querySnapshot.empty;
+    } catch (error: any) {
+      console.error('Error checking comment like status:', error);
+      return false;
+    }
+  }
+
+  // Check if user has disliked a comment
+  static async hasUserDislikedComment(commentId: string, userId: string): Promise<boolean> {
+    try {
+      const dislikesRef = collection(db, 'comment_dislikes');
+      const q = query(
+        dislikesRef,
+        where('commentId', '==', commentId),
+        where('userId', '==', userId)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      return !querySnapshot.empty;
+    } catch (error: any) {
+      console.error('Error checking comment dislike status:', error);
+      return false;
+    }
+  }
+
   // Get comments for a post
-  static async getComments(postId: string): Promise<any[]> {
+  static async getComments(postId: string, isEnglish: boolean = false): Promise<any[]> {
     try {
       const commentsRef = collection(db, 'comments');
       const q = query(
@@ -2370,17 +2695,115 @@ export class FirebaseService {
         });
       });
       
+      // Enrich comments with user profile data and nagrik numbers ONLY
+      const enrichedComments = await Promise.all(
+        comments.map(async (comment) => {
+          try {
+            // Get user profile to check for nagrik number
+            const userProfile = await this.getUserProfile(comment.userId);
+            
+            // ONLY show nagrik number - no display names or usernames
+            let displayName = 'User'; // Default fallback
+            if (userProfile?.nagrik_number) {
+              displayName = isEnglish ? `Nagrik_${userProfile.nagrik_number}` : `नागरिक_${userProfile.nagrik_number}`;
+            }
+            
+            return {
+              ...comment,
+              userName: displayName,
+              nagrikNumber: userProfile?.nagrik_number
+            };
+          } catch (error) {
+            console.error('Error enriching comment:', error);
+            return {
+              ...comment,
+              userName: 'User' // Only fallback if error
+            };
+          }
+        })
+      );
+      
       // Sort comments by createdAt in memory instead
-      comments.sort((a, b) => {
+      enrichedComments.sort((a, b) => {
         const aTime = a.createdAt?.toDate?.() || new Date(a.createdAt);
         const bTime = b.createdAt?.toDate?.() || new Date(b.createdAt);
         return aTime.getTime() - bTime.getTime();
       });
       
-      return comments;
+      return enrichedComments;
     } catch (error: any) {
       console.error('Error fetching comments:', error);
       throw error;
+    }
+  }
+
+  // Get top comment for a post (by likes, then by creation time)
+  static async getTopComment(postId: string, isEnglish: boolean = false): Promise<any | null> {
+    try {
+      const commentsRef = collection(db, 'comments');
+      const q = query(
+        commentsRef,
+        where('postId', '==', postId)
+        // Removed orderBy to avoid index requirement
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const comments: any[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const commentData = doc.data();
+        comments.push({
+          id: doc.id,
+          ...commentData
+        });
+      });
+      
+      if (comments.length === 0) {
+        return null;
+      }
+      
+      // Sort by likes count (descending), then by creation time (newest first)
+      comments.sort((a, b) => {
+        const aLikes = a.likesCount || 0;
+        const bLikes = b.likesCount || 0;
+        
+        if (aLikes !== bLikes) {
+          return bLikes - aLikes; // Descending by likes
+        }
+        
+        // If likes are equal, sort by creation time (newest first)
+        const aTime = a.createdAt?.toDate?.() || new Date(a.createdAt);
+        const bTime = b.createdAt?.toDate?.() || new Date(b.createdAt);
+        return bTime.getTime() - aTime.getTime();
+      });
+      
+      // Get the top comment
+      const topComment = comments[0];
+      
+      // Enrich the top comment with user profile data
+      try {
+        const userProfile = await this.getUserProfile(topComment.userId);
+        
+        let displayName = 'User'; // Default fallback
+        if (userProfile?.nagrik_number) {
+          displayName = isEnglish ? `Nagrik_${userProfile.nagrik_number}` : `नागरिक_${userProfile.nagrik_number}`;
+        }
+        
+        return {
+          ...topComment,
+          userName: displayName,
+          nagrikNumber: userProfile?.nagrik_number
+        };
+      } catch (error) {
+        console.error('Error enriching top comment:', error);
+        return {
+          ...topComment,
+          userName: 'User' // Only fallback if error
+        };
+      }
+    } catch (error: any) {
+      console.error('Error fetching top comment:', error);
+      return null;
     }
   }
 
@@ -2424,6 +2847,7 @@ export class FirebaseService {
           await updateDoc(postRef, {
             dislikesCount: increment(-1),
             updatedAt: serverTimestamp()
+            // Note: Not setting isEdited: true for like/dislike changes
           });
           console.log('✅ Existing dislike removed and count updated');
         }
@@ -2440,6 +2864,7 @@ export class FirebaseService {
         await updateDoc(postRef, {
           likesCount: increment(1),
           updatedAt: serverTimestamp()
+          // Note: Not setting isEdited: true for like/dislike changes
         });
         console.log('✅ New like added and count updated');
       } else {
@@ -2452,6 +2877,7 @@ export class FirebaseService {
         await updateDoc(postRef, {
           likesCount: increment(-1),
           updatedAt: serverTimestamp()
+          // Note: Not setting isEdited: true for like/dislike changes
         });
         console.log('✅ Existing like removed and count updated');
       }
@@ -2528,6 +2954,7 @@ export class FirebaseService {
           await updateDoc(postRef, {
             likesCount: increment(-1),
             updatedAt: serverTimestamp()
+            // Note: Not setting isEdited: true for like/dislike changes
           });
           console.log('✅ Existing like removed and count updated');
         }
@@ -2544,6 +2971,7 @@ export class FirebaseService {
         await updateDoc(postRef, {
           dislikesCount: increment(1),
           updatedAt: serverTimestamp()
+          // Note: Not setting isEdited: true for like/dislike changes
         });
         console.log('✅ New dislike added and count updated');
       } else {
@@ -2556,6 +2984,7 @@ export class FirebaseService {
         await updateDoc(postRef, {
           dislikesCount: increment(-1),
           updatedAt: serverTimestamp()
+          // Note: Not setting isEdited: true for like/dislike changes
         });
         console.log('✅ Existing dislike removed and count updated');
       }
@@ -2727,21 +3156,9 @@ export class FirebaseService {
       const replyData = replySnapshot.data();
       console.log(`🔍 Reply data:`, replyData);
       
-      // Get post data to check if user is post owner
-      const postRef = doc(db, 'discussion_posts', postId);
-      const postDoc = await getDoc(postRef);
-      const postData = postDoc.data();
-      
-      if (!postData) {
-        throw new Error('Post not found');
-      }
-      
-      console.log(`🔍 Post data:`, postData);
-      console.log(`🔍 Checking permissions: reply owner: ${replyData.userId}, post owner: ${postData.userId}, current user: ${userId}`);
-      
-      // Check if user is the reply owner or post owner
-      if (replyData.userId !== userId && postData.userId !== userId) {
-        throw new Error('Only reply owner or post owner can delete this reply');
+      // Check if user is the reply owner ONLY - post owners cannot delete others' replies
+      if (replyData.userId !== userId) {
+        throw new Error('Only reply owner can delete this reply');
       }
       
       console.log(`✅ Permission check passed, proceeding with deletion`);
@@ -2817,9 +3234,9 @@ export class FirebaseService {
       console.log(`🔍 Post data:`, postData);
       console.log(`🔍 Checking permissions: reply owner: ${replyData.userId}, post owner: ${postData.userId}, current user: ${userId}, isAdmin: ${isAdmin}`);
       
-      // Check if user is the reply owner, post owner, or admin
-      if (!isAdmin && replyData.userId !== userId && postData.userId !== userId) {
-        throw new Error('Only reply owner, post owner, or admin can edit this reply');
+      // Check if user is the reply owner or admin ONLY - post owners cannot edit others' replies
+      if (!isAdmin && replyData.userId !== userId) {
+        throw new Error('Only reply owner or admin can edit this reply');
       }
       
       console.log(`✅ Permission check passed, proceeding with update`);
@@ -2869,9 +3286,9 @@ export class FirebaseService {
       console.log(`🔍 Post data:`, postData);
       console.log(`🔍 Checking permissions: comment owner: ${commentData.userId}, post owner: ${postData.userId}, current user: ${userId}`);
       
-      // Check if user is the comment owner or post owner
-      if (commentData.userId !== userId && postData.userId !== userId) {
-        throw new Error('Only comment owner or post owner can delete this comment');
+      // Check if user is the comment owner ONLY - post owners cannot delete others' comments
+      if (commentData.userId !== userId) {
+        throw new Error('Only comment owner can delete this comment');
       }
       
       console.log(`✅ Permission check passed, proceeding with deletion`);
@@ -2886,6 +3303,7 @@ export class FirebaseService {
       batch.update(postRef, {
         commentsCount: increment(-1),
         updatedAt: serverTimestamp()
+        // Note: Not setting isEdited: true for comment deletions
       });
       
       // Commit the batch
@@ -2930,9 +3348,9 @@ export class FirebaseService {
       console.log(`🔍 Post data:`, postData);
       console.log(`🔍 Checking permissions: comment owner: ${commentData.userId}, post owner: ${postData.userId}, current user: ${userId}, isAdmin: ${isAdmin}`);
       
-      // Check if user is the comment owner, post owner, or admin
-      if (!isAdmin && commentData.userId !== userId && postData.userId !== userId) {
-        throw new Error('Only comment owner, post owner, or admin can edit this comment');
+      // Check if user is the comment owner or admin ONLY - post owners cannot edit others' comments
+      if (!isAdmin && commentData.userId !== userId) {
+        throw new Error('Only comment owner or admin can edit this comment');
       }
       
       console.log(`✅ Permission check passed, proceeding with update`);
@@ -2980,6 +3398,7 @@ export class FirebaseService {
       batch.update(postRef, {
         commentsCount: increment(-1),
         updatedAt: serverTimestamp()
+        // Note: Not setting isEdited: true for comment deletions
       });
       
       // Commit the batch
@@ -3022,10 +3441,8 @@ export class FirebaseService {
     }
   }
 
-
-
   // Get replies for a comment
-  static async getReplies(commentId: string): Promise<any[]> {
+  static async getReplies(commentId: string, isEnglish: boolean = false): Promise<any[]> {
     try {
       const repliesRef = collection(db, 'comment_replies');
       const q = query(
@@ -3045,24 +3462,50 @@ export class FirebaseService {
         });
       });
       
+      // Enrich replies with user profile data and nagrik numbers
+      const enrichedReplies = await Promise.all(
+        replies.map(async (reply) => {
+          try {
+            // Get user profile to check for nagrik number
+            const userProfile = await this.getUserProfile(reply.userId);
+            
+            // Generate nagrik name if user has a nagrik number
+            let displayName = reply.userName || userProfile?.display_name || 'User';
+            if (userProfile?.nagrik_number) {
+              displayName = isEnglish ? `Nagrik_${userProfile.nagrik_number}` : `नागरिक_${userProfile.nagrik_number}`;
+            }
+            
+            return {
+              ...reply,
+              userName: displayName,
+              nagrikNumber: userProfile?.nagrik_number
+            };
+          } catch (error) {
+            console.error('Error enriching reply:', error);
+            return {
+              ...reply,
+              userName: reply.userName || 'User'
+            };
+          }
+        })
+      );
+      
       // Sort replies by createdAt in memory instead
-      replies.sort((a, b) => {
+      enrichedReplies.sort((a, b) => {
         const aTime = a.createdAt?.toDate?.() || new Date(a.createdAt);
         const bTime = b.createdAt?.toDate?.() || new Date(b.createdAt);
         return aTime.getTime() - bTime.getTime();
       });
       
-      return replies;
+      return enrichedReplies;
     } catch (error: any) {
       console.error('Error fetching replies:', error);
       throw error;
     }
   }
 
-
-
   // Get discussion posts by constituency
-  static async getDiscussionPostsByConstituency(constituencyId: number): Promise<any[]> {
+  static async getDiscussionPostsByConstituency(constituencyId: number, isEnglish: boolean = false): Promise<any[]> {
     try {
       const postsRef = collection(db, 'discussion_posts');
       const q = query(
@@ -3083,9 +3526,17 @@ export class FirebaseService {
         posts.map(async (post) => {
           try {
             const userProfile = await this.getUserProfile(post.userId);
+            
+            // Generate nagrik name if user has a nagrik number
+            let displayName = 'User'; // Default fallback - no display names
+            if (userProfile?.nagrik_number) {
+              displayName = isEnglish ? `Nagrik_${userProfile.nagrik_number}` : `नागरिक_${userProfile.nagrik_number}`;
+            }
+            
             return {
               ...post,
-              userName: userProfile?.display_name || 'User',
+              userName: displayName,
+              nagrikNumber: userProfile?.nagrik_number,
               interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
             };
           } catch (error) {
@@ -3114,7 +3565,7 @@ export class FirebaseService {
   }
 
   // Search discussion posts
-  static async searchDiscussionPosts(searchTerm: string, constituencyId?: number): Promise<any[]> {
+  static async searchDiscussionPosts(searchTerm: string, constituencyId?: number, isEnglish: boolean = false): Promise<any[]> {
     try {
       const postsRef = collection(db, 'discussion_posts');
       let q;
@@ -3156,9 +3607,17 @@ export class FirebaseService {
           try {
             const userProfile = await this.getUserProfile(post.userId);
             const constituencyName = await this.getConstituencyName(post.constituency);
+            
+            // Generate nagrik name if user has a nagrik number
+            let displayName = 'User'; // Default fallback - no display names
+            if (userProfile?.nagrik_number) {
+              displayName = isEnglish ? `Nagrik_${userProfile.nagrik_number}` : `नागरिक_${userProfile.nagrik_number}`;
+            }
+            
             return {
               ...post,
-              userName: userProfile?.display_name || 'User',
+              userName: displayName,
+              nagrikNumber: userProfile?.nagrik_number,
               constituencyName: constituencyName || `Constituency ${post.constituency}`,
               interactionsCount: (post.likesCount || 0) + (post.commentsCount || 0)
             };
@@ -3180,6 +3639,195 @@ export class FirebaseService {
       return [];
     }
   }
+
+  // Like a reply (one like per user, removes any existing dislike)
+  static async likeReply(replyId: string, userId: string): Promise<void> {
+    try {
+      console.log(`🔍 Starting like operation for reply ${replyId} by user ${userId}`);
+      
+      const replyRef = doc(db, 'replies', replyId);
+      
+      // Check if user already liked the reply
+      const likesRef = collection(db, 'reply_likes');
+      const likeQuery = query(
+        likesRef,
+        where('replyId', '==', replyId),
+        where('userId', '==', userId)
+      );
+      
+      const existingLike = await getDocs(likeQuery);
+      console.log(`🔍 Existing like check: ${existingLike.empty ? 'No existing like' : 'User already liked'}`);
+      
+      if (existingLike.empty) {
+        // Check if user has disliked the reply and remove it first
+        const dislikesRef = collection(db, 'reply_dislikes');
+        const dislikeQuery = query(
+          dislikesRef,
+          where('replyId', '==', replyId),
+          where('userId', '==', userId)
+        );
+        
+        const existingDislike = await getDocs(dislikeQuery);
+        console.log(`🔍 Existing dislike check: ${existingDislike.empty ? 'No existing dislike' : 'User already disliked'}`);
+        
+        if (!existingDislike.empty) {
+          console.log('🔍 Removing existing dislike before adding like');
+          // Remove existing dislike
+          const dislikeDoc = existingDislike.docs[0];
+          await deleteDoc(doc(db, 'reply_dislikes', dislikeDoc.id));
+          
+          // Update reply dislike count
+          await updateDoc(replyRef, {
+            dislikesCount: increment(-1),
+            updatedAt: serverTimestamp()
+          });
+        }
+        
+        // Add new like
+        await addDoc(likesRef, {
+          replyId,
+          userId,
+          createdAt: serverTimestamp()
+        });
+        
+        // Update reply like count
+        await updateDoc(replyRef, {
+          likesCount: increment(1),
+          updatedAt: serverTimestamp()
+        });
+        
+        console.log('✅ Reply liked successfully');
+      } else {
+        // Remove existing like
+        const likeDoc = existingLike.docs[0];
+        await deleteDoc(doc(db, 'reply_likes', likeDoc.id));
+        
+        // Update reply like count
+        await updateDoc(replyRef, {
+          likesCount: increment(-1),
+          updatedAt: serverTimestamp()
+        });
+        
+        console.log('✅ Reply unliked successfully');
+      }
+    } catch (error: any) {
+      console.error('❌ Error updating reply like:', error);
+      throw error;
+    }
+  }
+
+  // Dislike a reply (one dislike per user, removes any existing like)
+  static async dislikeReply(replyId: string, userId: string): Promise<void> {
+    try {
+      console.log(`🔍 Starting dislike operation for reply ${replyId} by user ${userId}`);
+      
+      const replyRef = doc(db, 'replies', replyId);
+      
+      // Check if user already disliked the reply
+      const dislikesRef = collection(db, 'reply_dislikes');
+      const dislikeQuery = query(
+        dislikesRef,
+        where('replyId', '==', replyId),
+        where('userId', '==', userId)
+      );
+      
+      const existingDislike = await getDocs(dislikeQuery);
+      console.log(`🔍 Existing dislike check: ${existingDislike.empty ? 'No existing dislike' : 'User already disliked'}`);
+      
+      if (existingDislike.empty) {
+        // Check if user has liked the reply and remove it first
+        const likesRef = collection(db, 'reply_likes');
+        const likeQuery = query(
+          likesRef,
+          where('replyId', '==', replyId),
+          where('userId', '==', userId)
+        );
+        
+        const existingLike = await getDocs(likeQuery);
+        console.log(`🔍 Existing like check: ${existingLike.empty ? 'No existing like' : 'User already liked'}`);
+        
+        if (!existingLike.empty) {
+          console.log('🔍 Removing existing like before adding dislike');
+          // Remove existing like
+          const likeDoc = existingLike.docs[0];
+          await deleteDoc(doc(db, 'reply_likes', likeDoc.id));
+          
+          // Update reply like count
+          await updateDoc(replyRef, {
+            likesCount: increment(-1),
+            updatedAt: serverTimestamp()
+          });
+        }
+        
+        // Add new dislike
+        await addDoc(dislikesRef, {
+          replyId,
+          userId,
+          createdAt: serverTimestamp()
+        });
+        
+        // Update reply dislike count
+        await updateDoc(replyRef, {
+          dislikesCount: increment(1),
+          updatedAt: serverTimestamp()
+        });
+        
+        console.log('✅ Reply disliked successfully');
+      } else {
+        // Remove existing dislike
+        const dislikeDoc = existingDislike.docs[0];
+        await deleteDoc(doc(db, 'reply_likes', dislikeDoc.id));
+        
+        // Update reply dislike count
+        await updateDoc(replyRef, {
+          dislikesCount: increment(-1),
+          updatedAt: serverTimestamp()
+        });
+        
+        console.log('✅ Reply undisliked successfully');
+      }
+    } catch (error: any) {
+      console.error('❌ Error updating reply dislike:', error);
+      throw error;
+    }
+  }
+
+  // Check if user has liked a reply
+  static async hasUserLikedReply(replyId: string, userId: string): Promise<boolean> {
+    try {
+      const likesRef = collection(db, 'reply_likes');
+      const q = query(
+        likesRef,
+        where('replyId', '==', replyId),
+        where('userId', '==', userId)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      return !querySnapshot.empty;
+    } catch (error: any) {
+      console.error('Error checking reply like status:', error);
+      return false;
+    }
+  }
+
+  // Check if user has disliked a reply
+  static async hasUserDislikedReply(replyId: string, userId: string): Promise<boolean> {
+    try {
+      const dislikesRef = collection(db, 'reply_dislikes');
+      const q = query(
+        dislikesRef,
+        where('replyId', '==', replyId),
+        where('userId', '==', userId)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      return !querySnapshot.empty;
+    } catch (error: any) {
+      console.error('Error checking reply dislike status:', error);
+      return false;
+    }
+  }
+
 }
 
 export default FirebaseService;

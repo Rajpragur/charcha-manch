@@ -137,7 +137,7 @@ const Dashboard: React.FC = () => {
       // Load profile
       let profile = null;
       try {
-        profile = await FirebaseService.getUserProfile(currentUser.uid);
+        profile = await FirebaseService.getUserProfile(currentUser.uid, true);
         console.log('✅ Loaded profile:', profile);
         setUserProfile(profile);
       } catch (error) {

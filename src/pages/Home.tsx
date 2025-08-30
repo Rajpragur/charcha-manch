@@ -572,7 +572,7 @@ const Home: React.FC = () => {
     try {
       if (!currentUser?.uid) return;
       
-      const profile = await FirebaseService.getUserProfile(currentUser.uid);
+              const profile = await FirebaseService.getUserProfile(currentUser.uid, true);
       if (profile) {
         // Calculate current engagement score based on achievements
         const { surveys } = await FirebaseService.loadUserInteractions(currentUser.uid);
@@ -588,7 +588,7 @@ const Home: React.FC = () => {
         }
         
         // Get updated profile with new tier
-        const updatedProfile = await FirebaseService.getUserProfile(currentUser.uid);
+        const updatedProfile = await FirebaseService.getUserProfile(currentUser.uid, true);
         const currentTier = updatedProfile?.tier_level || 1;
         
         setUserProfile({

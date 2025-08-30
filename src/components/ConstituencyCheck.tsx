@@ -40,7 +40,7 @@ const ConstituencyCheck: React.FC<ConstituencyCheckProps> = ({ children }) => {
         setError(null);
         
         // Check if user has a profile with constituency
-        const userProfile = await FirebaseService.getUserProfile(currentUser.uid);
+        const userProfile = await FirebaseService.getUserProfile(currentUser.uid, true);
         
         if (userProfile && userProfile.constituency_id) {
           // User has constituency set, allow access

@@ -27,7 +27,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       }
 
       try {
-        const userProfile = await FirebaseService.getUserProfile(currentUser.uid);
+        const userProfile = await FirebaseService.getUserProfile(currentUser.uid, true);
         
         if (userProfile && userProfile.constituency_id && userProfile.gender && userProfile.age_group && userProfile.area) {
           setOnboardingStatus('completed');

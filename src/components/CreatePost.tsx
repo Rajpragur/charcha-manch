@@ -100,7 +100,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated,
   // Set default constituency if user is logged in
   useEffect(() => {
     if (currentUser?.uid && constituencies.length > 0) {
-      const userProfile = FirebaseService.getUserProfile(currentUser.uid);
+              const userProfile = FirebaseService.getUserProfile(currentUser.uid, true);
       userProfile.then(profile => {
         if (profile?.constituency_id) {
           // Find the constituency in our list by ID
@@ -320,8 +320,17 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated,
       const constituency = constituencies.find(c => c.id === selectedConstituency);
       const constituencyName = constituency?.name || constituency?.area_name || `Constituency ${selectedConstituency}`;
       
-      // Get user's display name
-      const userName = currentUser.displayName || 'User';
+      // Get user's nagrik number ONLY - no display names
+      let userName = 'User'; // Default fallback
+      try {
+        const userProfile = await FirebaseService.getUserProfile(currentUser.uid, true);
+        if (userProfile?.nagrik_number) {
+          userName = isEnglish ? `Nagrik_${userProfile.nagrik_number}` : `नागरिक_${userProfile.nagrik_number}`;
+        }
+      } catch (error) {
+        console.error('Error getting user profile for nagrik number:', error);
+        // Fallback to 'User' if there's an error
+      }
 
       // Split title into titlefirst and titlesecond
       const titleWords = title.trim().split(' ');
@@ -339,8 +348,10 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated,
         userId: currentUser.uid,
         userName,
         status: moderatedContent.status,
+        isEdited: false,
         createdAt: new Date(),
         likesCount: 0,
+        dislikesCount: 0,
         commentsCount: 0,
         tags,
         media: []
@@ -377,7 +388,10 @@ const CreatePost: React.FC<CreatePostProps> = ({ isOpen, onClose, onPostCreated,
         const uploadedMedia = await Promise.all(mediaPromises);
         
         // Update post with media URLs
-        await FirebaseService.updateDiscussionPost(postId, { media: uploadedMedia });
+        await FirebaseService.updateDiscussionPost(postId, { 
+          media: uploadedMedia,
+          updatedAt: new Date()
+        });
       }
       
       // Reset form

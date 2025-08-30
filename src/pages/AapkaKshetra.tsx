@@ -392,7 +392,7 @@ const AapkaKshetra: React.FC = () => {
     if (!currentUser) return;
     
     try {
-      const userProfile = await FirebaseService.getUserProfile(currentUser.uid);
+              const userProfile = await FirebaseService.getUserProfile(currentUser.uid, true);
       if (userProfile?.constituency_id) {
 
         

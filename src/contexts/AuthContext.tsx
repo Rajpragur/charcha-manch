@@ -48,7 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const userProfile = await FirebaseService.getUserProfile(currentUser.uid);
+              const userProfile = await FirebaseService.getUserProfile(currentUser.uid, true);
       const isCompleted = !!(userProfile && userProfile.constituency_id && userProfile.gender && userProfile.age_group && userProfile.area);
       setOnboardingCompleted(isCompleted);
       return isCompleted;

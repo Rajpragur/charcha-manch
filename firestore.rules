@@ -17,8 +17,10 @@ service cloud.firestore {
     }
     
     // Allow authenticated users to read and write their own data
+    // Allow public read access to user profiles for displaying nagrik numbers
     match /user_profiles/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if true; // Allow public read access for nagrik numbers
+      allow write: if request.auth != null && request.auth.uid == userId; // Only owner can write
     }
     
     // Allow authenticated users to read and write satisfaction surveys
@@ -135,6 +137,42 @@ service cloud.firestore {
     
     // Post dislikes collection - allow authenticated users to manage their dislikes
     match /post_dislikes/{dislikeId} {
+      allow read: if true; // Allow public read access
+      allow create: if request.auth != null && 
+        request.resource.data.userId == request.auth.uid; // Users can only create dislikes for themselves
+      allow update, delete: if request.auth != null && 
+        resource.data.userId == request.auth.uid; // Users can only manage their own dislikes
+    }
+    
+    // Comment likes collection - allow authenticated users to manage their likes
+    match /comment_likes/{likeId} {
+      allow read: if true; // Allow public read access
+      allow create: if request.auth != null && 
+        request.resource.data.userId == request.auth.uid; // Users can only create likes for themselves
+      allow update, delete: if request.auth != null && 
+        resource.data.userId == request.auth.uid; // Users can only manage their own likes
+    }
+    
+    // Comment dislikes collection - allow authenticated users to manage their dislikes
+    match /comment_dislikes/{dislikeId} {
+      allow read: if true; // Allow public read access
+      allow create: if request.auth != null && 
+        request.resource.data.userId == request.auth.uid; // Users can only create dislikes for themselves
+      allow update, delete: if request.auth != null && 
+        resource.data.userId == request.auth.uid; // Users can only manage their own dislikes
+    }
+    
+    // Reply likes collection - allow authenticated users to manage their likes
+    match /reply_likes/{likeId} {
+      allow read: if true; // Allow public read access
+      allow create: if request.auth != null && 
+        request.resource.data.userId == request.auth.uid; // Users can only create likes for themselves
+      allow update, delete: if request.auth != null && 
+        resource.data.userId == request.auth.uid; // Users can only manage their own likes
+    }
+    
+    // Reply dislikes collection - allow authenticated users to manage their dislikes
+    match /reply_dislikes/{dislikeId} {
       allow read: if true; // Allow public read access
       allow create: if request.auth != null && 
         request.resource.data.userId == request.auth.uid; // Users can only create dislikes for themselves

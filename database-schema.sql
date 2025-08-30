@@ -1,6 +1,9 @@
 -- Complete Database Schema for Charcha Manch
 -- Run this script in your Supabase SQL Editor
 
+-- Create sequence for nagrik numbers
+CREATE SEQUENCE IF NOT EXISTS nagrik_number_seq START 1001;
+
 -- 1. User Profiles Table (Enhanced)
 CREATE TABLE user_profiles (
   id UUID REFERENCES auth.users(id) PRIMARY KEY,
@@ -13,6 +16,7 @@ CREATE TABLE user_profiles (
   tier_level INTEGER DEFAULT 1,
   engagement_score INTEGER DEFAULT 0,
   constituency_id INTEGER, -- Will be set during onboarding
+  nagrik_number INTEGER UNIQUE DEFAULT nextval('nagrik_number_seq'), -- Unique nagrik number for each user
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
